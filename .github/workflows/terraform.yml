@@ -6,6 +6,10 @@ on:
       - main
   pull_request:
 
+defaults:
+  run:
+    working-directory: infra
+
 jobs:
   terraform:
     name: "Terraform"
