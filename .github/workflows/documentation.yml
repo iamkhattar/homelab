@@ -1,0 +1,56 @@
+name: "Documentation"
+
+on:
+  push:
+    paths:
+      - docs/**
+      - .github/workflows/documentation.yml
+  pull_request:
+    paths:
+      - docs/**
+      - .github/workflows/documentation.yml
+
+defaults:
+  run:
+    working-directory: docs
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Install Hugo
+        uses: peaceiris/actions-hugo@v2
+        with:
+          hugo-version: 'latest'
+          extended: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
+
+      - name: Install Node.js dependencies
+        run: "[[ -f package-lock.json || -f npm-shrinkwrap.json ]] && npm ci || true"
+
+      - name: Build with Hugo
+        env:
+          HUGO_CACHEDIR: ${{ runner.temp }}/hugo_cache
+          HUGO_ENVIRONMENT: production
+          TZ: Europe/London
+        run: hugo --gc --minify

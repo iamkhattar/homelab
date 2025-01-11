@@ -1,10 +1,16 @@
-name: "Terraform"
+name: "Infrastructure"
 
 on:
   push:
     branches:
       - main
+    paths:
+      - infra/**
+      - .github/workflows/terraform.yml
   pull_request:
+    paths:
+      - infra/**
+      - .github/workflows/terraform.yml
 
 defaults:
   run:
@@ -23,7 +29,6 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          # terraform_version: 0.13.0:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
       - name: Terraform Format
@@ -83,3 +88,5 @@ jobs:
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: terraform apply -auto-approve -input=false
+        env:
+          TF_VAR_hetzner_cloud_api_token: ${{ secrets.HETZNER_API_TOKEN }}
