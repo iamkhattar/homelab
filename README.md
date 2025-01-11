@@ -1,5 +1,7 @@
 # Homelab
 
+![Infrastructure](https://github.com/iamkhattar/homelab/actions/workflows/terraform.yml/badge.svg)
+
 Welcome to my Homelab project, a dynamic and scalable infrastructure built on Hetzner Cloud using Terraform, Ansible,
 and K3s. This setup is designed to host a variety of personal services and experimental projects, providing a flexible
 and cost-effective platform for learning and development.
