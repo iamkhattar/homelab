@@ -8,7 +8,7 @@ toc: true
 ## Installing Terraform
 
 Installing Terraform through Homebrew on macOS is a straightforward process. First, tap into HashiCorp's official
-repository by running brew tap hashicorp/tap in the terminal. 
+repository by running brew tap hashicorp/tap in the terminal.
 
 Install Terraform using Brew:
 
@@ -16,7 +16,7 @@ Install Terraform using Brew:
 $ brew install hashicorp/tap/terraform
 ```
 
-This method installs a signed binary that automatically updates with each new official release. 
+This method installs a signed binary that automatically updates with each new official release.
 
 Update Terraform by running:
 
