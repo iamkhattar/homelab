@@ -49,7 +49,7 @@ jobs:
         run: "[[ -f package-lock.json || -f npm-shrinkwrap.json ]] && npm ci || true"
 
       - name: Run Prettier
-        run: npx prettier . --check
+        run: npx prettier --check . --config .prettierrc.yaml
 
       - name: Build with Hugo
         env:
