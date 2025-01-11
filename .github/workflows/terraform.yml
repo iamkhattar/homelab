@@ -1,10 +1,14 @@
-name: "Terraform"
+name: "Terraform Plan and Apply"
 
 on:
   push:
     branches:
       - main
+    paths:
+      - infra/**
   pull_request:
+    paths:
+      - infra/**
 
 defaults:
   run:
@@ -23,7 +27,6 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          # terraform_version: 0.13.0:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
       - name: Terraform Format
