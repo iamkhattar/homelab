@@ -1,6 +1,6 @@
 # Homelab
 
-![Infrastructure](https://github.com/iamkhattar/homelab/actions/workflows/terraform.yml/badge.svg)
+![Infrastructure](https://github.com/iamkhattar/homelab/actions/workflows/infrastructure.yml/badge.svg)
 ![Documentation](https://github.com/iamkhattar/homelab/actions/workflows/documentation.yml/badge.svg)
 
 Welcome to my Homelab project, a dynamic and scalable infrastructure built on Hetzner Cloud using Terraform, Ansible,
