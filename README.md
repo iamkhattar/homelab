@@ -1,5 +1,6 @@
 # Homelab
 
+![Linting](https://github.com/iamkhattar/homelab/actions/workflows/linting.yml/badge.svg)
 ![Infrastructure](https://github.com/iamkhattar/homelab/actions/workflows/infrastructure.yml/badge.svg)
 ![Documentation](https://github.com/iamkhattar/homelab/actions/workflows/documentation.yml/badge.svg)
 
