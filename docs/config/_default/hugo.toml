@@ -1,5 +1,5 @@
 title = "Homelab"
-baseurl = "https://homelab.iamkhattar.github.io"
+baseurl = "https://shivamkhattar.com/homelab"
 canonifyURLs = false
 disableAliases = true
 disableHugoGeneratorInject = true
