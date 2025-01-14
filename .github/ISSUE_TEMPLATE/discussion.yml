@@ -10,7 +10,7 @@ body:
     id: discussion-description
     attributes:
       label: Discussion
-      description: 'Explain the matter here!'
+      description: "Explain the matter here!"
     validations:
       required: true
   - type: checkboxes

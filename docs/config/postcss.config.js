@@ -1,6 +1,6 @@
-const autoprefixer = require('autoprefixer');
-const purgecss = require('@fullhuman/postcss-purgecss');
-const whitelister = require('purgecss-whitelister');
+const autoprefixer = require('autoprefixer')
+const purgecss = require('@fullhuman/postcss-purgecss')
+const whitelister = require('purgecss-whitelister')
 
 module.exports = {
   plugins: [
@@ -10,8 +10,8 @@ module.exports = {
       extractors: [
         {
           extractor: (content) => {
-            const els = JSON.parse(content).htmlElements;
-            return els.tags.concat(els.classes, els.ids);
+            const els = JSON.parse(content).htmlElements
+            return els.tags.concat(els.classes, els.ids)
           },
           extensions: ['json']
         }
@@ -61,4 +61,4 @@ module.exports = {
       ]
     })
   ]
-};
+}

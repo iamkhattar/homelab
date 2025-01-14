@@ -44,3 +44,4 @@ docs/node_modules
 docs/public
 docs/resources
 docs/hugo_stats.json
+megalinter-reports/
