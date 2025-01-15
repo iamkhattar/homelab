@@ -23,3 +23,8 @@ SHOW_ELAPSED_TIME: true
 FILEIO_REPORTER: false
 # Uncomment if you want MegaLinter to detect errors but not block CI to pass
 # DISABLE_ERRORS: true
+
+ADDITIONAL_EXCLUDED_DIRECTORIES:
+  - docs/node_modules
+
+SPELL_CSPELL_CONFIG_FILE: config/cspell.config.yaml

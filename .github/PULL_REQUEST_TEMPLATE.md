@@ -5,7 +5,7 @@ so we can talk about features and discuss implementations.
 [1]: https://github.com/iamkhattar/homelab/blob/master/.github/CONTRIBUTING.md
 -->
 
-## Description
+# Description
 
 <!-- Explanation about your pull request, what changes you've made -->
 

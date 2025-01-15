@@ -46,7 +46,7 @@ jobs:
           cache-dependency-path: "**/package-lock.json"
 
       - name: Install Node.js dependencies
-        run: "[[ -f package-lock.json || -f npm-shrinkwrap.json ]] && npm ci || true"
+        run: "[[ -f package-lock.json || -f npm-shrinkwrap.json ]] && npm ci"
 
       - name: Build with Hugo
         env:

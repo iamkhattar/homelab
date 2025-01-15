@@ -21,15 +21,6 @@ body:
       placeholder: Reproduction
     validations:
       required: true
-  - type: textarea
-    id: system-info
-    attributes:
-      label: System Info
-      description: Output of `npx envinfo --system --binaries --browsers`
-      render: Shell
-      placeholder: Paste the output of the following command
-    validations:
-      required: true
   - type: checkboxes
     id: validations
     attributes:

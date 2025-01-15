@@ -1,0 +1,23 @@
+---
+$schema: https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json
+version: "0.2"
+language: en
+noConfigSearch: true
+ignorePaths:
+  - "**/node_modules/**"
+  - "**/vscode-extension/**"
+  - "**/.git/**"
+  - "**/.pnpm-lock.json"
+  - ".vscode"
+  - "megalinter"
+  - "package-lock.json"
+  - "report"
+  - "**/public/**"
+  - "**/.github/**"
+words:
+  - megalinter
+  - oxsecurity
+  - homelab
+  - iamkhattar
+  - unmark
+  - peaceiris
