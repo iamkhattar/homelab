@@ -3,6 +3,7 @@
   "language": "en",
   "noConfigSearch": true,
   "useGitignore": true,
+  "globRoot": "../",
   "ignorePaths": [
     "**/node_modules/**",
     "**/vscode-extension/**",
@@ -33,6 +34,7 @@
     "terraformrc",
     "Shivam",
     "Khattar",
-    "hetznercloud/hcloud"
+    "hetznercloud/hcloud",
+    "venv"
   ]
 }
