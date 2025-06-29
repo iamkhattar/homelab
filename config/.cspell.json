@@ -1,0 +1,35 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "noConfigSearch": true,
+  "useGitignore": true,
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/vscode-extension/**",
+    "**/.git/**",
+    "**/.pnpm-lock.json",
+    ".vscode",
+    "megalinter",
+    "package-lock.json",
+    "report",
+    "**/public/**",
+    "**/.github/**",
+    ".gitignore",
+    ".mega-linter.yml",
+    "config/.jscpd.json",
+    "infra/*.tf"
+  ],
+  "words": [
+    "megalinter",
+    "oxsecurity",
+    "homelab",
+    "iamkhattar",
+    "unmark",
+    "peaceiris",
+    "tfstate",
+    "tfvars",
+    "terraformrc",
+    "Shivam",
+    "Khattar"
+  ]
+}
