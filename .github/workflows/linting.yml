@@ -82,8 +82,6 @@ jobs:
           #   }}
           VALIDATE_ALL_CODEBASE: true
 
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
           # Uncomment to use ApiReporter (Grafana)
           # API_REPORTER: true
           # API_REPORTER_URL: ${{ secrets.API_REPORTER_URL }}
