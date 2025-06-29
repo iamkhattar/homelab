@@ -10,6 +10,7 @@
     "**/.pnpm-lock.json",
     ".vscode",
     "megalinter",
+    "package.json",
     "package-lock.json",
     "report",
     "**/public/**",
@@ -17,7 +18,8 @@
     ".gitignore",
     ".mega-linter.yml",
     "config/.jscpd.json",
-    "infra/*.tf"
+    "infra/*.tf",
+    "docs/layouts/*.html"
   ],
   "words": [
     "megalinter",
@@ -30,6 +32,7 @@
     "tfvars",
     "terraformrc",
     "Shivam",
-    "Khattar"
+    "Khattar",
+    "hetznercloud/hcloud"
   ]
 }
