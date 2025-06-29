@@ -1,0 +1,15 @@
+#cloud-config
+users:
+  - name: ansible
+    shell: /usr/sbin/nologin
+    lock_passwd: true
+    sudo: [ ]
+    ssh-authorized-keys: [ ]
+
+package_update: true
+package_upgrade: true
+
+ansible:
+  package_name: ansible-core
+  install_method: distro
+  run_user: ansible

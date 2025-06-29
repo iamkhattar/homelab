@@ -18,7 +18,7 @@
     "**/.github/**",
     ".gitignore",
     ".mega-linter.yml",
-    "config/.jscpd.json",
+    ".config/.jscpd.json",
     "infra/*.tf",
     "docs/layouts/*.html",
     "docs/config/*.config.js",

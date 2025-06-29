@@ -27,9 +27,9 @@ FILEIO_REPORTER: false
 ADDITIONAL_EXCLUDED_DIRECTORIES:
   - docs/node_modules
 
-COPYPASTE_JSCPD_CONFIG_FILE: config/.jscpd.json
-SPELL_CSPELL_CONFIG_FILE: config/.cspell.json
-HTML_HTMLHINT_CONFIG_FILE: config/.htmlhintrc
+COPYPASTE_JSCPD_CONFIG_FILE: .config/.jscpd.json
+SPELL_CSPELL_CONFIG_FILE: .config/.cspell.json
+HTML_HTMLHINT_CONFIG_FILE: .config/.htmlhintrc
 CSS_STYLELINT_FILTER_REGEX_EXCLUDE: docs/assets/scss/common/.*.scss
 REPOSITORY_CHECKOV_ARGUMENTS: --skip-check CKV2_GHA_1
 SPELL_LYCHEE_FILTER_REGEX_EXCLUDE: docs/layouts/.*.html|package-lock.json

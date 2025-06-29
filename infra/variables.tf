@@ -5,3 +5,65 @@ variable "hetzner_cloud_api_token" {
   sensitive   = true
   type        = string
 }
+
+variable "networking" {
+  type = object(
+    {
+      private_network_cidr = string
+      private_subnet_zone = string
+      private_subnet_cidr  = string
+    }
+  )
+  description = "Networking configuration"
+  default = {
+    private_network_cidr : "10.0.0.0/16"
+    private_subnet_zone = "eu-central"
+    private_subnet_cidr : "10.0.1.0/24"
+  }
+}
+
+variable "cluster" {
+  type = object(
+    {
+      location   = string
+      datacenter = string
+    }
+  )
+  description = "Cluster location configuration"
+  default = {
+    location : "nbg1",
+    datacenter : "nbg1-dc3"
+  }
+}
+
+variable "master" {
+  type = object(
+    {
+      image = string
+      type  = string
+      ip    = string
+    }
+  )
+  description = "Master node configuration"
+  default = {
+    image : "ubuntu-24.04"
+    type : "cx22" # TODO: change this later
+    ip : "10.0.1.1"
+  }
+}
+
+variable "worker" {
+  type = object(
+    {
+      image = string
+      type  = string
+      count = number
+    }
+  )
+  description = "Worker node configuration"
+  default = {
+    image : "ubuntu-24.04"
+    type : "cx32"
+    count : 1
+  }
+}
