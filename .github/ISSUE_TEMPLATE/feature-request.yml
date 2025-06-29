@@ -10,14 +10,14 @@ body:
     id: feature-description
     attributes:
       label: Description of the problem
-      description: 'As a user I want [goal] so that [benefit]. If you want to contribute with a PR, tell us in the description. Thanks!'
+      description: "As a user I want [goal] so that [benefit]. If you want to contribute with a PR, tell us in the description. Thanks!"
     validations:
       required: true
   - type: textarea
     id: suggested-solution
     attributes:
       label: Solution
-      description: 'In module [xy] we could provide following implementation...'
+      description: "In module [xy] we could provide following implementation..."
     validations:
       required: true
   - type: textarea
@@ -36,8 +36,6 @@ body:
       label: Validations
       description: Before submitting the issue, please make sure you do the following
       options:
-        - label: Follow our [Code of Conduct](https://github.com/iamkhattar/homelab/blob/master/CODE_OF_CONDUCT.md)
-          required: true
         - label: Read the [Contributing Guide](https://github.com/iamkhattar/homelab/blob/master/.github/CONTRIBUTING.md).
           required: true
         - label: Check that there isn't already an issue requesting the same feature.

@@ -13,7 +13,7 @@ repository by running brew tap hashicorp/tap in the terminal.
 Install Terraform using Brew:
 
 ```bash
-$ brew install hashicorp/tap/terraform
+brew install hashicorp/tap/terraform
 ```
 
 This method installs a signed binary that automatically updates with each new official release.
@@ -21,8 +21,8 @@ This method installs a signed binary that automatically updates with each new of
 Update Terraform by running:
 
 ```bash
-$ brew update
-$ brew upgrade hashicorp/tap/terraform
+brew update
+brew upgrade hashicorp/tap/terraform
 ```
 
 This approach ensures you always have access to the latest version of Terraform, making it an efficient and convenient
