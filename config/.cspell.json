@@ -20,7 +20,10 @@
     ".mega-linter.yml",
     "config/.jscpd.json",
     "infra/*.tf",
-    "docs/layouts/*.html"
+    "docs/layouts/*.html",
+    "docs/config/*.config.js",
+    "docs/assets/**",
+    "docs/config/_default/**/*.toml"
   ],
   "words": [
     "megalinter",
@@ -34,7 +37,11 @@
     "terraformrc",
     "Shivam",
     "Khattar",
-    "hetznercloud/hcloud",
-    "venv"
+    "hetznercloud",
+    "svgs",
+    "npmignore",
+    "venv",
+    "tfrc",
+    "instantpage"
   ]
 }
