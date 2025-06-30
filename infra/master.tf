@@ -34,4 +34,5 @@ resource "hcloud_server" "master-node" {
 
 output "master_node_public_ip" {
   value = tostring(hcloud_primary_ip.master_node_public_ip.ip_address)
+  description = "Public ip address for the master node"
 }

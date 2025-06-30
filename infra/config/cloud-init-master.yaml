@@ -3,13 +3,29 @@ users:
   - name: ansible
     shell: /usr/sbin/nologin
     lock_passwd: true
-    sudo: [ ]
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
     ssh-authorized-keys: [ ]
 
 package_update: true
 package_upgrade: true
 
-ansible:
-  package_name: ansible-core
-  install_method: distro
-  run_user: ansible
+packages:
+  - ansible-core
+  - git
+
+write_files:
+  - path: /etc/ansible/hosts.yml
+    content: |
+      k3s_cluster:
+        children:
+          server:
+            hosts:
+              localhost:
+                ansible_connection: local
+        vars:
+          k3s_version: v1.33.1+k3s1
+
+runcmd:
+  - su - ansible -s /bin/bash -c "cd /tmp && git clone https://github.com/iamkhattar/homelab.git"
+  - su - ansible -s /bin/bash -c "cd /tmp/homelab && git switch feature/ansible-playbook"
+  - su - ansible -s /bin/bash -c "cd /tmp/homelab/k3s && ansible-playbook playbooks/site.yml -i /etc/ansible/hosts.yml"
