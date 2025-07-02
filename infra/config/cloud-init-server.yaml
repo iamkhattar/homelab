@@ -24,8 +24,11 @@ write_files:
                 ansible_connection: local
         vars:
           k3s_version: v1.33.1+k3s1
+          ansible_user: ansible
+          api_endpoint: "{{ hostvars[groups['server'][0]]['ansible_host'] | default(groups['server'][0]) }}"
+          extra_server_args: "--disable-cloud-controller -kubelet-arg cloud-provider=external"
 
 runcmd:
   - su - ansible -s /bin/bash -c "cd /tmp && git clone https://github.com/iamkhattar/homelab.git"
   - su - ansible -s /bin/bash -c "cd /tmp/homelab && git switch feature/ansible-playbook"
-  - su - ansible -s /bin/bash -c "cd /tmp/homelab/k3s && ansible-playbook playbooks/site.yml -i /etc/ansible/hosts.yml"
+#  - su - ansible -s /bin/bash -c "cd /tmp/homelab/k3s && ansible-playbook playbooks/site.yml -i /etc/ansible/hosts.yml"

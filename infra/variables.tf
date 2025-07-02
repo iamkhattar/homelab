@@ -36,7 +36,7 @@ variable "cluster" {
   }
 }
 
-variable "master" {
+variable "server" {
   type = object(
     {
       image = string
@@ -44,7 +44,7 @@ variable "master" {
       ip    = string
     }
   )
-  description = "Master node configuration"
+  description = "Server node configuration"
   default = {
     image : "ubuntu-24.04"
     type : "cx22" # TODO: change this later
