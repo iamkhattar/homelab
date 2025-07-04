@@ -8,7 +8,7 @@ resource "hcloud_primary_ip" "server_node_public_ip" {
 }
 
 resource "hcloud_server" "server-node" {
-  name        = "server-node"
+  name        = "server-node-0"
   image       = var.server.image
   server_type = var.server.type
   location    = var.cluster.location
