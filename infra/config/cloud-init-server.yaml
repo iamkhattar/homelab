@@ -4,12 +4,14 @@ users:
     shell: /bin/bash
     sudo: ["ALL=(ALL) NOPASSWD:ALL"]
     lock_passwd: true
-    ssh-authorized-keys: [ ]
+    ssh-authorized-keys:
+      - ${local_ssh_public_key}
   - name: iamkhattar
     shell: /bin/bash
     sudo: ["ALL=(ALL) NOPASSWD:ALL"]
     lock_passwd: true
-    ssh-authorized-keys: [ ]
+    ssh-authorized-keys:
+      - ${local_ssh_public_key}
 
 package_update: true
 package_upgrade: true
