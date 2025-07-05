@@ -53,6 +53,7 @@
 - name: Get the token from the first server
   ansible.builtin.set_fact:
     token: "{{ hostvars[groups[server_group][0]].token }}"
+  when: groups[server_group] is defined and groups[server_group]|length > 0 and hostvars[groups[server_group][0]].token is defined
 
 - name: Add service environment variables
   when: extra_service_envs is defined
@@ -74,6 +75,7 @@
     line: "{{ item }}"
   with_items:
     - "K3S_TOKEN={{ token }}"
+  when: token is defined
 
 - name: Copy K3s service file
   register: k3s_agent_service

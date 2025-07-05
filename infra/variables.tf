@@ -6,6 +6,12 @@ variable "hetzner_cloud_api_token" {
   type        = string
 }
 
+variable "k3s_api_token" {
+  description = "K3s Cluster API Token"
+  sensitive = true
+  type = string
+}
+
 variable "networking" {
   type = object(
     {
@@ -52,7 +58,7 @@ variable "server" {
   }
 }
 
-variable "worker" {
+variable "agent" {
   type = object(
     {
       image = string
@@ -60,10 +66,10 @@ variable "worker" {
       count = number
     }
   )
-  description = "Worker node configuration"
+  description = "Agent node configuration"
   default = {
     image : "ubuntu-24.04"
-    type : "cx32"
+    type : "cx22" # TODO: change this later
     count : 1
   }
 }
