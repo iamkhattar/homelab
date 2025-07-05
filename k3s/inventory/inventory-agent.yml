@@ -1,6 +1,6 @@
 k3s_cluster:
   children:
-    server:
+    agent:
       hosts:
         localhost:
           ansible_connection: local
