@@ -8,4 +8,3 @@ k3s_cluster:
     k3s_version: v1.33.1+k3s1
     ansible_user: ansible
     api_endpoint: "10.0.1.1"
-    extra_server_args: "--disable-cloud-controller -kubelet-arg cloud-provider=external --secrets-encryption"
