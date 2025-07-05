@@ -18,6 +18,13 @@ resource "hcloud_server" "agent_nodes" {
     type : "agent"
   }
 
+  public_net {
+    ipv4_enabled = true
+    ipv6_enabled = true
+  }
+
+  firewall_ids = [hcloud_firewall.private_nodes_firewall.id]
+
   network {
     network_id = hcloud_network.private_network.id
   }
