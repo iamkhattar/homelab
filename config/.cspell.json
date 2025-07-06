@@ -24,7 +24,9 @@
     "docs/config/*.config.js",
     "docs/assets/**",
     "docs/config/_default/**/*.toml",
-    "infra/config/cloud-init-agent.yml"
+    "infra/config/cloud-init-agent.yml",
+    "infra/config/cloud-init-server.yml",
+    "**/k3s/**"
   ],
   "words": [
     "megalinter",

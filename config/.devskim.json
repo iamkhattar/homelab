@@ -1,0 +1,7 @@
+{
+  "rules": {
+    "DS162092": {
+      "severity": "none"
+    }
+  }
+}

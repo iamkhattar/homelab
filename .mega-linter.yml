@@ -30,6 +30,7 @@ ADDITIONAL_EXCLUDED_DIRECTORIES:
 COPYPASTE_JSCPD_CONFIG_FILE: config/.jscpd.json
 SPELL_CSPELL_CONFIG_FILE: config/.cspell.json
 HTML_HTMLHINT_CONFIG_FILE: config/.htmlhintrc
+REPOSITORY_DEVSKIM_CONFIG_FILE: config/.devskim.json
 CSS_STYLELINT_FILTER_REGEX_EXCLUDE: docs/assets/scss/common/.*.scss
 REPOSITORY_CHECKOV_ARGUMENTS: --skip-check CKV2_GHA_1
 SPELL_LYCHEE_FILTER_REGEX_EXCLUDE: docs/layouts/.*.html|package-lock.json
