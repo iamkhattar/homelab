@@ -34,18 +34,6 @@ resource "hcloud_firewall" "public_nodes_firewall" {
     ]
   }
 
-  # TODO: Remove this we shouldn't keep standing ssh access
-  rule {
-    description = "Allow SSH traffic"
-    direction   = "in"
-    protocol    = "tcp"
-    port        = "22"
-    source_ips = [
-      "0.0.0.0/0",
-      "::/0"
-    ]
-  }
-
 }
 
 

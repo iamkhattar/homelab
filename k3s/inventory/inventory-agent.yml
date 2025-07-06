@@ -2,7 +2,7 @@ k3s_cluster:
   children:
     agent:
       hosts:
-        localhost:
+        localhost:  # DevSkim: ignore DS162092
           ansible_connection: local
   vars:
     k3s_version: v1.33.1+k3s1

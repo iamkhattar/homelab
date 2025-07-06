@@ -6,7 +6,6 @@ data "template_file" "server_node_config" {
   }
 }
 
-
 resource "hcloud_server" "server_node" {
   name        = "server-node-0"
   image       = var.server.image
