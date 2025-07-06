@@ -23,7 +23,8 @@
     "docs/layouts/*.html",
     "docs/config/*.config.js",
     "docs/assets/**",
-    "docs/config/_default/**/*.toml"
+    "docs/config/_default/**/*.toml",
+    "infra/config/cloud-init-agent.yml"
   ],
   "words": [
     "megalinter",
