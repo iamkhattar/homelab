@@ -45,6 +45,7 @@
     "npmignore",
     "venv",
     "tfrc",
-    "instantpage"
+    "instantpage",
+    "devskim"
   ]
 }

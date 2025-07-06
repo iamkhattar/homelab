@@ -1,7 +1,5 @@
 {
-  "rules": {
-    "DS162092": {
-      "severity": "none"
-    }
-  }
+  "IgnoreRuleIds": [
+    "DS162092"
+  ]
 }
