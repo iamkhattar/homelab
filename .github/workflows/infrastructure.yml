@@ -93,3 +93,4 @@ jobs:
         env:
           TF_VAR_hetzner_cloud_api_token: ${{ secrets.HETZNER_API_TOKEN }}
           TF_VAR_k3s_api_token: ${{ secrets.K3S_API_TOKEN }}
+          TF_VAR_ssh_public_key: ${{ secrets.CLUSTER_SSH_PUBLIC_KEY }}

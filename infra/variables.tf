@@ -12,6 +12,12 @@ variable "k3s_api_token" {
   type        = string
 }
 
+variable "ssh_public_key" {
+  description = "SSH Public Key to login to cluster"
+  sensitive   = true
+  type        = string
+}
+
 variable "networking" {
   type = object(
     {
