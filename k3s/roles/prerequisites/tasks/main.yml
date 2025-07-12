@@ -16,7 +16,7 @@
 - name: Install Dependent Ubuntu Packages
   when: ansible_distribution in ['Ubuntu']
   ansible.builtin.apt:
-    name: policycoreutils  # Used by install script to restore SELinux context
+    name: policycoreutils # Used by install script to restore SELinux context
     update_cache: true
 
 - name: Enable IPv4 forwarding
@@ -70,7 +70,7 @@
         - "'Status: active' in ufw_status['stdout']"
       community.general.ufw:
         rule: allow
-        src: '{{ item }}'
+        src: "{{ item }}"
       loop: "{{ (cluster_cidr + ',' + service_cidr) | split(',') }}"
 
 - name: Allow Firewalld Exceptions
@@ -103,11 +103,11 @@
         permanent: true
         immediate: true
       with_items:
-        - 5001/tcp   # Spegel (Embedded distributed registry)
-        - 8472/udp   # Flannel VXLAN
-        - 10250/tcp  # Kubelet metrics
-        - 51820/udp  # Flannel Wireguard (IPv4)
-        - 51821/udp  # Flannel Wireguard (IPv6)
+        - 5001/tcp # Spegel (Embedded distributed registry)
+        - 8472/udp # Flannel VXLAN
+        - 10250/tcp # Kubelet metrics
+        - 51820/udp # Flannel Wireguard (IPv4)
+        - 51821/udp # Flannel Wireguard (IPv6)
 
     - name: If firewalld enabled, allow node CIDRs
       ansible.posix.firewalld:
@@ -207,10 +207,10 @@
 
 - name: Add /usr/local/bin to sudo secure_path
   ansible.builtin.lineinfile:
-    line: 'Defaults    secure_path = /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin'
+    line: "Defaults    secure_path = /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin"
     regexp: "Defaults(\\s)*secure_path(\\s)*="
     state: present
     insertafter: EOF
     path: /etc/sudoers
-    validate: 'visudo -cf %s'
+    validate: "visudo -cf %s"
   when: ansible_os_family == 'RedHat'
