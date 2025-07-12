@@ -8,15 +8,15 @@ variable "hetzner_cloud_api_token" {
 
 variable "k3s_api_token" {
   description = "K3s Cluster API Token"
-  sensitive = true
-  type = string
+  sensitive   = true
+  type        = string
 }
 
 variable "networking" {
   type = object(
     {
       private_network_cidr = string
-      private_subnet_zone = string
+      private_subnet_zone  = string
       private_subnet_cidr  = string
     }
   )

@@ -44,7 +44,7 @@ resource "hcloud_firewall" "private_nodes_firewall" {
     direction   = "in"
     protocol    = "tcp"
     port        = "any"
-    source_ips = [var.networking.private_network_cidr]
+    source_ips  = [var.networking.private_network_cidr]
     description = "Allow all tcp traffic from private network"
   }
 
@@ -52,14 +52,14 @@ resource "hcloud_firewall" "private_nodes_firewall" {
     direction   = "in"
     protocol    = "udp"
     port        = "any"
-    source_ips = [var.networking.private_network_cidr]
+    source_ips  = [var.networking.private_network_cidr]
     description = "Allow all tcp traffic from private network"
   }
 
   rule {
     direction   = "in"
     protocol    = "icmp"
-    source_ips = [var.networking.private_network_cidr]
+    source_ips  = [var.networking.private_network_cidr]
     description = "Allow all icmp traffic from private network"
   }
 }
