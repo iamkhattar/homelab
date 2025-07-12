@@ -47,3 +47,6 @@ docs/public
 docs/resources
 docs/hugo_stats.json
 megalinter-reports/
+
+infra/config/.ssh/id_rsa
+infra/config/.ssh/id_rsa.pub

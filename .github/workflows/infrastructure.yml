@@ -51,6 +51,8 @@ jobs:
         continue-on-error: true
         env:
           TF_VAR_hetzner_cloud_api_token: ${{ secrets.HETZNER_API_TOKEN }}
+          TF_VAR_k3s_api_token: ${{ secrets.K3S_API_TOKEN }}
+          TF_VAR_ssh_public_key: ${{ secrets.CLUSTER_SSH_PUBLIC_KEY }}
 
       - name: Update Pull Request
         uses: actions/github-script@v7
@@ -91,3 +93,5 @@ jobs:
         run: terraform apply -auto-approve -input=false
         env:
           TF_VAR_hetzner_cloud_api_token: ${{ secrets.HETZNER_API_TOKEN }}
+          TF_VAR_k3s_api_token: ${{ secrets.K3S_API_TOKEN }}
+          TF_VAR_ssh_public_key: ${{ secrets.CLUSTER_SSH_PUBLIC_KEY }}

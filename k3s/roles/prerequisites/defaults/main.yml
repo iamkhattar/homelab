@@ -1,0 +1,4 @@
+---
+api_port: 6443
+server_group: server
+agent_group: agent
