@@ -7,5 +7,5 @@ user_kubectl: true
 cluster_context: k3s-ansible
 server_group: server
 agent_group: agent
-use_external_database: false 
-extra_server_args: "" 
+use_external_database: false
+extra_server_args: ""
