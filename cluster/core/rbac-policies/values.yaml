@@ -1,0 +1,44 @@
+serviceAccounts:
+  - name: monitoring-reader
+    namespace: monitoring
+    clusterRole: monitoring-reader
+  - name: storage-admin
+    namespace: storage
+    clusterRole: storage-admin
+  - name: database-operator
+    namespace: databases
+    clusterRole: database-operator
+
+clusterRoles:
+  - name: monitoring-reader
+    rules:
+      - apiGroups: [""]
+        resources: ["pods", "services", "endpoints"]
+        verbs: ["get", "list", "watch"]
+      - apiGroups: ["apps"]
+        resources: ["deployments", "replicasets"]
+        verbs: ["get", "list", "watch"]
+
+  - name: storage-admin
+    rules:
+      - apiGroups: [""]
+        resources: ["persistentvolumes", "persistentvolumeclaims"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  - name: database-operator
+    rules:
+      - apiGroups: [""]
+        resources: ["pods", "services", "configmaps", "secrets"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+roleBindings:
+  - name: monitoring-reader-binding
+    namespace: monitoring
+    subjects:
+      - kind: ServiceAccount
+        name: monitoring-reader
+        namespace: monitoring
+    roleRef:
+      kind: ClusterRole
+      name: monitoring-reader
+      apiGroup: rbac.authorization.k8s.io

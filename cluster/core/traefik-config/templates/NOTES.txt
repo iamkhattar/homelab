@@ -1,0 +1,34 @@
+Traefik Deployment on Master Node Only (k3s + HelmChartConfig)
+==============================================================
+
+Traefik has been configured to run exclusively on the master node(s) in your k3s cluster.
+
+Key Configuration:
+------------------
+- nodeSelector:
+    node-role.kubernetes.io/master: "true"
+
+This ensures that Traefik pods are scheduled only on nodes labeled as master.
+
+To verify the deployment:
+-------------------------
+1. Check that Traefik pods are running on the intended node(s):
+   kubectl get pods -n kube-system -o wide | grep traefik
+
+2. Ensure the node labels and taints:
+   kubectl get nodes --show-labels
+   kubectl describe node <master-node-name> | grep -i taint
+
+If you need to update the master node label, use:
+   kubectl label node <master-node-name> node-role.kubernetes.io/master=true
+
+Troubleshooting:
+----------------
+- If Traefik pods are not scheduling, ensure the node label and taint match the configuration above.
+- For more details, check pod events:
+   kubectl describe pod <traefik-pod-name> -n kube-system
+
+For further customization, edit the HelmChartConfig at:
+   /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+
+Happy clustering!

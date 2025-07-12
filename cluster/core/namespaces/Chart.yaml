@@ -1,0 +1,6 @@
+apiVersion: v2
+name: namespaces
+description: A Helm chart to create namespaces for the homelab k3s cluster
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -33,3 +33,9 @@ resource "hcloud_server" "server_node" {
   # We want this node to be created after the private network is created
   depends_on = [hcloud_network_subnet.private_network_subnet]
 }
+
+
+output "server_node_ip" {
+  description = "Server Node IP address"
+  value = hcloud_server.server_node.ipv4_address
+}

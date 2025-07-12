@@ -24,16 +24,15 @@ FILEIO_REPORTER: false
 # Uncomment if you want MegaLinter to detect errors but not block CI to pass
 # DISABLE_ERRORS: true
 
-ADDITIONAL_EXCLUDED_DIRECTORIES:
-  - docs/node_modules
-
 COPYPASTE_JSCPD_CONFIG_FILE: config/.jscpd.json
 SPELL_CSPELL_CONFIG_FILE: config/.cspell.json
 HTML_HTMLHINT_CONFIG_FILE: config/.htmlhintrc
 REPOSITORY_DEVSKIM_CONFIG_FILE: config/.devskim.json
-CSS_STYLELINT_FILTER_REGEX_EXCLUDE: docs/assets/scss/common/.*.scss
-REPOSITORY_CHECKOV_ARGUMENTS: --skip-check CKV2_GHA_1,CKV2_ANSIBLE_3
-SPELL_LYCHEE_FILTER_REGEX_EXCLUDE: docs/layouts/.*.html|package-lock.json
+SPELL_LYCHEE_FILTER_REGEX_EXCLUDE: package-lock.json|helmfile.yaml|Chart.yaml
+REPOSITORY_TRIVY_CONFIG_FILE: config/trivy.yaml
+YAML_YAMLLINT_CONFIG_FILE: config/.yamllint.yml
+REPOSITORY_CHECKOV_CONFIG_FILE: config/.checkov.yml
+REPOSITORY_CHECKOV_ARGUMENTS: --skip-path cluster/storage/longhorn/charts
 
 DISABLE_LINTERS:
   - TERRAFORM_TERRASCAN

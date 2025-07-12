@@ -20,13 +20,10 @@
     ".mega-linter.yml",
     "config/.jscpd.json",
     "infra/*.tf",
-    "docs/layouts/*.html",
-    "docs/config/*.config.js",
-    "docs/assets/**",
-    "docs/config/_default/**/*.toml",
     "infra/config/cloud-init-agent.yml",
     "infra/config/cloud-init-server.yml",
-    "**/k3s/**"
+    "**/k3s/**",
+    "**/cluster/**"
   ],
   "words": [
     "megalinter",
@@ -46,6 +43,9 @@
     "venv",
     "tfrc",
     "instantpage",
-    "devskim"
+    "devskim",
+    "traefik",
+    "helmignore",
+    "serviceAccounts"
   ]
 }

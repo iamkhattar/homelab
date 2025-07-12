@@ -1,0 +1,33 @@
+namespaces:
+  - name: databases
+    labels:
+      app.kubernetes.io/component: database
+      6940469.xyz/category: infrastructure
+  - name: storage
+    labels:
+      app.kubernetes.io/component: storage
+      6940469.xyz/category: infrastructure
+  - name: messaging
+    labels:
+      app.kubernetes.io/component: messaging
+      6940469.xyz/category: infrastructure
+  - name: monitoring
+    labels:
+      app.kubernetes.io/component: monitoring
+      6940469.xyz/category: observability
+  - name: security
+    labels:
+      app.kubernetes.io/component: security
+      6940469.xyz/category: security
+  - name: applications
+    labels:
+      app.kubernetes.io/component: application
+      6940469.xyz/category: applications
+  - name: services
+    labels:
+      app.kubernetes.io/component: service
+      6940469.xyz/category: services
+
+networkPolicies:
+  enabled: true
+  defaultDeny: true
