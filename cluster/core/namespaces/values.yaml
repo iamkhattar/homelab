@@ -29,5 +29,5 @@ namespaces:
       6940469.xyz/category: services
 
 networkPolicies:
-  enabled: false
+  enabled: true
   defaultDeny: true
