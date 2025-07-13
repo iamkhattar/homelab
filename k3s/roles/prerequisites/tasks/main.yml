@@ -221,14 +221,19 @@
     name: open-iscsi
     update_cache: yes
 
-- name: Find private interface using ip command
-  shell: |
-    ip -4 addr show | grep -E "inet 10\.0\." | head -1 | awk '{print $2, $NF}' | sed 's/\/.*$//'
-  register: private_net_result
+- name: Get all interfaces with 10.0.x.x addresses
+  shell: ip -4 addr show | grep -E "inet 10\.0\."
+  register: all_private_ips
   changed_when: false
+  failed_when: false
 
-- name: Set private IP and interface from command output
+- name: Show all private IPs found
+  debug:
+    msg: "Found private IPs: {{ all_private_ips.stdout_lines }}"
+
+- name: Extract IP and interface manually
   set_fact:
-    private_ip: "{{ private_net_result.stdout.split()[0] }}"
-    private_iface: "{{ private_net_result.stdout.split()[1] }}"
-  when: private_net_result.stdout != ""
+    private_ip: "{{ all_private_ips.stdout_lines[0].split()[1].split('/')[0] }}"
+    private_iface: "{{ (all_private_ips.stdout_lines[0].split()[-1] == 'scope') | ternary(all_private_ips.stdout_lines[0].split()[-2], all_private_ips.stdout_lines[0].split()[-1]) }}"
+  when:
+    - all_private_ips.stdout_lines | length > 0
