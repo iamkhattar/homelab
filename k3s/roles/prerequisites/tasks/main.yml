@@ -227,13 +227,25 @@
   changed_when: false
   failed_when: false
 
+- name: Get all public IP addresses (non-private ranges)
+  shell: ip -4 addr show | grep -E "inet " | grep -v -E "inet (10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|127\.)"
+  register: all_public_ips
+  changed_when: false
+  failed_when: false
+
 - name: Show all private IPs found
   debug:
     msg: "Found private IPs: {{ all_private_ips.stdout_lines }}"
+
+- name: Show all public IPs found
+  debug:
+    msg: "Found public IPs: {{ all_public_ips.stdout_lines }}"
 
 - name: Extract IP and interface manually
   set_fact:
     private_ip: "{{ all_private_ips.stdout_lines[0].split()[1].split('/')[0] }}"
     private_iface: "{{ (all_private_ips.stdout_lines[0].split()[-1] == 'scope') | ternary(all_private_ips.stdout_lines[0].split()[-2], all_private_ips.stdout_lines[0].split()[-1]) }}"
+    public_ip: "{{ all_public_ips.stdout_lines[0].split()[1].split('/')[0] }}"
   when:
     - all_private_ips.stdout_lines | length > 0
+    - all_public_ips.stdout_lines | length > 0
