@@ -37,5 +37,5 @@ resource "hcloud_server" "server_node" {
 
 output "server_node_ip" {
   description = "Server Node IP address"
-  value = hcloud_server.server_node.ipv4_address
+  value       = hcloud_server.server_node.ipv4_address
 }
