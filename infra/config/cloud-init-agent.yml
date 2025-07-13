@@ -22,4 +22,4 @@ packages:
 
 runcmd:
   - su - ansible -s /bin/bash -c "cd /tmp && git clone https://github.com/iamkhattar/homelab.git"
-  - su - ansible -s /bin/bash -c "cd /tmp/homelab/k3s && ansible-playbook playbooks/site.yml -i inventory/inventory-agent.yml -e 'token=${k3s_api_token}'"
+#  - su - ansible -s /bin/bash -c "cd /tmp/homelab/k3s && ansible-playbook playbooks/site.yml -i inventory/inventory-agent.yml -e 'token=${k3s_api_token}'"

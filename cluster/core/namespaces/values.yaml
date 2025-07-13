@@ -27,11 +27,7 @@ namespaces:
     labels:
       app.kubernetes.io/component: service
       6940469.xyz/category: services
-  - name: longhorn-system
-    labels:
-      app.kubernetes.io/component: longhorn
-      6940469.xyz/category: longhorn
 
 networkPolicies:
-  enabled: true
+  enabled: false
   defaultDeny: true

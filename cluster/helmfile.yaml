@@ -4,10 +4,6 @@ repositories:
 
 releases:
 ###  CORE CONFIGURATION ###
-  - name: traefik-config
-    chart: ./core/traefik-config
-    historyMax: 5
-    namespace: kube-system
   - name: namespaces
     chart: ./core/namespaces
     historyMax: 5
@@ -16,20 +12,16 @@ releases:
     chart: ./core/rbac-policies
     historyMax: 5
     namespace: kube-system
-    needs: [namespaces]
+    needs: [kube-system/namespaces]
 
 ###  STORAGE CONFIGURATION ###
   - name: longhorn
     chart: ./storage/longhorn
     historyMax: 5
     namespace: longhorn-system
-    needs: [namespaces]
+    createNamespace: true
 
 hooks:
-  - events: ["prepare"]
-    showlogs: true
-    command: "kubectl"
-    args: ["label", "node", "server-node-0", "svccontroller.k3s.cattle.io/enablelb=true", "--overwrite"]
   - events: ["prepare"]
     showlogs: true
     command: "kubectl"

@@ -59,7 +59,7 @@ variable "server" {
   description = "Server node configuration"
   default = {
     image : "ubuntu-24.04"
-    type : "cx32"
+    type : "cx22"
     ip : "10.0.1.1"
   }
 }
@@ -75,7 +75,7 @@ variable "agent" {
   description = "Agent node configuration"
   default = {
     image : "ubuntu-24.04"
-    type : "cx32"
+    type : "cx22"
     count : 1
   }
 }

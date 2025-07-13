@@ -1,4 +1,6 @@
 {{- if $.Values.networkPolicies.enabled }}
+{{- range .Values.namespaces }}
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -14,5 +16,6 @@ spec:
     - {}
   egress:
     - {}
+{{- end }}
 {{- end }}
 {{- end }}
