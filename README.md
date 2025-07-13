@@ -2,7 +2,6 @@
 
 ![Linting](https://github.com/iamkhattar/homelab/actions/workflows/linting.yml/badge.svg)
 ![Infrastructure](https://github.com/iamkhattar/homelab/actions/workflows/infrastructure.yml/badge.svg)
-![Documentation](https://github.com/iamkhattar/homelab/actions/workflows/documentation.yml/badge.svg)
 
 Welcome to my Homelab project, a dynamic and scalable infrastructure built on Hetzner Cloud using Terraform, Ansible,
 and K3s. This setup is designed to host a variety of personal services and experimental projects, providing a flexible
