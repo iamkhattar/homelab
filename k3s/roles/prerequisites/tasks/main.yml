@@ -222,13 +222,27 @@
     update_cache: yes
 
 - name: Find private IP and interface
-  set_fact:
-    private_ip: "{{ item.value.ipv4.address }}"
-    private_iface: "{{ item.key | regex_replace('^ansible_', '') }}"
-  loop: "{{ ansible_facts | dict2items }}"
-  when:
-    - item.key is match('^ansible_(en|eth)')
-    - item.value.ipv4 is defined
-    - item.value.ipv4.address is match('^10\.0\.')
-  loop_control:
-    label: "{{ item.key }}"
+  block:
+    - name: Get all network interfaces with 10.0.* IPs
+      set_fact:
+        matching_interfaces: >-
+          {{
+            ansible_interfaces
+            | select('match', '^(en|eth)')
+            | map('regex_replace', '^(.+)$', 'ansible_\1')
+            | map('extract', ansible_facts)
+            | selectattr('ipv4', 'defined')
+            | selectattr('ipv4.address', 'match', '^10\.0\.')
+            | list
+          }}
+
+    - name: Set private IP and interface facts
+      set_fact:
+        private_ip: "{{ matching_interfaces[0].ipv4.address }}"
+        private_iface: "{{ matching_interfaces[0].device }}"
+      when: matching_interfaces | length > 0
+
+    - name: Fail if no matching interface found
+      fail:
+        msg: "No interface found with 10.0.* IP address"
+      when: matching_interfaces | length == 0
