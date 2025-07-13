@@ -1,6 +1,6 @@
 apiVersion: v2
 name: longhorn
-description: A Helm chart to install Longhorn for the homelab k3s cluster
+description: A Helm chart to manage Longhorn for the homelab k3s cluster
 type: application
 version: 0.1.0
 appVersion: "1.1.0"
