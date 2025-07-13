@@ -214,7 +214,7 @@
     path: /etc/sudoers
     validate: "visudo -cf %s"
   when: ansible_os_family == 'RedHat'
-  
+
 - name: Install open-iscsi
   hosts: all
   become: yes
