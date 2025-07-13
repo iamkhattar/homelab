@@ -23,7 +23,7 @@ releases:
     chart: ./storage/longhorn
     historyMax: 5
     namespace: longhorn-system
-    createNamespace: true
+    needs: [namespaces]
 
 hooks:
   - events: ["prepare"]

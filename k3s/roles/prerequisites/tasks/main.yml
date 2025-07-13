@@ -214,14 +214,9 @@
     path: /etc/sudoers
     validate: "visudo -cf %s"
   when: ansible_os_family == 'RedHat'
-  
-- name: Install open-iscsi
-  hosts: all
-  become: yes
+
+- name: Ensure open-iscsi is installed
   when: ansible_distribution in ['Ubuntu']
-  tasks:
-    - name: Ensure open-iscsi is installed
-      apt:
-        name: open-iscsi
-        state: present
-        update_cache: yes
+  ansible.builtin.apt:
+    name: open-iscsi
+    update_cache: yes
