@@ -1,0 +1,14 @@
+# kics-scan disable=555ab8f9-2001-455e-a077-f2d0f41e2fb9
+name: Auto Assign
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  auto-assign:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: kentaro-m/auto-assign-action@v2.0.0
