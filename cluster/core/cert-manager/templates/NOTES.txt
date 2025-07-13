@@ -1,0 +1,1 @@
+Cert Manager is now installed on the cluster!

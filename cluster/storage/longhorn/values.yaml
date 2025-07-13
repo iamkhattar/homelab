@@ -1,2 +1,3 @@
-defaultSettings:
-  deletingConfirmationFlag: true
+longhorn:
+  defaultSettings:
+    deletingConfirmationFlag: true
