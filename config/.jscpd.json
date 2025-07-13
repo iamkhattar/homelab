@@ -15,7 +15,7 @@
     "cluster/k3s/roles/k3s_server/tasks/main.yml",
     "cluster/k3s/roles/k3s_agent/tasks/main.yml",
     "cluster/k3s/roles/k3s_server/tasks/main.yml",
-    "cluster/infra/config/cloud-init-agent.yml",
-    "cluster/infra/config/cloud-init-server.yml"
+    "infra/config/cloud-init-agent.yml",
+    "infra/config/cloud-init-server.yml"
   ]
 }
