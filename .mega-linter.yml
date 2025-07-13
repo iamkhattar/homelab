@@ -32,7 +32,7 @@ SPELL_LYCHEE_FILTER_REGEX_EXCLUDE: package-lock.json|helmfile.yaml|Chart.yaml
 REPOSITORY_TRIVY_CONFIG_FILE: config/trivy.yaml
 YAML_YAMLLINT_CONFIG_FILE: config/.yamllint.yml
 REPOSITORY_CHECKOV_CONFIG_FILE: config/.checkov.yml
-REPOSITORY_CHECKOV_ARGUMENTS: --skip-path cluster/storage/longhorn/charts --skip-oath cluster/core/cert-manager/charts
+REPOSITORY_CHECKOV_ARGUMENTS: --skip-path cluster/storage/longhorn/charts --skip-path cluster/core/cert-manager/charts
 
 DISABLE_LINTERS:
   - TERRAFORM_TERRASCAN
