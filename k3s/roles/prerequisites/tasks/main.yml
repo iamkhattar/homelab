@@ -223,26 +223,23 @@
 
 - name: Find private IP and interface
   block:
-    - name: Get all network interfaces with 10.0.* IPs
+    - name: Find matching interfaces
       set_fact:
-        matching_interfaces: >-
+        _temp_interfaces: >-
           {{
             ansible_interfaces
             | select('match', '^(en|eth)')
-            | map('regex_replace', '^(.+)$', 'ansible_\1')
-            | map('extract', ansible_facts)
-            | selectattr('ipv4', 'defined')
-            | selectattr('ipv4.address', 'match', '^10\.0\.')
             | list
           }}
 
-    - name: Set private IP and interface facts
+    - name: Set private IP and interface
       set_fact:
-        private_ip: "{{ matching_interfaces[0].ipv4.address }}"
-        private_iface: "{{ matching_interfaces[0].device }}"
-      when: matching_interfaces | length > 0
-
-    - name: Fail if no matching interface found
-      fail:
-        msg: "No interface found with 10.0.* IP address"
-      when: matching_interfaces | length == 0
+        private_ip: "{{ ansible_facts['ansible_' + item]['ipv4']['address'] }}"
+        private_iface: "{{ item }}"
+      loop: "{{ _temp_interfaces }}"
+      when:
+        - ansible_facts['ansible_' + item] is defined
+        - ansible_facts['ansible_' + item]['ipv4'] is defined
+        - ansible_facts['ansible_' + item]['ipv4']['address'] is match('^10\.0\.')
+      loop_control:
+        label: "{{ item }}"
