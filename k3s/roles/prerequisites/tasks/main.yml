@@ -251,18 +251,6 @@
   loop_control:
     label: "{{ item }}"
 
-# Then filter for en/eth interfaces
-- name: Find private IP and interface (improved)
-  set_fact:
-    private_ip: "{{ item.ip }}"
-    private_iface: "{{ item.name }}"
-  loop: "{{ all_private_interfaces | default([]) }}"
-  when:
-    - item.name.startswith('en') or item.name.startswith('eth')
-  loop_control:
-    label: "{{ item.name }}"
-
-# Alternative single-task approach with better error handling
 - name: Find private IP and interface (single task)
   set_fact:
     private_ip: "{{ ansible_facts['ansible_' + item]['ipv4']['address'] }}"
