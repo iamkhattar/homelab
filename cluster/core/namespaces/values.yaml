@@ -27,7 +27,11 @@ namespaces:
     labels:
       app.kubernetes.io/component: service
       6940469.xyz/category: services
-
-networkPolicies:
-  enabled: true
-  defaultDeny: true
+  - name: longhorn-system
+    labels:
+      app.kubernetes.io/component: longhorn
+      6940469.xyz/category: longhorn
+  - name: cert-manager
+    labels:
+      app.kubernetes.io/component: cert-manager
+      6940469.xyz/category: cert-manager

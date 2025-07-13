@@ -1,6 +1,8 @@
 repositories:
   - name: longhorn
     url: https://charts.longhorn.io
+  - name: cert-manager
+    url: https://charts.jetstack.io
 
 releases:
 ###  CORE CONFIGURATION ###
@@ -13,6 +15,11 @@ releases:
     historyMax: 5
     namespace: kube-system
     needs: [kube-system/namespaces]
+  - name: cert-manager
+    chart: ./core/cert-manager
+    historyMax: 5
+    namespace: cert-manager
+    needs: [kube-system/namespaces]
 
 ###  STORAGE CONFIGURATION ###
   - name: longhorn
@@ -20,6 +27,9 @@ releases:
     historyMax: 5
     namespace: longhorn-system
     createNamespace: true
+    needs: [kube-system/namespaces]
+
+###  DATABASES CONFIGURATION ###
 
 hooks:
   - events: ["prepare"]
