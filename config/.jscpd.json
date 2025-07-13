@@ -11,10 +11,10 @@
     "**/.idea/**",
     "**/report/**",
     "**/*.svg",
-    "k3s/roles/k3s_server/tasks/main.yml",
-    "k3s/roles/k3s_server/tasks/main.yml",
-    "k3s/roles/k3s_agent/tasks/main.yml",
-    "k3s/roles/k3s_server/tasks/main.yml",
+    "cluster/k3s/roles/k3s_server/tasks/main.yml",
+    "cluster/k3s/roles/k3s_server/tasks/main.yml",
+    "cluster/k3s/roles/k3s_agent/tasks/main.yml",
+    "cluster/k3s/roles/k3s_server/tasks/main.yml",
     "infra/config/cloud-init-agent.yml",
     "infra/config/cloud-init-server.yml"
   ]
