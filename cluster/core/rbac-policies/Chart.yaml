@@ -1,0 +1,6 @@
+apiVersion: v2
+name: rbac-policies
+description: A Helm chart to manage RBAC policies for the homelab k3s cluster
+type: application
+version: 0.1.0
+appVersion: "1.1.0"

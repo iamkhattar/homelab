@@ -1,0 +1,25 @@
+Namespaces and Network Policies Provisioned
+===========================================
+
+The following namespaces have been created as part of this release:
+
+{{- range .Values.namespaces }}
+- **{{ .name }}**
+  - Labels:
+    {{- range $key, $value := .labels }}
+    - `{{ $key }}: {{ $value }}`
+    {{- end }}
+{{- end }}
+
+Network Policies
+----------------
+Network policies have been {{ if .Values.networkPolicies.enabled }}**ENABLED**{{ else }}**DISABLED**{{ end }} for these namespaces.
+{{- if .Values.networkPolicies.enabled }}
+- A default deny-all policy has been {{ if .Values.networkPolicies.defaultDeny }}**ENABLED**{{ else }}**DISABLED**{{ end }}.
+- Only explicitly allowed ingress and egress traffic will be permitted.
+{{- end }}
+
+Verification
+------------
+To verify the namespaces and network policies, run:
+

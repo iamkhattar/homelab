@@ -1,0 +1,41 @@
+Service Accounts and RBAC Resources Created
+===========================================
+
+The following Service Accounts have been created:
+
+{{- range .Values.serviceAccounts }}
+- **Name:** `{{ .name }}`
+  - Namespace: `{{ .namespace }}`
+  - ClusterRole: `{{ .clusterRole }}`
+{{- end }}
+
+ClusterRoles defined in this release:
+
+{{- range .Values.clusterRoles }}
+- **Name:** `{{ .name }}`
+  - Rules:
+    {{- range .rules }}
+    - API Groups: `{{ .apiGroups | join ", " }}`
+      Resources: `{{ .resources | join ", " }}`
+      Verbs: `{{ .verbs | join ", " }}`
+    {{- end }}
+{{- end }}
+
+RoleBindings created:
+
+{{- range .Values.roleBindings }}
+- **Name:** `{{ .name }}`
+  - Namespace: `{{ .namespace }}`
+  - RoleRef: `{{ .roleRef.kind }} / {{ .roleRef.name }}`
+  - Subjects:
+    {{- range .subjects }}
+    - Kind: `{{ .kind }}` | Name: `{{ .name }}` | Namespace: `{{ .namespace }}`
+    {{- end }}
+{{- end }}
+
+Usage
+-----
+
+- Deploy workloads in the specified namespaces using the corresponding ServiceAccount for least-privilege access.
+- To use a ServiceAccount in a deployment, set the `serviceAccountName` field, for example:
+

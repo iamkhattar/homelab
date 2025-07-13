@@ -1,0 +1,9 @@
+extends: relaxed
+
+rules:
+  line-length: disable
+
+ignore:
+  - cluster/core/namespaces/templates/namespaces.yml
+  - cluster/core/rbac-policies/templates/serviceaccounts.yaml
+  - cluster/core/namespaces/templates/network-policies.yml

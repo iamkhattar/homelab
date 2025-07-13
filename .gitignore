@@ -39,14 +39,12 @@ terraform.rc
 # IntelliJ
 .idea
 
-docs/.hugo_build.lock
-docs/node_modules
 **/node_modules/**
-docs/public
 **/public/**
-docs/resources
-docs/hugo_stats.json
 megalinter-reports/
 
 infra/config/.ssh/id_rsa
 infra/config/.ssh/id_rsa.pub
+cluster/kubeconfig.yml
+
+*.tgz
