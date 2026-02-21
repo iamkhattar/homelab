@@ -6,12 +6,6 @@ variable "hetzner_cloud_api_token" {
   type        = string
 }
 
-variable "k3s_api_token" {
-  description = "K3s Cluster API Token"
-  sensitive   = true
-  type        = string
-}
-
 variable "ssh_public_key" {
   description = "SSH Public Key to login to cluster"
   sensitive   = true
@@ -58,8 +52,8 @@ variable "server" {
   )
   description = "Server node configuration"
   default = {
-    image : "ubuntu-24.04"
-    type : "cx32"
+    image : "debian-12"
+    type : "cx43"
     ip : "10.0.1.1"
   }
 }
@@ -74,8 +68,8 @@ variable "agent" {
   )
   description = "Agent node configuration"
   default = {
-    image : "ubuntu-24.04"
+    image : "debian-12"
     type : "cx32"
-    count : 1
+    count : 0
   }
 }
