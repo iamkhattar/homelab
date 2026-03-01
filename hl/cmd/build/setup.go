@@ -31,9 +31,9 @@ type tool struct {
 var tools = []tool{
 	{
 		name:    "helm",
-		version: "3.17.3",
+		version: "4.1.1",
 		url: func(goos, goarch string) string {
-			return fmt.Sprintf("https://get.helm.sh/helm-v3.17.3-%s-%s.tar.gz", goos, goarch)
+			return fmt.Sprintf("https://get.helm.sh/helm-v4.1.1-%s-%s.tar.gz", goos, goarch)
 		},
 		installed: func() bool { _, err := exec.LookPath("helm"); return err == nil },
 		postInstall: func(downloadPath, binDir string) error {
@@ -50,9 +50,9 @@ var tools = []tool{
 	},
 	{
 		name:    "helmfile",
-		version: "0.171.0",
+		version: "1.3.2",
 		url: func(goos, goarch string) string {
-			return fmt.Sprintf("https://github.com/helmfile/helmfile/releases/download/v0.171.0/helmfile_%s_%s.tar.gz", goos, goarch)
+			return fmt.Sprintf("https://github.com/helmfile/helmfile/releases/download/v1.3.2/helmfile_1.3.2_%s_%s.tar.gz", goos, goarch)
 		},
 		installed: func() bool { _, err := exec.LookPath("helmfile"); return err == nil },
 		postInstall: func(downloadPath, binDir string) error {
@@ -67,9 +67,9 @@ var tools = []tool{
 	},
 	{
 		name:    "terraform",
-		version: "1.11.4",
+		version: "1.14.5",
 		url: func(goos, goarch string) string {
-			return fmt.Sprintf("https://releases.hashicorp.com/terraform/1.11.4/terraform_1.11.4_%s_%s.zip", goos, goarch)
+			return fmt.Sprintf("https://releases.hashicorp.com/terraform/1.14.5/terraform_1.14.5_%s_%s.zip", goos, goarch)
 		},
 		installed: func() bool { _, err := exec.LookPath("terraform"); return err == nil },
 		postInstall: func(downloadPath, binDir string) error {
