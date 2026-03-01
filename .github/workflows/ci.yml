@@ -64,12 +64,23 @@ jobs:
           echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
 
       - name: Setup tools
-        run: hl ci setup helm helmfile terraform gotestsum
+        run: hl ci setup helm helmfile terraform gotestsum golangci-lint
 
       - name: Check
         run: hl ci check
         env:
           CI: "true"
+
+      - name: golangci-lint (SARIF)
+        if: always()
+        run: hl ci lint-sarif --output-dir "$GITHUB_WORKSPACE/sarif"
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif/
+          category: golangci-lint
 
       - name: Upload test reports
         if: always()
@@ -128,43 +139,6 @@ jobs:
             --tag "${{ github.sha }}"
         env:
           CI: "true"
-
-  golangci-lint:
-    name: golangci-lint
-    needs: setup
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: hl/go.sum
-
-      - name: Download hl
-        uses: actions/download-artifact@v4
-        with:
-          name: hl
-          path: bin/
-
-      - name: Prepare hl
-        run: |
-          chmod +x bin/hl
-          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
-
-      - name: Setup tools
-        run: hl ci setup golangci-lint
-
-      - name: Run golangci-lint (SARIF)
-        run: hl ci lint-sarif --output-dir "$GITHUB_WORKSPACE/sarif"
-
-      - name: Upload SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: sarif/
-          category: golangci-lint
 
   gitleaks:
     name: Gitleaks
