@@ -82,6 +82,10 @@ func EnsureTerraformInit(dir string) error {
 		return nil
 	}
 
+	// Set dummy provider variables so init/validate don't fail on
+	// required variables that are only needed for real applies.
+	setDummyTerraformVars()
+
 	ui.Step("terraform init -backend=false")
 	c := exec.Command("terraform", "init", "-backend=false")
 	c.Dir = dir
@@ -91,6 +95,21 @@ func EnsureTerraformInit(dir string) error {
 		return fmt.Errorf("terraform init: %w", err)
 	}
 	return nil
+}
+
+// setDummyTerraformVars sets placeholder values for required Terraform
+// variables when they aren't already set. This allows init, validate,
+// and test to run without real credentials.
+func setDummyTerraformVars() {
+	dummyVars := map[string]string{
+		"TF_VAR_hetzner_cloud_api_token": strings.Repeat("0", 64),
+		"TF_VAR_ssh_public_key":          "ssh-ed25519 AAAA placeholder",
+	}
+	for k, v := range dummyVars {
+		if os.Getenv(k) == "" {
+			_ = os.Setenv(k, v)
+		}
+	}
 }
 
 // validate runs terraform validate if the CLI is on PATH, initialising
