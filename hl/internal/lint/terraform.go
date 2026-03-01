@@ -78,13 +78,13 @@ return fmt.Errorf("%d file(s) need formatting — run hl ci fix", len(unformatte
 // directory doesn't exist. This downloads providers without configuring
 // the remote backend (which requires credentials).
 func EnsureTerraformInit(dir string) error {
+	// Set dummy provider variables so init/validate/test don't fail on
+	// required variables that are only needed for real applies.
+	setDummyTerraformVars()
+
 	if _, err := os.Stat(filepath.Join(dir, ".terraform")); err == nil {
 		return nil
 	}
-
-	// Set dummy provider variables so init/validate don't fail on
-	// required variables that are only needed for real applies.
-	setDummyTerraformVars()
 
 	ui.Step("terraform init -backend=false")
 	c := exec.Command("terraform", "init", "-backend=false")

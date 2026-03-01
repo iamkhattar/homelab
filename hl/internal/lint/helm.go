@@ -37,6 +37,17 @@ func (h *HelmLinter) Lint(root string) error {
 	var failed []string
 	for _, chartDir := range charts {
 		rel, _ := filepath.Rel(root, chartDir)
+
+		// Build dependencies if Chart.lock exists.
+		if _, err := os.Stat(filepath.Join(chartDir, "Chart.lock")); err == nil {
+			dep := exec.Command("helm", "dependency", "build", chartDir)
+			dep.Stdout = os.Stdout
+			dep.Stderr = os.Stderr
+			if err := dep.Run(); err != nil {
+				ui.KeyValue("  dep build", fmt.Sprintf("%s (failed, continuing)", rel))
+			}
+		}
+
 		c := exec.Command("helm", "lint", chartDir)
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stderr
