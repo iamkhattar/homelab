@@ -26,8 +26,8 @@ func captureStdout(fn func()) string {
 
 func TestStep(t *testing.T) {
 	out := captureStdout(func() { Step("Installing packages") })
-	if !strings.Contains(out, "==>") {
-		t.Errorf("Step output should contain arrow indicator, got: %s", out)
+	if !strings.Contains(out, "🔧") {
+		t.Errorf("Step output should contain wrench emoji, got: %s", out)
 	}
 	if !strings.Contains(out, "Installing packages") {
 		t.Errorf("Step output should contain the step name, got: %s", out)
@@ -36,8 +36,8 @@ func TestStep(t *testing.T) {
 
 func TestStepDone(t *testing.T) {
 	out := captureStdout(func() { StepDone("Task complete") })
-	if !strings.Contains(out, "✓") {
-		t.Errorf("StepDone output should contain check mark, got: %s", out)
+	if !strings.Contains(out, "✅") {
+		t.Errorf("StepDone output should contain check mark emoji, got: %s", out)
 	}
 	if !strings.Contains(out, "Task complete") {
 		t.Errorf("StepDone output should contain the message, got: %s", out)
@@ -46,8 +46,8 @@ func TestStepDone(t *testing.T) {
 
 func TestStepFail(t *testing.T) {
 	out := captureStdout(func() { StepFail("Task failed") })
-	if !strings.Contains(out, "✗") {
-		t.Errorf("StepFail output should contain cross mark, got: %s", out)
+	if !strings.Contains(out, "❌") {
+		t.Errorf("StepFail output should contain cross emoji, got: %s", out)
 	}
 	if !strings.Contains(out, "Task failed") {
 		t.Errorf("StepFail output should contain the message, got: %s", out)
