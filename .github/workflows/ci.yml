@@ -31,7 +31,8 @@ jobs:
         working-directory: hl
 
       - name: Check
-        run: "$GITHUB_WORKSPACE/bin/hl" build check
+        run: |
+          "$GITHUB_WORKSPACE/bin/hl" build check
         env:
           CI: "true"
 
