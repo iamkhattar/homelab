@@ -74,18 +74,35 @@ return fmt.Errorf("%d file(s) need formatting — run hl ci fix", len(unformatte
 	return nil
 }
 
-// validate runs terraform validate if the CLI is on PATH and the working
-// directory has been initialised (.terraform/ exists).
+// EnsureTerraformInit runs terraform init -backend=false if the .terraform/
+// directory doesn't exist. This downloads providers without configuring
+// the remote backend (which requires credentials).
+func EnsureTerraformInit(dir string) error {
+	if _, err := os.Stat(filepath.Join(dir, ".terraform")); err == nil {
+		return nil
+	}
+
+	ui.Step("terraform init -backend=false")
+	c := exec.Command("terraform", "init", "-backend=false")
+	c.Dir = dir
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	if err := c.Run(); err != nil {
+		return fmt.Errorf("terraform init: %w", err)
+	}
+	return nil
+}
+
+// validate runs terraform validate if the CLI is on PATH, initialising
+// providers first if needed.
 func (t *TerraformLinter) validate(dir string) error {
 	if _, err := exec.LookPath("terraform"); err != nil {
 		ui.KeyValue("terraform validate", "skipped (terraform not found)")
 		return nil
 	}
 
-	// Skip validate if terraform init hasn't been run yet.
-	if _, err := os.Stat(filepath.Join(dir, ".terraform")); os.IsNotExist(err) {
-		ui.KeyValue("terraform validate", "skipped (run terraform init first)")
-		return nil
+	if err := EnsureTerraformInit(dir); err != nil {
+		return err
 	}
 
 	ui.Step("terraform validate")

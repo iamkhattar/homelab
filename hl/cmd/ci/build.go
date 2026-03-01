@@ -189,6 +189,10 @@ func runTerraformTests() error {
 		return nil
 	}
 
+	if err := lint.EnsureTerraformInit(infraDir); err != nil {
+		return err
+	}
+
 	ui.Step(fmt.Sprintf("Terraform tests (%d test file(s))", len(matches)))
 	c := exec.Command("terraform", "test")
 	c.Dir = infraDir
