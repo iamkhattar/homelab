@@ -104,8 +104,16 @@ var tools = []tool{
 		name:    "gitleaks",
 		version: "8.30.0",
 		url: func(goos, goarch string) string {
+			// gitleaks uses x64/x32 instead of amd64/386.
+			arch := goarch
+			switch goarch {
+			case "amd64":
+				arch = "x64"
+			case "386":
+				arch = "x32"
+			}
 			return fmt.Sprintf("https://github.com/gitleaks/gitleaks/releases/download/v8.30.0/gitleaks_%s_%s_%s.tar.gz",
-				"8.30.0", goos, goarch)
+				"8.30.0", goos, arch)
 		},
 		installed: func() bool { _, err := exec.LookPath("gitleaks"); return err == nil },
 		postInstall: func(downloadPath, binDir string) error {
