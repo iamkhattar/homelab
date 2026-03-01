@@ -1,0 +1,6 @@
+---
+systemd_dir: "/etc/systemd/system"
+server_group: server
+agent_group: agent
+extra_server_args: ""
+extra_agent_args: ""

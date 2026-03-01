@@ -376,6 +376,7 @@ func init() {
 	dockerCmd.Flags().BoolVar(&changed, "changed", false, "Only build services changed relative to --base")
 	dockerCmd.Flags().StringVar(&base, "base", "origin/main", "Git ref to diff against (used with --changed)")
 
+	Cmd.AddCommand(setupCmd)
 	Cmd.AddCommand(lintCmd)
 	Cmd.AddCommand(fixCmd)
 	Cmd.AddCommand(testCmd)

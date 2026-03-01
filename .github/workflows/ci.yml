@@ -30,6 +30,11 @@ jobs:
         run: go build -o "$GITHUB_WORKSPACE/bin/hl" .
         working-directory: hl
 
+      - name: Setup tools
+        run: |
+          "$GITHUB_WORKSPACE/bin/hl" build setup
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
+
       - name: Check
         run: |
           "$GITHUB_WORKSPACE/bin/hl" build check

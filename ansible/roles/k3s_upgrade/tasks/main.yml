@@ -1,0 +1,77 @@
+---
+- name: Get k3s installed version
+  ansible.builtin.command: k3s --version
+  register: k3s_upgrade_version_output
+  changed_when: false
+  check_mode: false
+
+- name: Set k3s installed version
+  ansible.builtin.set_fact:
+    k3s_upgrade_current_version: "{{ k3s_upgrade_version_output.stdout_lines[0].split(' ')[2] }}"
+  check_mode: false
+
+- name: Update node only if needed
+  when: k3s_upgrade_current_version is version(k3s_version, '<')
+  block:
+    - name: Stop K3s service
+      ansible.builtin.service:
+        state: stopped
+        name: "{{ (server_group in group_names) | ternary('k3s', 'k3s-agent') }}"
+
+    - name: Download and install new K3s version [server]
+      when: server_group in group_names
+      ansible.builtin.command:
+        cmd: /usr/local/bin/k3s-install.sh
+      environment:
+        INSTALL_K3S_SKIP_START: "true"
+        INSTALL_K3S_VERSION: "{{ k3s_version }}"
+        INSTALL_K3S_EXEC: "{{ extra_server_args }}"
+      changed_when: true
+
+    - name: Save the existing K3s token if needed
+      when:
+        - token is not defined
+        - inventory_hostname == groups[server_group][0] or ansible_host == groups[server_group][0]
+      ansible.builtin.command: cut -d':' -f4 /var/lib/rancher/k3s/server/node-token
+      register: k3s_upgrade_old_token
+      changed_when: false
+
+    - name: Get the token from the first server
+      when:
+        - agent_group in group_names
+        - token is not defined
+      ansible.builtin.set_fact:
+        k3s_upgrade_old_server_token: "{{ hostvars[groups[server_group][0]].k3s_upgrade_old_token }}"
+
+    - name: Download and install new K3s version [agent]
+      when: agent_group in group_names
+      ansible.builtin.command:
+        cmd: /usr/local/bin/k3s-install.sh
+      environment:
+        INSTALL_K3S_SKIP_START: "true"
+        INSTALL_K3S_VERSION: "{{ k3s_version }}"
+        INSTALL_K3S_EXEC: "agent --server https://{{ api_endpoint }}:{{ api_port | default('6443') }} {{ extra_agent_args }}"
+        K3S_TOKEN: "{{ token if token is defined else k3s_upgrade_old_server_token.stdout }}"
+      changed_when: true
+
+    - name: Reload systemd daemon
+      when: ansible_facts['service_mgr'] == 'systemd'
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Restart K3s service [server]
+      when: server_group in group_names
+      ansible.builtin.service:
+        state: restarted
+        name: k3s
+
+    - name: Restart K3s service [agent]
+      when: agent_group in group_names
+      ansible.builtin.service:
+        state: restarted
+        name: k3s-agent
+
+- name: Report current version
+  when: k3s_upgrade_current_version is version(k3s_version, '>=')
+  ansible.builtin.debug:
+    msg: "K3s is already at {{ k3s_upgrade_current_version }} (requested {{ k3s_version }}), skipping upgrade."
