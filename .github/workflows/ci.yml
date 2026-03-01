@@ -99,15 +99,16 @@ jobs:
         run: |
           mkdir -p "$GITHUB_WORKSPACE/sarif"
           for mod in $(find . -name go.mod -not -path '*/vendor/*' | xargs -I{} dirname {}); do
+            name=$(echo "$mod" | tr '/./' '-' | sed 's/^-//')
             echo "==> Linting $mod"
-            golangci-lint run --out-format=sarif ./... > "$GITHUB_WORKSPACE/sarif/golangci-$(echo $mod | tr '/./' '-').sarif" 2>/dev/null || true
+            (cd "$mod" && golangci-lint run --output.sarif.path="$GITHUB_WORKSPACE/sarif/golangci-${name}.sarif" ./...) || true
           done
         working-directory: .
 
       - name: Gitleaks (SARIF)
         if: always()
         run: |
-          gitleaks dir --source . --report-format sarif --report-path "$GITHUB_WORKSPACE/sarif/gitleaks.sarif" || true
+          gitleaks dir . --report-format sarif --report-path "$GITHUB_WORKSPACE/sarif/gitleaks.sarif" || true
 
       - name: SBOM generation (syft)
         if: always()
@@ -129,9 +130,13 @@ jobs:
             grype "sbom:$sbom" --output sarif --file "$GITHUB_WORKSPACE/sarif/grype-${name}.sarif" || true
           done
 
+      - name: Clean empty SARIF files
+        if: always()
+        run: find "$GITHUB_WORKSPACE/sarif" -name '*.sarif' -empty -delete
+
       - name: Upload SARIF reports
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: sarif/
 

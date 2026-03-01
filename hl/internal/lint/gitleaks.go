@@ -15,7 +15,7 @@ func (g *GitleaksLinter) CanFix() bool { return false }
 func (g *GitleaksLinter) Fix(_ string) error { return nil }
 
 func (g *GitleaksLinter) Lint(root string) error {
-	c := exec.Command("gitleaks", "dir", "--source", root)
+	c := exec.Command("gitleaks", "dir", root)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	return c.Run()
