@@ -19,8 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -32,19 +30,15 @@ jobs:
         run: go build -o "$GITHUB_WORKSPACE/bin/hl" .
         working-directory: hl
 
-      - name: Setup tools
-        run: |
-          "$GITHUB_WORKSPACE/bin/hl" ci setup
-
-      - name: Upload toolchain
+      - name: Upload hl
         uses: actions/upload-artifact@v4
         with:
-          name: toolchain
-          path: bin/
+          name: hl
+          path: bin/hl
           retention-days: 1
 
-  ci:
-    name: CI
+  check:
+    name: Check
     needs: setup
     runs-on: ubuntu-latest
     steps:
@@ -58,16 +52,19 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: hl/go.sum
 
-      - name: Download toolchain
+      - name: Download hl
         uses: actions/download-artifact@v4
         with:
-          name: toolchain
+          name: hl
           path: bin/
 
-      - name: Prepare tools
+      - name: Prepare hl
         run: |
-          chmod +x bin/*
+          chmod +x bin/hl
           echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
+
+      - name: Setup tools
+        run: hl ci setup helm helmfile terraform gotestsum
 
       - name: Check
         run: hl ci check
@@ -82,6 +79,26 @@ jobs:
           path: test-results/*.xml
           reporter: java-junit
           fail-on-error: false
+
+  docker:
+    name: Docker
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download hl
+        uses: actions/download-artifact@v4
+        with:
+          name: hl
+          path: bin/
+
+      - name: Prepare hl
+        run: |
+          chmod +x bin/hl
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
 
       - name: Log in to Docker Hub
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -112,8 +129,45 @@ jobs:
         env:
           CI: "true"
 
-  security:
-    name: Security
+  golangci-lint:
+    name: golangci-lint
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: hl/go.sum
+
+      - name: Download hl
+        uses: actions/download-artifact@v4
+        with:
+          name: hl
+          path: bin/
+
+      - name: Prepare hl
+        run: |
+          chmod +x bin/hl
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
+
+      - name: Setup tools
+        run: hl ci setup golangci-lint
+
+      - name: Run golangci-lint (SARIF)
+        run: hl ci lint-sarif --output-dir "$GITHUB_WORKSPACE/sarif"
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif/
+          category: golangci-lint
+
+  gitleaks:
+    name: Gitleaks
     needs: setup
     runs-on: ubuntu-latest
     steps:
@@ -121,62 +175,63 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download toolchain
+      - name: Download hl
         uses: actions/download-artifact@v4
         with:
-          name: toolchain
+          name: hl
           path: bin/
 
-      - name: Prepare tools
+      - name: Prepare hl
         run: |
-          chmod +x bin/*
+          chmod +x bin/hl
           echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
 
-      - name: golangci-lint (SARIF)
-        if: always()
-        run: |
-          mkdir -p "$GITHUB_WORKSPACE/sarif"
-          for mod in $(find . -name go.mod -not -path '*/vendor/*' | xargs -I{} dirname {}); do
-            name=$(echo "$mod" | tr '/./' '-' | sed 's/^-//')
-            echo "==> Linting $mod"
-            (cd "$mod" && golangci-lint run --output.sarif.path="$GITHUB_WORKSPACE/sarif/golangci-${name}.sarif" ./...) || true
-          done
-        working-directory: .
+      - name: Setup tools
+        run: hl ci setup gitleaks
 
-      - name: Gitleaks (SARIF)
-        if: always()
-        run: |
-          gitleaks dir . --report-format sarif --report-path "$GITHUB_WORKSPACE/sarif/gitleaks.sarif" || true
+      - name: Run gitleaks (SARIF)
+        run: hl ci gitleaks --output-dir "$GITHUB_WORKSPACE/sarif"
 
-      - name: SBOM generation (syft)
-        if: always()
-        run: |
-          mkdir -p "$GITHUB_WORKSPACE/sbom"
-          for mod in $(find . -name go.mod -not -path '*/vendor/*' | xargs -I{} dirname {}); do
-            name=$(echo "$mod" | tr '/./' '-' | sed 's/^-//')
-            echo "==> SBOM for $mod"
-            syft scan "dir:$mod" -o spdx-json="$GITHUB_WORKSPACE/sbom/${name}.spdx.json" -o cyclonedx-json="$GITHUB_WORKSPACE/sbom/${name}.cdx.json"
-          done
-
-      - name: Vulnerability scan (grype)
-        if: always()
-        run: |
-          for sbom in "$GITHUB_WORKSPACE"/sbom/*.spdx.json; do
-            [ -f "$sbom" ] || continue
-            name=$(basename "$sbom" .spdx.json)
-            echo "==> Scanning $name"
-            grype "sbom:$sbom" --output sarif --file "$GITHUB_WORKSPACE/sarif/grype-${name}.sarif" || true
-          done
-
-      - name: Clean empty SARIF files
-        if: always()
-        run: find "$GITHUB_WORKSPACE/sarif" -name '*.sarif' -empty -delete
-
-      - name: Upload SARIF reports
+      - name: Upload SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: sarif/
+          category: gitleaks
+
+  sbom:
+    name: SBOM & Vulnerability Scan
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download hl
+        uses: actions/download-artifact@v4
+        with:
+          name: hl
+          path: bin/
+
+      - name: Prepare hl
+        run: |
+          chmod +x bin/hl
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
+
+      - name: Setup tools
+        run: hl ci setup syft grype
+
+      - name: Generate SBOMs
+        run: hl ci sbom --output-dir "$GITHUB_WORKSPACE/sbom"
+
+      - name: Run vulnerability scan
+        run: hl ci vulnscan --sbom-dir "$GITHUB_WORKSPACE/sbom" --output-dir "$GITHUB_WORKSPACE/sarif"
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif/
+          category: grype
 
       - name: Upload SBOMs
         if: always()

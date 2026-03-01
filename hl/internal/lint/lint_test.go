@@ -8,7 +8,7 @@ import (
 
 func TestNames_ReturnsAllLinters(t *testing.T) {
 	names := Names()
-	expected := []string{"go", "terraform", "helm", "helmfile", "ansible", "yaml"}
+	expected := []string{"go", "terraform", "helm", "helmfile", "ansible", "yaml", "gitleaks"}
 	if len(names) != len(expected) {
 		t.Fatalf("expected %d linters, got %d: %v", len(expected), len(names), names)
 	}

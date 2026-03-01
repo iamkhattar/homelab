@@ -183,17 +183,33 @@ return fmt.Sprintf("https://github.com/gotestyourself/gotestsum/releases/downloa
 }
 
 var setupCmd = &cobra.Command{
-	Use:   "setup",
+	Use:   "setup [tool...]",
 	Short: "Install required tools for CI and lint",
 	Long: `Download and install external tools needed by hl ci commands.
 
 Tools: helm, helmfile, terraform, golangci-lint, gitleaks, gotestsum, syft, grype
 
+With no arguments, all tools are installed. Pass one or more tool names
+to install only those tools.
+
 Binaries are installed to ./bin (or $GITHUB_WORKSPACE/bin in CI).
 Already-installed tools are skipped.`,
-	Example: `  hl ci setup
-  hl ci setup   # in CI, installs to $GITHUB_WORKSPACE/bin`,
+	Example: `  hl ci setup                          # install all tools
+  hl ci setup helm helmfile terraform   # install only these three
+  hl ci setup golangci-lint             # install a single tool`,
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var names []string
+		for _, t := range tools {
+			names = append(names, t.name)
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		selected, err := selectTools(args)
+		if err != nil {
+			return err
+		}
+
 		binDir := setupBinDir()
 		if err := os.MkdirAll(binDir, 0755); err != nil {
 			return fmt.Errorf("creating bin dir: %w", err)
@@ -209,7 +225,7 @@ Already-installed tools are skipped.`,
 		goos := runtime.GOOS
 		goarch := runtime.GOARCH
 
-		for _, t := range tools {
+		for _, t := range selected {
 			if t.installed() {
 				ui.StepDone(fmt.Sprintf("%s %s (already installed)", t.name, t.version))
 				continue
@@ -244,6 +260,33 @@ Already-installed tools are skipped.`,
 		ui.StepDone(ui.SuccessStyle.Render("All tools ready"))
 		return nil
 	},
+}
+
+// selectTools returns the tools to install based on the given names.
+// If names is empty, all tools are returned.
+func selectTools(names []string) ([]tool, error) {
+	if len(names) == 0 {
+		return tools, nil
+	}
+
+	byName := make(map[string]tool, len(tools))
+	for _, t := range tools {
+		byName[t.name] = t
+	}
+
+	selected := make([]tool, 0, len(names))
+	for _, name := range names {
+		t, ok := byName[name]
+		if !ok {
+			var available []string
+			for _, t := range tools {
+				available = append(available, t.name)
+			}
+			return nil, fmt.Errorf("unknown tool %q (available: %v)", name, available)
+		}
+		selected = append(selected, t)
+	}
+	return selected, nil
 }
 
 // setupBinDir returns the directory where tools should be installed.
