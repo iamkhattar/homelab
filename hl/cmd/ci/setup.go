@@ -180,6 +180,17 @@ return fmt.Sprintf("https://github.com/gotestyourself/gotestsum/releases/downloa
 			return os.Remove(downloadPath)
 		},
 	},
+	{
+		name:      "ansible-lint",
+		version:   "25.4.0",
+		installed: func() bool { _, err := exec.LookPath("ansible-lint"); return err == nil },
+		postInstall: func(_, _ string) error {
+			c := exec.Command("pip", "install", "ansible-lint==25.4.0")
+			c.Stdout = os.Stdout
+			c.Stderr = os.Stderr
+			return c.Run()
+		},
+	},
 }
 
 var setupCmd = &cobra.Command{
@@ -187,12 +198,13 @@ var setupCmd = &cobra.Command{
 	Short: "Install required tools for CI and lint",
 	Long: `Download and install external tools needed by hl ci commands.
 
-Tools: helm, helmfile, terraform, golangci-lint, gitleaks, gotestsum, syft, grype
+Tools: helm, helmfile, terraform, golangci-lint, gitleaks, gotestsum, syft, grype, ansible-lint
 
 With no arguments, all tools are installed. Pass one or more tool names
 to install only those tools.
 
 Binaries are installed to ./bin (or $GITHUB_WORKSPACE/bin in CI).
+Pip-based tools (e.g. ansible-lint) are installed via pip.
 Already-installed tools are skipped.`,
 	Example: `  hl ci setup                          # install all tools
   hl ci setup helm helmfile terraform   # install only these three
@@ -231,26 +243,35 @@ Already-installed tools are skipped.`,
 				continue
 			}
 
-			url := t.url(goos, goarch)
 			ui.Step(fmt.Sprintf("Installing %s %s", t.name, t.version))
 
-			downloadPath := filepath.Join(binDir, t.name+"-download")
-			if err := downloadFile(url, downloadPath); err != nil {
-				ui.StepFail(fmt.Sprintf("Failed to download %s", t.name))
-				return fmt.Errorf("downloading %s: %w", t.name, err)
-			}
+			if t.url != nil {
+				// Binary download flow.
+				url := t.url(goos, goarch)
+				downloadPath := filepath.Join(binDir, t.name+"-download")
+				if err := downloadFile(url, downloadPath); err != nil {
+					ui.StepFail(fmt.Sprintf("Failed to download %s", t.name))
+					return fmt.Errorf("downloading %s: %w", t.name, err)
+				}
 
-			if t.postInstall != nil {
-				if err := t.postInstall(downloadPath, binDir); err != nil {
+				if t.postInstall != nil {
+					if err := t.postInstall(downloadPath, binDir); err != nil {
+						ui.StepFail(fmt.Sprintf("Failed to install %s", t.name))
+						return fmt.Errorf("installing %s: %w", t.name, err)
+					}
+				}
+
+				// Ensure the binary is executable.
+				binPath := filepath.Join(binDir, t.name)
+				if err := os.Chmod(binPath, 0755); err != nil {
+					return err
+				}
+			} else if t.postInstall != nil {
+				// Non-binary install (e.g. pip).
+				if err := t.postInstall("", binDir); err != nil {
 					ui.StepFail(fmt.Sprintf("Failed to install %s", t.name))
 					return fmt.Errorf("installing %s: %w", t.name, err)
 				}
-			}
-
-			// Ensure the binary is executable.
-			binPath := filepath.Join(binDir, t.name)
-			if err := os.Chmod(binPath, 0755); err != nil {
-				return err
 			}
 
 			ui.StepDone(fmt.Sprintf("%s %s", t.name, t.version))

@@ -89,7 +89,7 @@ are tolerated so that all targets are scanned.`,
 			if _, lookErr := exec.LookPath("ansible-lint"); lookErr == nil {
 				ui.Step("Running ansible-lint (SARIF)")
 				ansibleSarif := filepath.Join(sarifDir, "ansible-lint.sarif")
-				c := exec.Command("ansible-lint", "-f", "sarif", "-o", ansibleSarif)
+				c := exec.Command("ansible-lint", "-f", "sarif", "--sarif-file", ansibleSarif)
 				c.Dir = ansibleDir
 				c.Stdout = os.Stdout
 				c.Stderr = os.Stderr
