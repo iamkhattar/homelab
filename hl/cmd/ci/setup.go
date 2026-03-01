@@ -15,7 +15,7 @@ import (
 	"github.com/iamkhattar/homelab/hl/internal/ui"
 )
 
-// tool describes an external dependency that hl build commands need.
+// tool describes an external dependency that hl ci commands need.
 type tool struct {
 	name    string
 	version string
@@ -148,7 +148,7 @@ var tools = []tool{
 		name:    "gotestsum",
 		version: "1.13.0",
 		url: func(goos, goarch string) string {
-			return fmt.Sprintf("https://github.com/gotestyourself/gotestsum/releases/download/v1.13.0/gotestsum_%s_%s.tar.gz",
+return fmt.Sprintf("https://github.com/gotestyourself/gotestsum/releases/download/v1.13.0/gotestsum_%s_%s_%s.tar.gz",
 				"1.13.0", goos, goarch)
 		},
 		installed: func() bool { _, err := exec.LookPath("gotestsum"); return err == nil },

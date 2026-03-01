@@ -69,7 +69,7 @@ func (t *TerraformLinter) checkFormat(root, dir string) error {
 		for _, f := range unformatted {
 			ui.KeyValue("unformatted", f)
 		}
-		return fmt.Errorf("%d file(s) need formatting — run hl build fix", len(unformatted))
+return fmt.Errorf("%d file(s) need formatting — run hl ci fix", len(unformatted))
 	}
 	return nil
 }

@@ -7,7 +7,7 @@ A Go CLI using Cobra + Viper to manage the homelab cluster.
 ```
 hl
 │
-├── build                            # CI/dev tooling
+├── ci                               # CI/dev tooling
 │   ├── lint                         # Run all linters
 │   ├── test                         # Run all tests
 │   ├── fmt                          # Format all code
@@ -49,7 +49,7 @@ hl
 
 ## Design Principles
 
-- **`hl build check`** is the single CI entry point — pipelines call this one command.
+- **`hl ci check`** is the single CI entry point — pipelines call this one command.
 - **`hl app`** is the generic interface for all deployed services. No per-service commands — `hl app forward vault`, `hl app exec postgres -- psql`, `hl app logs grafana` all work the same way.
 - **`hl infra`** is optional — only needed when managing external Hetzner nodes.
 - All commands that wrap external tools (terraform, helmfile, kubectl) respect the Viper config for paths and contexts.
@@ -67,6 +67,6 @@ Config file at `~/.homelab/config.yaml` managed via Viper:
 
 ## Implementation Priority
 
-1. **Phase 1**: `config`, `build`, `cluster`, `deploy` — core workflow, CI integration
+1. **Phase 1**: `config`, `ci`, `cluster`, `deploy` — core workflow, CI integration
 2. **Phase 2**: `app`, `infra` — operational access
 3. **Phase 3**: extended `app` capabilities as services come online
