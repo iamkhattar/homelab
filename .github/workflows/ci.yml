@@ -66,12 +66,15 @@ jobs:
       - name: Setup tools
         run: hl ci setup helm helmfile terraform gotestsum golangci-lint
 
+      - name: Install ansible-lint
+        run: pip install ansible-lint
+
       - name: Check
         run: hl ci check
         env:
           CI: "true"
 
-      - name: golangci-lint (SARIF)
+      - name: Lint SARIF (golangci-lint, ansible-lint)
         if: always()
         run: hl ci lint-sarif --output-dir "$GITHUB_WORKSPACE/sarif"
 
@@ -80,13 +83,13 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: sarif/
-          category: golangci-lint
+          category: lint
 
       - name: Upload test reports
         if: always()
         uses: dorny/test-reporter@v1
         with:
-          name: Go Tests
+          name: Tests
           path: test-results/*.xml
           reporter: java-junit
           fail-on-error: false
