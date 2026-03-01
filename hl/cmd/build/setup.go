@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/iamkhattar/homelab/hl/internal/lint"
 	"github.com/iamkhattar/homelab/hl/internal/ui"
 )
 
