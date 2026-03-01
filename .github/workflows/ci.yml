@@ -13,8 +13,8 @@ env:
   GO_VERSION: "1.25"
 
 jobs:
-  ci:
-    name: CI
+  setup:
+    name: Setup
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,11 +34,42 @@ jobs:
       - name: Setup tools
         run: |
           "$GITHUB_WORKSPACE/bin/hl" build setup
+
+      - name: Upload toolchain
+        uses: actions/upload-artifact@v4
+        with:
+          name: toolchain
+          path: bin/
+          retention-days: 1
+
+  ci:
+    name: CI
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: hl/go.sum
+
+      - name: Download toolchain
+        uses: actions/download-artifact@v4
+        with:
+          name: toolchain
+          path: bin/
+
+      - name: Prepare tools
+        run: |
+          chmod +x bin/*
           echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
 
       - name: Check
-        run: |
-          "$GITHUB_WORKSPACE/bin/hl" build check
+        run: hl build check
         env:
           CI: "true"
 
@@ -52,7 +83,7 @@ jobs:
       - name: Build images (PR)
         if: github.event_name == 'pull_request'
         run: |
-          "$GITHUB_WORKSPACE/bin/hl" build docker \
+          hl build docker \
             --changed \
             --base "origin/${{ github.base_ref }}" \
             --tag "${{ github.sha }}"
@@ -62,7 +93,7 @@ jobs:
       - name: Build and push images (main)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          "$GITHUB_WORKSPACE/bin/hl" build docker \
+          hl build docker \
             --changed \
             --base "${{ github.event.before }}" \
             --push \
@@ -73,25 +104,22 @@ jobs:
 
   security:
     name: Security
+    needs: setup
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: Download toolchain
+        uses: actions/download-artifact@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: hl/go.sum
+          name: toolchain
+          path: bin/
 
-      - name: Build hl
-        run: go build -o "$GITHUB_WORKSPACE/bin/hl" .
-        working-directory: hl
-
-      - name: Setup tools
+      - name: Prepare tools
         run: |
-          "$GITHUB_WORKSPACE/bin/hl" build setup
+          chmod +x bin/*
           echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
 
       - name: golangci-lint (SARIF)
