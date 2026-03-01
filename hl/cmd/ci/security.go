@@ -30,10 +30,10 @@ func moduleName(rel string) string {
 
 var lintSarifCmd = &cobra.Command{
 	Use:   "lint-sarif",
-	Short: "Run golangci-lint with SARIF output for all Go modules",
-	Long: `Run golangci-lint across every Go module in the repo,
-producing a single merged SARIF report. Non-zero exits from golangci-lint
-are tolerated so that all modules are scanned.`,
+	Short: "Run linters with SARIF output (golangci-lint, ansible-lint)",
+	Long: `Run golangci-lint across every Go module and ansible-lint against
+the Ansible directory, producing SARIF reports for each. Non-zero exits
+are tolerated so that all targets are scanned.`,
 	Example: `  hl ci lint-sarif
   hl ci lint-sarif --output-dir sarif/`,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -46,6 +46,7 @@ are tolerated so that all modules are scanned.`,
 			return fmt.Errorf("creating sarif dir: %w", err)
 		}
 
+		// --- golangci-lint SARIF ---
 		modules, err := lint.FindGoModules(root)
 		if err != nil {
 			return err
@@ -78,10 +79,27 @@ are tolerated so that all modules are scanned.`,
 
 		outFile := filepath.Join(sarifDir, "golangci-lint.sarif")
 		if err := mergeSARIFFiles(tmpFiles, outFile); err != nil {
-			return fmt.Errorf("merging SARIF: %w", err)
+			return fmt.Errorf("merging golangci-lint SARIF: %w", err)
+		}
+		ui.StepDone("golangci-lint SARIF complete")
+
+		// --- ansible-lint SARIF ---
+		ansibleDir := filepath.Join(root, "ansible")
+		if _, statErr := os.Stat(ansibleDir); statErr == nil {
+			if _, lookErr := exec.LookPath("ansible-lint"); lookErr == nil {
+				ui.Step("Running ansible-lint (SARIF)")
+				ansibleSarif := filepath.Join(sarifDir, "ansible-lint.sarif")
+				c := exec.Command("ansible-lint", "-f", "sarif", "-o", ansibleSarif)
+				c.Dir = ansibleDir
+				c.Stdout = os.Stdout
+				c.Stderr = os.Stderr
+				_ = c.Run() // tolerate non-zero (findings present)
+				ui.StepDone("ansible-lint SARIF complete")
+			} else {
+				ui.KeyValue("ansible-lint", "skipped (not found)")
+			}
 		}
 
-		ui.StepDone("golangci-lint SARIF complete")
 		return nil
 	},
 }

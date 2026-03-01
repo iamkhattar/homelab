@@ -166,6 +166,7 @@ func runGoTests() error {
 
 // runTerraformTests runs terraform test in the infra/ directory if
 // .tftest.hcl files exist and the terraform CLI is available.
+// When available, it produces a JUnit XML report in the test-results directory.
 func runTerraformTests() error {
 	root, err := lint.RepoRoot()
 	if err != nil {
@@ -193,8 +194,14 @@ func runTerraformTests() error {
 		return err
 	}
 
+	resultsDir := testResultsDir(root)
+	if err := os.MkdirAll(resultsDir, 0755); err != nil {
+		return fmt.Errorf("creating test-results dir: %w", err)
+	}
+	junitFile := filepath.Join(resultsDir, "terraform.xml")
+
 	ui.Step(fmt.Sprintf("Terraform tests (%d test file(s))", len(matches)))
-	c := exec.Command("terraform", "test")
+	c := exec.Command("terraform", "test", fmt.Sprintf("-junit-xml=%s", junitFile))
 	c.Dir = infraDir
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
