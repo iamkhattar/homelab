@@ -1,4 +1,4 @@
-package build
+package ci
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ var docsCmd = &cobra.Command{
 	Use:     "docs",
 	Short:   "Generate CLI documentation in markdown",
 	Long:    "Generate markdown documentation for all CLI commands into the specified directory (default: ../docs/cli).",
-	Example: "  hl build docs\n  hl build docs --output ../docs/cli",
+	Example: "  hl ci docs\n  hl ci docs --output ../docs/cli",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.Step(fmt.Sprintf("Generating docs to %s", ui.Bold.Render(docsDir)))
 

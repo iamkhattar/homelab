@@ -1,4 +1,4 @@
-package build
+package ci
 
 import (
 	"fmt"
@@ -145,6 +145,24 @@ var tools = []tool{
 		},
 	},
 	{
+		name:    "gotestsum",
+		version: "1.13.0",
+		url: func(goos, goarch string) string {
+			return fmt.Sprintf("https://github.com/gotestyourself/gotestsum/releases/download/v1.13.0/gotestsum_%s_%s.tar.gz",
+				"1.13.0", goos, goarch)
+		},
+		installed: func() bool { _, err := exec.LookPath("gotestsum"); return err == nil },
+		postInstall: func(downloadPath, binDir string) error {
+			c := exec.Command("tar", "-xzf", downloadPath, "-C", binDir, "gotestsum")
+			c.Stdout = os.Stdout
+			c.Stderr = os.Stderr
+			if err := c.Run(); err != nil {
+				return err
+			}
+			return os.Remove(downloadPath)
+		},
+	},
+	{
 		name:    "grype",
 		version: "0.92.0",
 		url: func(goos, goarch string) string {
@@ -166,15 +184,15 @@ var tools = []tool{
 
 var setupCmd = &cobra.Command{
 	Use:   "setup",
-	Short: "Install required tools for build and lint",
-	Long: `Download and install external tools needed by hl build commands.
+	Short: "Install required tools for CI and lint",
+	Long: `Download and install external tools needed by hl ci commands.
 
-Tools: helm, helmfile, terraform, golangci-lint, gitleaks, syft, grype
+Tools: helm, helmfile, terraform, golangci-lint, gitleaks, gotestsum, syft, grype
 
 Binaries are installed to ./bin (or $GITHUB_WORKSPACE/bin in CI).
 Already-installed tools are skipped.`,
-	Example: `  hl build setup
-  hl build setup   # in CI, installs to $GITHUB_WORKSPACE/bin`,
+	Example: `  hl ci setup
+  hl ci setup   # in CI, installs to $GITHUB_WORKSPACE/bin`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		binDir := setupBinDir()
 		if err := os.MkdirAll(binDir, 0755); err != nil {

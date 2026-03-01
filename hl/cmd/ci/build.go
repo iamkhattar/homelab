@@ -1,4 +1,4 @@
-package build
+package ci
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ var (
 )
 
 var Cmd = &cobra.Command{
-	Use:   "build",
+	Use:   "ci",
 	Short: "CI/dev tooling — lint, test, fix, check, docker",
 	Long:  "Commands for linting, testing, fixing, running checks, and building container images. Designed to be called both locally and from CI pipelines.",
 }
@@ -37,9 +37,9 @@ var lintCmd = &cobra.Command{
 Linters: %s
 
 Use --skip to exclude specific linters by name.`, strings.Join(lint.Names(), ", ")),
-	Example: `  hl build lint
-  hl build lint --skip helm,helmfile
-  hl build lint --skip ansible`,
+	Example: `  hl ci lint
+  hl ci lint --skip helm,helmfile
+  hl ci lint --skip ansible`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		root, err := lint.RepoRoot()
 		if err != nil {
@@ -67,8 +67,8 @@ var fixCmd = &cobra.Command{
 Fixable linters: go (go fmt), terraform (hcl format)
 
 Use --skip to exclude specific fixers by name. Available: %s`, strings.Join(lint.Names(), ", ")),
-	Example: `  hl build fix
-  hl build fix --skip terraform`,
+	Example: `  hl ci fix
+  hl ci fix --skip terraform`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		root, err := lint.RepoRoot()
 		if err != nil {
@@ -94,7 +94,7 @@ var testCmd = &cobra.Command{
 	Long: `Run all test suites across the repository.
 
 Suites: go (go test ./... per module), terraform (terraform test in infra/)`,
-	Example: "  hl build test",
+	Example: "  hl ci test",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Go tests — run per module.
 		ui.Step("Go tests")
@@ -113,7 +113,17 @@ Suites: go (go test ./... per module), terraform (terraform test in infra/)`,
 	},
 }
 
-// runGoTests discovers Go modules and runs go test ./... in each.
+// testResultsDir returns the directory for JUnit XML test results.
+// In CI it uses $GITHUB_WORKSPACE/test-results, locally it uses <root>/test-results.
+func testResultsDir(root string) string {
+	if ws := os.Getenv("GITHUB_WORKSPACE"); ws != "" {
+		return filepath.Join(ws, "test-results")
+	}
+	return filepath.Join(root, "test-results")
+}
+
+// runGoTests discovers Go modules and runs tests in each.
+// When gotestsum is available, it produces JUnit XML reports.
 func runGoTests() error {
 	root, err := lint.RepoRoot()
 	if err != nil {
@@ -123,10 +133,27 @@ func runGoTests() error {
 	if err != nil {
 		return err
 	}
+
+	useGotestsum := false
+	if _, err := exec.LookPath("gotestsum"); err == nil {
+		useGotestsum = true
+		resultsDir := testResultsDir(root)
+		if err := os.MkdirAll(resultsDir, 0755); err != nil {
+			return fmt.Errorf("creating test-results dir: %w", err)
+		}
+	}
+
 	for _, dir := range modules {
 		rel, _ := filepath.Rel(root, dir)
 		ui.KeyValue("  module", rel)
-		c := exec.Command("go", "test", "./...")
+
+		var c *exec.Cmd
+		if useGotestsum {
+			junitFile := filepath.Join(testResultsDir(root), strings.ReplaceAll(rel, "/", "-")+".xml")
+			c = exec.Command("gotestsum", "--junitfile", junitFile, "--", "./...")
+		} else {
+			c = exec.Command("go", "test", "./...")
+		}
 		c.Dir = dir
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stderr
@@ -180,8 +207,8 @@ var checkCmd = &cobra.Command{
 	Short: "Run all checks (lint + test) — single CI entry point",
 	Long: `Run lint and test sequentially. Exits on the first failure.
 This is the intended single entry point for CI pipelines.`,
-	Example: `  hl build check
-  hl build check --skip ansible,helmfile`,
+	Example: `  hl ci check
+  hl ci check --skip ansible,helmfile`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		steps := []struct {
 			name string
@@ -210,12 +237,12 @@ If no service names are given, all services with a Dockerfile are built.
 Use --changed to only build services that have changed relative to --base ref.
 Use --push to push images after building (intended for CI only).
 Requires the CI environment variable to be set when using --push.`,
-	Example: `  hl build docker butler
-  hl build docker --tag v1.0.0
-  hl build docker --tag latest --tag abc1234
-  hl build docker --changed                     # only services changed vs origin/main
-  hl build docker --changed --base HEAD~1        # changed vs previous commit
-  hl build docker --push --changed --tag latest  # CI only`,
+	Example: `  hl ci docker butler
+  hl ci docker --tag v1.0.0
+  hl ci docker --tag latest --tag abc1234
+  hl ci docker --changed                     # only services changed vs origin/main
+  hl ci docker --changed --base HEAD~1        # changed vs previous commit
+  hl ci docker --push --changed --tag latest  # CI only`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if push && os.Getenv("CI") == "" {
 			return fmt.Errorf("--push is only allowed in CI environments (CI env var not set)")

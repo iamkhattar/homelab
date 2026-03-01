@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  checks: write
   security-events: write
 
 env:
@@ -69,9 +70,18 @@ jobs:
           echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
 
       - name: Check
-        run: hl build check
+        run: hl ci check
         env:
           CI: "true"
+
+      - name: Upload test reports
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Go Tests
+          path: test-results/*.xml
+          reporter: java-junit
+          fail-on-error: false
 
       - name: Log in to Docker Hub
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -83,7 +93,7 @@ jobs:
       - name: Build images (PR)
         if: github.event_name == 'pull_request'
         run: |
-          hl build docker \
+          hl ci docker \
             --changed \
             --base "origin/${{ github.base_ref }}" \
             --tag "${{ github.sha }}"
@@ -93,7 +103,7 @@ jobs:
       - name: Build and push images (main)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          hl build docker \
+          hl ci docker \
             --changed \
             --base "${{ github.event.before }}" \
             --push \

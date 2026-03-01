@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/iamkhattar/homelab/hl/cmd/app"
-	"github.com/iamkhattar/homelab/hl/cmd/build"
+	"github.com/iamkhattar/homelab/hl/cmd/ci"
 	"github.com/iamkhattar/homelab/hl/cmd/cluster"
 	"github.com/iamkhattar/homelab/hl/cmd/config"
 	"github.com/iamkhattar/homelab/hl/cmd/deploy"
@@ -35,7 +35,7 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.AddCommand(build.Cmd)
+	rootCmd.AddCommand(ci.Cmd)
 	rootCmd.AddCommand(cluster.Cmd)
 	rootCmd.AddCommand(deploy.Cmd)
 	rootCmd.AddCommand(infra.Cmd)
