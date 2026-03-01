@@ -4,17 +4,19 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 ## Project Overview
 
-Homelab infrastructure on Hetzner Cloud. Terraform provisions cloud resources, cloud-init bootstraps nodes by cloning this repo and running Ansible, which installs and configures a K3s Kubernetes cluster. Helm charts (managed via Helmfile) deploy cluster services.
+Homelab infrastructure supporting both local (home) nodes and external (Hetzner) nodes. Ansible bootstraps all nodes into a K3s cluster. Terraform provisions external cloud resources. Helm charts (managed via Helmfile) deploy cluster services. Custom services and CLIs are built and deployed from this repo.
 
 ## Architecture
 
-The repo has three layers that execute in sequence:
+The repo has four top-level layers:
 
-1. **`infra/`** — Terraform (Hetzner Cloud provider, Terraform Cloud backend `iamkhattar/homelab`). Provisions a private network (`10.0.0.0/16`, subnet `10.0.1.0/24` in `eu-central`), one server node (static IP `10.0.1.1`), N agent nodes, and two firewalls (public for HTTP/HTTPS/K8s API, private for intra-cluster). Cloud-init user data templates (`infra/config/cloud-init-*.yml`) clone this repo on each node and run the Ansible playbook automatically.
+1. **`infra/`** — Terraform (Hetzner Cloud provider, Terraform Cloud backend `iamkhattar/homelab`). Provisions external nodes with a private network (`10.0.0.0/16`, subnet `10.0.1.0/24` in `eu-central`), firewalls, and cloud-init templates (`infra/config/cloud-init-*.yml`).
 
-2. **`cluster/k3s/`** — Ansible roles for K3s installation. The `site.yml` playbook runs three roles in order: `prerequisites` (OS prep, networking, IP detection), `k3s_server` (downloads and starts K3s server with `--secrets-encryption`), `k3s_agent` (joins agent nodes to the server at `10.0.1.1:6443`). Inventory files are per node type (`inventory-server.yml`, `inventory-agent.yml`) and use `ansible_connection: local` because cloud-init runs Ansible on-node. The K3s version is pinned in inventory vars.
+2. **`ansible/`** — Ansible roles for bootstrapping all nodes (local and external) into a K3s cluster. The `site.yml` playbook runs three roles in order: `prerequisites` (OS prep, networking, IP detection), `k3s_server` (downloads and starts K3s server with `--secrets-encryption`), `k3s_agent` (joins agent nodes to the server). Inventory files are per node type. The K3s version is pinned in inventory vars.
 
-3. **`cluster/` (Helm layer)** — `helmfile.yaml` at `cluster/` root orchestrates Helm releases with dependency ordering via `needs`. Local charts live in `cluster/core/` and `cluster/storage/`. Current releases: namespaces, rbac-policies, cert-manager, longhorn. Each chart's `values.yaml` defines the configurable resources.
+3. **`cluster/`** — Helmfile at `cluster/` root orchestrates Helm releases with dependency ordering via `needs`. Charts are organized into `core/` (namespaces, RBAC, cert-manager), `storage/` (Longhorn), and `apps/` (user-facing applications like Home Assistant, Vault, MQTT).
+
+4. **`services/` and `cli/`** — Custom services and CLIs that get containerized and deployed to the cluster.
 
 ## Key Commands
 
@@ -26,9 +28,9 @@ terraform validate          # Validate configuration
 terraform plan              # Preview changes (requires TF_VAR_* env vars)
 terraform apply             # Apply changes
 ```
-Required environment variables: `TF_VAR_hetzner_cloud_api_token`, `TF_VAR_k3s_api_token`, `TF_VAR_ssh_public_key`.
+Required environment variables: `TF_VAR_hetzner_cloud_api_token`, `TF_VAR_ssh_public_key`.
 
-### Ansible (run from `cluster/k3s/`)
+### Ansible (run from `ansible/`)
 ```
 ansible-playbook playbooks/site.yml -i inventory/inventory-server.yml -e 'token=<k3s_token>'   # Bootstrap server
 ansible-playbook playbooks/site.yml -i inventory/inventory-agent.yml -e 'token=<k3s_token>'    # Bootstrap agent

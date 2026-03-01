@@ -1,0 +1,3 @@
+Vaultwarden has been deployed to the cluster.
+
+Web Vault: vaultwarden.applications.svc.cluster.local:{{ .Values.service.port }}

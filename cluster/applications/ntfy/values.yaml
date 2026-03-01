@@ -1,0 +1,33 @@
+replicaCount: 1
+
+image:
+  repository: binwiederhier/ntfy
+  tag: v2.11.0
+  pullPolicy: IfNotPresent
+
+command: ["ntfy", "serve"]
+
+service:
+  type: ClusterIP
+  port: 80
+  containerPort: 80
+
+env:
+  NTFY_BASE_URL: "https://ntfy.example.com"  # Update with your domain
+  NTFY_UPSTREAM_BASE_URL: "https://ntfy.sh"
+  NTFY_BEHIND_PROXY: "true"
+
+persistence:
+  enabled: true
+  size: 2Gi
+  accessMode: ReadWriteOnce
+  mountPath: /var/cache/ntfy
+  storageClass: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

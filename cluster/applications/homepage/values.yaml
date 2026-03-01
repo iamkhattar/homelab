@@ -1,0 +1,98 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/gethomepage/homepage
+  tag: latest
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port: 80
+  containerPort: 3000
+
+env:
+  HOMEPAGE_ALLOWED_HOSTS: "*"
+
+persistence:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+# Homepage is configured via ConfigMap mounted to /app/config
+config:
+  settings.yaml: |
+    title: Homelab
+    favicon: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/homepage.png
+    headerStyle: clean
+    layout:
+      - Smart Home:
+          icon: home-assistant
+      - Monitoring:
+          icon: grafana
+      - Applications:
+          icon: docker
+      - Infrastructure:
+          icon: server
+  widgets.yaml: |
+    - kubernetes:
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+        nodes:
+          show: true
+  services.yaml: |
+    - Smart Home:
+        - Home Assistant:
+            href: http://home-assistant.smart-home.svc.cluster.local:8123
+            icon: home-assistant
+            description: Home automation
+        - Zigbee2MQTT:
+            href: http://zigbee2mqtt.smart-home.svc.cluster.local:80
+            icon: zigbee2mqtt
+            description: Zigbee device management
+    - Monitoring:
+        - Grafana:
+            href: http://grafana.monitoring.svc.cluster.local:80
+            icon: grafana
+            description: Dashboards and metrics
+        - Prometheus:
+            href: http://prometheus-server.monitoring.svc.cluster.local:80
+            icon: prometheus
+            description: Metrics collection
+    - Applications:
+        - Paperless-ngx:
+            href: http://paperless-ngx.applications.svc.cluster.local:8000
+            icon: paperless-ngx
+            description: Document management
+        - Vaultwarden:
+            href: http://vaultwarden.applications.svc.cluster.local:80
+            icon: vaultwarden
+            description: Password manager
+        - KitchenOwl:
+            href: http://kitchenowl.applications.svc.cluster.local:8080
+            icon: kitchenowl
+            description: Grocery and recipe management
+        - ntfy:
+            href: http://ntfy.applications.svc.cluster.local:80
+            icon: ntfy
+            description: Push notifications
+    - Infrastructure:
+        - Vault:
+            href: http://vault.security.svc.cluster.local:8200
+            icon: vault
+            description: Secrets management
+        - Pocket ID:
+            href: http://pocket-id.security.svc.cluster.local:80
+            icon: authentik
+            description: OIDC authentication
+  bookmarks.yaml: ""
+  docker.yaml: ""
+  kubernetes.yaml: |
+    mode: cluster

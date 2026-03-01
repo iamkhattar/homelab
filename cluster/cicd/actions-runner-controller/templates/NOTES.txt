@@ -1,0 +1,6 @@
+GitHub Actions Runner Controller has been deployed to the cluster.
+
+Next steps:
+  1. Create a GitHub App or PAT for authentication
+  2. Store credentials in Vault
+  3. Deploy a RunnerScaleSet to register runners with your repo/org

@@ -19,3 +19,8 @@ package_upgrade: true
 packages:
   - ansible
   - git
+
+runcmd:
+  - git clone -b new-homelab https://github.com/iamkhattar/homelab.git /opt/homelab
+  - chown -R ansible:ansible /opt/homelab
+  - su - ansible -s /bin/bash -c "cd /opt/homelab/ansible && ansible-playbook playbooks/site.yml -i inventory/inventory-agent.yml -e 'token=${k3s_api_token}'"

@@ -1,11 +1,25 @@
 repositories:
-  - name: longhorn
-    url: https://charts.longhorn.io
   - name: cert-manager
     url: https://charts.jetstack.io
+  - name: hashicorp
+    url: https://helm.releases.hashicorp.com
+  # - name: prometheus-community
+  #   url: https://prometheus-community.github.io/helm-charts
+  # - name: grafana
+  #   url: https://grafana.github.io/helm-charts
+  # - name: fluent
+  #   url: https://fluent.github.io/helm-charts
+  # - name: bitnami
+  #   url: https://charts.bitnami.com/bitnami
+  # - name: crowdsec
+  #   url: https://crowdsecurity.github.io/helm-charts
+  # - name: gatekeeper
+  #   url: https://open-policy-agent.github.io/gatekeeper/charts
+  # - name: tailscale
+  #   url: https://pkgs.tailscale.com/helmcharts
 
 releases:
-###  CORE CONFIGURATION ###
+###  CORE  ###
   - name: namespaces
     chart: ./core/namespaces
     historyMax: 5
@@ -21,18 +35,135 @@ releases:
     namespace: cert-manager
     needs: [kube-system/namespaces]
 
-###  STORAGE CONFIGURATION ###
-  - name: longhorn
-    chart: ./storage/longhorn
+###  SECURITY  ###
+  - name: vault
+    chart: ./security/vault
     historyMax: 5
-    namespace: longhorn-system
-    createNamespace: true
-    needs: [kube-system/namespaces]
+    namespace: security
+    needs: [kube-system/namespaces, kube-system/rbac-policies]
+  - name: vault-secrets-operator
+    chart: ./security/vault-secrets-operator
+    historyMax: 5
+    namespace: security
+    needs: [kube-system/namespaces, security/butler]
+  # - name: pocket-id
+  #   chart: ./security/pocket-id
+  #   historyMax: 5
+  #   namespace: security
+  #   needs: [kube-system/namespaces]
+  # - name: crowdsec
+  #   chart: ./security/crowdsec
+  #   historyMax: 5
+  #   namespace: security
+  #   needs: [kube-system/namespaces]
+  # - name: opa-gatekeeper
+  #   chart: ./security/opa
+  #   historyMax: 5
+  #   namespace: security
+  #   needs: [kube-system/namespaces]
 
-###  DATABASES CONFIGURATION ###
+###  SERVICES  ###
+  - name: butler
+    chart: ./services/butler
+    historyMax: 5
+    namespace: security
+    needs: [kube-system/namespaces, security/vault]
 
-hooks:
-  - events: ["prepare"]
-    showlogs: true
-    command: "kubectl"
-    args: ["label", "node", "agent-node-0", "node-role.kubernetes.io/worker=true", "--overwrite"]
+###  DATABASES  ###
+  # - name: postgresql
+  #   chart: ./databases/postgresql
+  #   historyMax: 5
+  #   namespace: databases
+  #   needs: [kube-system/namespaces, kube-system/rbac-policies, security/vault-secrets-operator]
+  # - name: redis
+  #   chart: ./databases/redis
+  #   historyMax: 5
+  #   namespace: databases
+  #   needs: [kube-system/namespaces, kube-system/rbac-policies, security/vault-secrets-operator]
+
+###  STORAGE  ###
+  # - name: garage
+  #   chart: ./storage/garage
+  #   historyMax: 5
+  #   namespace: storage
+  #   needs: [kube-system/namespaces, kube-system/rbac-policies, security/vault-secrets-operator]
+
+###  MONITORING  ###
+  # - name: prometheus
+  #   chart: ./monitoring/prometheus
+  #   historyMax: 5
+  #   namespace: monitoring
+  #   needs: [kube-system/namespaces, kube-system/rbac-policies]
+  # - name: loki
+  #   chart: ./monitoring/loki
+  #   historyMax: 5
+  #   namespace: monitoring
+  #   needs: [kube-system/namespaces, kube-system/rbac-policies]
+  # - name: fluent-bit
+  #   chart: ./monitoring/fluent-bit
+  #   historyMax: 5
+  #   namespace: monitoring
+  #   needs: [kube-system/namespaces, kube-system/rbac-policies, monitoring/loki]
+  # - name: grafana
+  #   chart: ./monitoring/grafana
+  #   historyMax: 5
+  #   namespace: monitoring
+  #   needs: [kube-system/namespaces, monitoring/prometheus, monitoring/loki, security/vault-secrets-operator]
+
+###  SMART HOME  ###
+  # - name: mosquitto
+  #   chart: ./smart-home/mosquitto
+  #   historyMax: 5
+  #   namespace: smart-home
+  #   needs: [kube-system/namespaces]
+  # - name: zigbee2mqtt
+  #   chart: ./smart-home/zigbee2mqtt
+  #   historyMax: 5
+  #   namespace: smart-home
+  #   needs: [kube-system/namespaces, smart-home/mosquitto]
+  # - name: home-assistant
+  #   chart: ./smart-home/home-assistant
+  #   historyMax: 5
+  #   namespace: smart-home
+  #   needs: [kube-system/namespaces, smart-home/mosquitto]
+
+###  APPLICATIONS  ###
+  # - name: homepage
+  #   chart: ./applications/homepage
+  #   historyMax: 5
+  #   namespace: applications
+  #   needs: [kube-system/namespaces]
+  # - name: paperless-ngx
+  #   chart: ./applications/paperless-ngx
+  #   historyMax: 5
+  #   namespace: applications
+  #   needs: [kube-system/namespaces, databases/postgresql, databases/redis, security/vault-secrets-operator]
+  # - name: kitchenowl
+  #   chart: ./applications/kitchenowl
+  #   historyMax: 5
+  #   namespace: applications
+  #   needs: [kube-system/namespaces, security/vault-secrets-operator]
+  # - name: ntfy
+  #   chart: ./applications/ntfy
+  #   historyMax: 5
+  #   namespace: applications
+  #   needs: [kube-system/namespaces]
+  # - name: vaultwarden
+  #   chart: ./applications/vaultwarden
+  #   historyMax: 5
+  #   namespace: applications
+  #   needs: [kube-system/namespaces, security/vault-secrets-operator]
+
+###  NETWORKING  ###
+  # - name: tailscale
+  #   chart: ./networking/tailscale
+  #   historyMax: 5
+  #   namespace: networking
+  #   needs: [kube-system/namespaces]
+
+###  CI/CD  ###
+  # - name: actions-runner-controller
+  #   chart: ./cicd/actions-runner-controller
+  #   historyMax: 5
+  #   namespace: cicd
+  #   needs: [kube-system/namespaces]

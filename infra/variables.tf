@@ -6,6 +6,12 @@ variable "hetzner_cloud_api_token" {
   type        = string
 }
 
+variable "k3s_api_token" {
+  description = "K3s Cluster API Token"
+  sensitive   = true
+  type        = string
+}
+
 variable "ssh_public_key" {
   description = "SSH Public Key to login to cluster"
   sensitive   = true

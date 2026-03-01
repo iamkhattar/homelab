@@ -1,0 +1,11 @@
+tailscale-operator:
+  oauth:
+    clientId: ""      # Set via Vault secret
+    clientSecret: ""  # Set via Vault secret
+  operatorConfig:
+    hostname: homelab-operator
+  apiServerProxyConfig:
+    mode: "true"
+
+# OAuth credentials should be created in the Tailscale admin console
+# and stored in Vault at: secret/networking/tailscale

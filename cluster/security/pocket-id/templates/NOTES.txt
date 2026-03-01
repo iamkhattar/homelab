@@ -1,0 +1,3 @@
+Pocket ID has been deployed to the cluster.
+
+OIDC Provider: pocket-id.security.svc.cluster.local:{{ .Values.service.port }}

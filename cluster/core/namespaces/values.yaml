@@ -1,4 +1,8 @@
 namespaces:
+  - name: cert-manager
+    labels:
+      app.kubernetes.io/component: cert-manager
+      6940469.xyz/category: core
   - name: databases
     labels:
       app.kubernetes.io/component: database
@@ -6,10 +10,6 @@ namespaces:
   - name: storage
     labels:
       app.kubernetes.io/component: storage
-      6940469.xyz/category: infrastructure
-  - name: messaging
-    labels:
-      app.kubernetes.io/component: messaging
       6940469.xyz/category: infrastructure
   - name: monitoring
     labels:
@@ -23,15 +23,15 @@ namespaces:
     labels:
       app.kubernetes.io/component: application
       6940469.xyz/category: applications
-  - name: services
+  - name: smart-home
     labels:
-      app.kubernetes.io/component: service
-      6940469.xyz/category: services
-  - name: longhorn-system
+      app.kubernetes.io/component: smart-home
+      6940469.xyz/category: applications
+  - name: networking
     labels:
-      app.kubernetes.io/component: longhorn
-      6940469.xyz/category: longhorn
-  - name: cert-manager
+      app.kubernetes.io/component: networking
+      6940469.xyz/category: infrastructure
+  - name: cicd
     labels:
-      app.kubernetes.io/component: cert-manager
-      6940469.xyz/category: cert-manager
+      app.kubernetes.io/component: cicd
+      6940469.xyz/category: infrastructure

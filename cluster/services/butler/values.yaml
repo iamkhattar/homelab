@@ -1,0 +1,25 @@
+replicaCount: 1
+
+image:
+  repository: iamkhattar/butler
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+  containerPort: 8080
+
+env:
+  LOG_LEVEL: "info"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+serviceAccount:
+  name: butler

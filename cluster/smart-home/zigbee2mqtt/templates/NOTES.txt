@@ -1,0 +1,6 @@
+Zigbee2MQTT has been deployed to the cluster.
+
+Frontend: zigbee2mqtt.smart-home.svc.cluster.local:{{ .Values.service.port }}
+
+NOTE: Ensure the Zigbee adapter is available at the configured serial port on the node.
+You may need to use a nodeSelector to pin this pod to the node with the USB adapter.

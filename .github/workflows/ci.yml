@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.25"
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: hl/go.sum
+
+      - name: Build hl
+        run: go build -o "$GITHUB_WORKSPACE/bin/hl" .
+        working-directory: hl
+
+      - name: Check
+        run: "$GITHUB_WORKSPACE/bin/hl" build check
+        env:
+          CI: "true"
+
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build images (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          "$GITHUB_WORKSPACE/bin/hl" build docker \
+            --changed \
+            --base "origin/${{ github.base_ref }}" \
+            --tag "${{ github.sha }}"
+        env:
+          CI: "true"
+
+      - name: Build and push images (main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          "$GITHUB_WORKSPACE/bin/hl" build docker \
+            --changed \
+            --base "${{ github.event.before }}" \
+            --push \
+            --tag latest \
+            --tag "${{ github.sha }}"
+        env:
+          CI: "true"

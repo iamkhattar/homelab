@@ -1,0 +1,44 @@
+crowdsec:
+  container_runtime: containerd
+  lapi:
+    env:
+      - name: ENROLL_KEY
+        valueFrom:
+          secretKeyRef:
+            name: crowdsec-credentials
+            key: enroll-key
+    persistentVolume:
+      data:
+        enabled: true
+        size: 1Gi
+      config:
+        enabled: true
+        size: 100Mi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+  agent:
+    acquisition:
+      - namespace: applications
+        podName: "*"
+        program: "*"
+      - namespace: smart-home
+        podName: "*"
+        program: "*"
+      - namespace: security
+        podName: "*"
+        program: "*"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+# Secret 'crowdsec-credentials' is managed by Vault.
+# Vault path: secret/security/crowdsec

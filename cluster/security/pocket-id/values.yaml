@@ -1,0 +1,30 @@
+replicaCount: 1
+
+image:
+  repository: stonith404/pocket-id
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  containerPort: 1411
+
+env:
+  PUBLIC_APP_URL: "https://auth.example.com"  # Update with your domain
+  TRUST_PROXY: "true"
+
+persistence:
+  enabled: true
+  size: 1Gi
+  accessMode: ReadWriteOnce
+  mountPath: /data
+  storageClass: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi

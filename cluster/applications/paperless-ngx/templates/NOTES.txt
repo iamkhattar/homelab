@@ -1,0 +1,5 @@
+Paperless-ngx has been deployed to the cluster.
+
+Web UI: paperless-ngx.applications.svc.cluster.local:{{ .Values.service.port }}
+
+Requires: PostgreSQL + Redis (databases namespace)

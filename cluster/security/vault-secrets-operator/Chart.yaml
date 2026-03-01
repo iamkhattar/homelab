@@ -1,0 +1,10 @@
+apiVersion: v2
+name: vault-secrets-operator
+description: A Helm chart to deploy HashiCorp Vault Secrets Operator for the homelab k3s cluster
+type: application
+version: 0.1.0
+appVersion: "0.9.0"
+dependencies:
+  - name: vault-secrets-operator
+    version: "0.9.0"
+    repository: https://helm.releases.hashicorp.com

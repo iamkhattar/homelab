@@ -1,7 +1,6 @@
 resource "hcloud_firewall" "public_nodes_firewall" {
   name = "public-nodes-firewall"
 
-  
   rule {
     description = "Allow SSH traffic"
     direction   = "in"

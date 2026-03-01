@@ -1,0 +1,8 @@
+Vault has been deployed to the cluster.
+
+UI: vault.security.svc.cluster.local:8200
+API: vault.security.svc.cluster.local:8200/v1
+
+Remember to initialize and unseal Vault after first deployment:
+  kubectl exec -n security vault-0 -- vault operator init
+  kubectl exec -n security vault-0 -- vault operator unseal

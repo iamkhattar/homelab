@@ -1,0 +1,39 @@
+replicaCount: 1
+
+image:
+  repository: vaultwarden/server
+  tag: "1.32.5"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  containerPort: 80
+
+env:
+  DOMAIN: "https://vault.example.com"  # Update with your domain
+  SIGNUPS_ALLOWED: "false"
+  INVITATIONS_ALLOWED: "true"
+  SHOW_PASSWORD_HINT: "false"
+  ROCKET_PORT: "80"
+
+envFromSecrets:
+  - secretName: vaultwarden-credentials
+    keys:
+      ADMIN_TOKEN: admin-token
+      DATABASE_URL: database-url
+
+persistence:
+  enabled: true
+  size: 2Gi
+  accessMode: ReadWriteOnce
+  mountPath: /data
+  storageClass: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi

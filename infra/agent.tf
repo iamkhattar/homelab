@@ -2,6 +2,7 @@ data "template_file" "agent_node_config" {
   template = file("${path.module}/config/cloud-init-agent.yml")
   vars = {
     local_ssh_public_key = var.ssh_public_key
+    k3s_api_token        = var.k3s_api_token
   }
 }
 

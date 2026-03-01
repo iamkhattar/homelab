@@ -1,0 +1,3 @@
+KitchenOwl has been deployed to the cluster.
+
+Web UI: kitchenowl.applications.svc.cluster.local:{{ .Values.service.port }}

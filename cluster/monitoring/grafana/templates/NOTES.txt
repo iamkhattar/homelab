@@ -1,0 +1,3 @@
+Grafana has been deployed to the cluster.
+
+Access: grafana.monitoring.svc.cluster.local:80

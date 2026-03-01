@@ -1,0 +1,32 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/home-assistant/home-assistant
+  tag: "2024.12"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8123
+  containerPort: 8123
+
+# Host network required for mDNS/SSDP device discovery
+hostNetwork: false  # Set to true if you need local device discovery
+
+env:
+  TZ: "UTC"  # Update with your timezone
+
+persistence:
+  enabled: true
+  size: 5Gi
+  accessMode: ReadWriteOnce
+  mountPath: /config
+  storageClass: ""
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi

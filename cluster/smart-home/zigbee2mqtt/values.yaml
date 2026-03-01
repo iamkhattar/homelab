@@ -1,0 +1,35 @@
+replicaCount: 1
+
+image:
+  repository: koenkk/zigbee2mqtt
+  tag: "1.41.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  containerPort: 8080
+
+env:
+  ZIGBEE2MQTT_CONFIG_MQTT_SERVER: "mqtt://mosquitto.smart-home.svc.cluster.local:1883"
+  ZIGBEE2MQTT_CONFIG_SERIAL_PORT: "/dev/ttyUSB0"  # Update to match your Zigbee adapter
+  ZIGBEE2MQTT_CONFIG_FRONTEND: "true"
+
+# USB device passthrough for Zigbee adapter
+securityContext:
+  privileged: true
+
+persistence:
+  enabled: true
+  size: 1Gi
+  accessMode: ReadWriteOnce
+  mountPath: /app/data
+  storageClass: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi

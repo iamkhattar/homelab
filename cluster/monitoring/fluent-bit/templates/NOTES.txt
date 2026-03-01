@@ -1,0 +1,3 @@
+Fluent Bit has been deployed as a DaemonSet.
+
+Logs are being shipped to Loki at loki.monitoring.svc.cluster.local:3100

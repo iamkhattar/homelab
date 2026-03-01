@@ -1,0 +1,13 @@
+{{- range .Values.clusterRoles }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .name }}
+  labels:
+    app.kubernetes.io/name: {{ .name }}
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/managed-by: rbac-policies
+rules:
+  {{- toYaml .rules | nindent 2 }}
+{{- end }}
