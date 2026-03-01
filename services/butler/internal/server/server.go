@@ -52,7 +52,7 @@ func (s *Server) protected(next http.Handler) http.Handler {
 
 func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
+	_, _ = w.Write([]byte("ok"))
 }
 
 func (s *Server) handleReadyz(w http.ResponseWriter, _ *http.Request) {
@@ -61,7 +61,7 @@ func (s *Server) handleReadyz(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
+	_, _ = w.Write([]byte("ok"))
 }
 
 func (s *Server) handleReconcile(w http.ResponseWriter, r *http.Request) {
@@ -80,5 +80,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 func writeJSON(w http.ResponseWriter, code int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		slog.Error("encoding JSON response", "error", err)
+	}
 }
