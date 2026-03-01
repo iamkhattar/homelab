@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 env:
   GO_VERSION: "1.25"
@@ -69,3 +70,74 @@ jobs:
             --tag "${{ github.sha }}"
         env:
           CI: "true"
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: hl/go.sum
+
+      - name: Build hl
+        run: go build -o "$GITHUB_WORKSPACE/bin/hl" .
+        working-directory: hl
+
+      - name: Setup tools
+        run: |
+          "$GITHUB_WORKSPACE/bin/hl" build setup
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
+
+      - name: golangci-lint (SARIF)
+        if: always()
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/sarif"
+          for mod in $(find . -name go.mod -not -path '*/vendor/*' | xargs -I{} dirname {}); do
+            echo "==> Linting $mod"
+            golangci-lint run --out-format=sarif ./... > "$GITHUB_WORKSPACE/sarif/golangci-$(echo $mod | tr '/./' '-').sarif" 2>/dev/null || true
+          done
+        working-directory: .
+
+      - name: Gitleaks (SARIF)
+        if: always()
+        run: |
+          gitleaks dir --source . --report-format sarif --report-path "$GITHUB_WORKSPACE/sarif/gitleaks.sarif" || true
+
+      - name: SBOM generation (syft)
+        if: always()
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/sbom"
+          for mod in $(find . -name go.mod -not -path '*/vendor/*' | xargs -I{} dirname {}); do
+            name=$(echo "$mod" | tr '/./' '-' | sed 's/^-//')
+            echo "==> SBOM for $mod"
+            syft scan "dir:$mod" -o spdx-json="$GITHUB_WORKSPACE/sbom/${name}.spdx.json" -o cyclonedx-json="$GITHUB_WORKSPACE/sbom/${name}.cdx.json"
+          done
+
+      - name: Vulnerability scan (grype)
+        if: always()
+        run: |
+          for sbom in "$GITHUB_WORKSPACE"/sbom/*.spdx.json; do
+            [ -f "$sbom" ] || continue
+            name=$(basename "$sbom" .spdx.json)
+            echo "==> Scanning $name"
+            grype "sbom:$sbom" --output sarif --file "$GITHUB_WORKSPACE/sarif/grype-${name}.sarif" || true
+          done
+
+      - name: Upload SARIF reports
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sarif/
+
+      - name: Upload SBOMs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom/

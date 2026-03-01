@@ -82,6 +82,78 @@ var tools = []tool{
 			return os.Remove(downloadPath)
 		},
 	},
+	{
+		name:    "golangci-lint",
+		version: "2.10.1",
+		url: func(goos, goarch string) string {
+			return fmt.Sprintf("https://github.com/golangci/golangci-lint/releases/download/v2.10.1/golangci-lint-2.10.1-%s-%s.tar.gz", goos, goarch)
+		},
+		installed: func() bool { _, err := exec.LookPath("golangci-lint"); return err == nil },
+		postInstall: func(downloadPath, binDir string) error {
+			c := exec.Command("tar", "-xzf", downloadPath, "-C", binDir, "--strip-components=1",
+				fmt.Sprintf("golangci-lint-2.10.1-%s-%s/golangci-lint", runtime.GOOS, runtime.GOARCH))
+			c.Stdout = os.Stdout
+			c.Stderr = os.Stderr
+			if err := c.Run(); err != nil {
+				return err
+			}
+			return os.Remove(downloadPath)
+		},
+	},
+	{
+		name:    "gitleaks",
+		version: "8.30.0",
+		url: func(goos, goarch string) string {
+			return fmt.Sprintf("https://github.com/gitleaks/gitleaks/releases/download/v8.30.0/gitleaks_%s_%s_%s.tar.gz",
+				"8.30.0", goos, goarch)
+		},
+		installed: func() bool { _, err := exec.LookPath("gitleaks"); return err == nil },
+		postInstall: func(downloadPath, binDir string) error {
+			c := exec.Command("tar", "-xzf", downloadPath, "-C", binDir, "gitleaks")
+			c.Stdout = os.Stdout
+			c.Stderr = os.Stderr
+			if err := c.Run(); err != nil {
+				return err
+			}
+			return os.Remove(downloadPath)
+		},
+	},
+	{
+		name:    "syft",
+		version: "1.29.0",
+		url: func(goos, goarch string) string {
+			return fmt.Sprintf("https://github.com/anchore/syft/releases/download/v1.29.0/syft_%s_%s_%s.tar.gz",
+				"1.29.0", goos, goarch)
+		},
+		installed: func() bool { _, err := exec.LookPath("syft"); return err == nil },
+		postInstall: func(downloadPath, binDir string) error {
+			c := exec.Command("tar", "-xzf", downloadPath, "-C", binDir, "syft")
+			c.Stdout = os.Stdout
+			c.Stderr = os.Stderr
+			if err := c.Run(); err != nil {
+				return err
+			}
+			return os.Remove(downloadPath)
+		},
+	},
+	{
+		name:    "grype",
+		version: "0.92.0",
+		url: func(goos, goarch string) string {
+			return fmt.Sprintf("https://github.com/anchore/grype/releases/download/v0.92.0/grype_%s_%s_%s.tar.gz",
+				"0.92.0", goos, goarch)
+		},
+		installed: func() bool { _, err := exec.LookPath("grype"); return err == nil },
+		postInstall: func(downloadPath, binDir string) error {
+			c := exec.Command("tar", "-xzf", downloadPath, "-C", binDir, "grype")
+			c.Stdout = os.Stdout
+			c.Stderr = os.Stderr
+			if err := c.Run(); err != nil {
+				return err
+			}
+			return os.Remove(downloadPath)
+		},
+	},
 }
 
 var setupCmd = &cobra.Command{
@@ -89,7 +161,7 @@ var setupCmd = &cobra.Command{
 	Short: "Install required tools for build and lint",
 	Long: `Download and install external tools needed by hl build commands.
 
-Tools: helm, helmfile, terraform
+Tools: helm, helmfile, terraform, golangci-lint, gitleaks, syft, grype
 
 Binaries are installed to ./bin (or $GITHUB_WORKSPACE/bin in CI).
 Already-installed tools are skipped.`,

@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	hlexec "github.com/iamkhattar/homelab/hl/internal/exec"
 	"github.com/iamkhattar/homelab/hl/internal/lint"
 	"github.com/iamkhattar/homelab/hl/internal/ui"
 )
@@ -94,12 +93,12 @@ var testCmd = &cobra.Command{
 	Short: "Run all tests (Go + Terraform)",
 	Long: `Run all test suites across the repository.
 
-Suites: go (go test ./...), terraform (terraform test in infra/)`,
+Suites: go (go test ./... per module), terraform (terraform test in infra/)`,
 	Example: "  hl build test",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Go tests.
+		// Go tests — run per module.
 		ui.Step("Go tests")
-		if err := hlexec.Run("go", "test", "./..."); err != nil {
+		if err := runGoTests(); err != nil {
 			ui.StepFail("Go tests failed")
 			return err
 		}
@@ -112,6 +111,30 @@ Suites: go (go test ./...), terraform (terraform test in infra/)`,
 
 		return nil
 	},
+}
+
+// runGoTests discovers Go modules and runs go test ./... in each.
+func runGoTests() error {
+	root, err := lint.RepoRoot()
+	if err != nil {
+		return err
+	}
+	modules, err := lint.FindGoModules(root)
+	if err != nil {
+		return err
+	}
+	for _, dir := range modules {
+		rel, _ := filepath.Rel(root, dir)
+		ui.KeyValue("  module", rel)
+		c := exec.Command("go", "test", "./...")
+		c.Dir = dir
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+		if err := c.Run(); err != nil {
+			return fmt.Errorf("%s: %w", rel, err)
+		}
+	}
+	return nil
 }
 
 // runTerraformTests runs terraform test in the infra/ directory if

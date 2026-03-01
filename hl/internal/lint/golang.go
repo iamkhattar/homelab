@@ -19,7 +19,21 @@ func (g *GoLinter) Tool() string { return "go" }
 func (g *GoLinter) CanFix() bool { return true }
 
 func (g *GoLinter) Lint(root string) error {
+	hasGolangciLint := false
+	if _, err := exec.LookPath("golangci-lint"); err == nil {
+		hasGolangciLint = true
+	}
+
 	return g.forEachModule(root, func(dir string) error {
+		if hasGolangciLint {
+			c := exec.Command("golangci-lint", "run", "./...")
+			c.Dir = dir
+			c.Stdout = os.Stdout
+			c.Stderr = os.Stderr
+			return c.Run()
+		}
+		// Fallback to go vet when golangci-lint is not installed.
+		ui.KeyValue("  note", "golangci-lint not found, falling back to go vet")
 		c := exec.Command("go", "vet", "./...")
 		c.Dir = dir
 		c.Stdout = os.Stdout
@@ -41,7 +55,7 @@ func (g *GoLinter) Fix(root string) error {
 // forEachModule finds all directories containing a go.mod file under root
 // and runs fn in each. Returns the first error encountered.
 func (g *GoLinter) forEachModule(root string, fn func(dir string) error) error {
-	modules, err := findGoModules(root)
+	modules, err := FindGoModules(root)
 	if err != nil {
 		return err
 	}
@@ -55,8 +69,8 @@ func (g *GoLinter) forEachModule(root string, fn func(dir string) error) error {
 	return nil
 }
 
-// findGoModules walks the repo and returns directories containing go.mod.
-func findGoModules(root string) ([]string, error) {
+// FindGoModules walks the repo and returns directories containing go.mod.
+func FindGoModules(root string) ([]string, error) {
 	var modules []string
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {

@@ -48,6 +48,7 @@ func allLinters() []Linter {
 		&HelmfileLinter{},
 		&AnsibleLinter{},
 		&YAMLLinter{},
+		&GitleaksLinter{},
 	}
 }
 
