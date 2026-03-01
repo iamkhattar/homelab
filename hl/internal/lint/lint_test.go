@@ -42,8 +42,12 @@ func TestNewRunner_EmptySkip(t *testing.T) {
 // TestYAMLLinter_ValidFiles tests that valid YAML passes.
 func TestYAMLLinter_ValidFiles(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "good.yaml"), []byte("key: value\n"), 0644)
-	os.WriteFile(filepath.Join(dir, "also-good.yml"), []byte("items:\n  - one\n  - two\n"), 0644)
+	if err := os.WriteFile(filepath.Join(dir, "good.yaml"), []byte("key: value\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "also-good.yml"), []byte("items:\n  - one\n  - two\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	y := &YAMLLinter{}
 	if err := y.Lint(dir); err != nil {
@@ -54,7 +58,9 @@ func TestYAMLLinter_ValidFiles(t *testing.T) {
 // TestYAMLLinter_InvalidFiles tests that broken YAML is detected.
 func TestYAMLLinter_InvalidFiles(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "bad.yaml"), []byte("key: [unclosed\n"), 0644)
+	if err := os.WriteFile(filepath.Join(dir, "bad.yaml"), []byte("key: [unclosed\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	y := &YAMLLinter{}
 	if err := y.Lint(dir); err == nil {
@@ -66,9 +72,15 @@ func TestYAMLLinter_InvalidFiles(t *testing.T) {
 func TestYAMLLinter_SkipsDotGit(t *testing.T) {
 	dir := t.TempDir()
 	gitDir := filepath.Join(dir, ".git")
-	os.MkdirAll(gitDir, 0755)
-	os.WriteFile(filepath.Join(gitDir, "bad.yaml"), []byte("key: [unclosed\n"), 0644)
-	os.WriteFile(filepath.Join(dir, "good.yaml"), []byte("key: value\n"), 0644)
+	if err := os.MkdirAll(gitDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gitDir, "bad.yaml"), []byte("key: [unclosed\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "good.yaml"), []byte("key: value\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	y := &YAMLLinter{}
 	if err := y.Lint(dir); err != nil {
@@ -89,12 +101,16 @@ func TestYAMLLinter_EmptyDir(t *testing.T) {
 func TestTerraformLinter_FormattedFiles(t *testing.T) {
 	dir := t.TempDir()
 	infraDir := filepath.Join(dir, "infra")
-	os.MkdirAll(infraDir, 0755)
-	os.WriteFile(filepath.Join(infraDir, "main.tf"), []byte(`variable "name" {
+	if err := os.MkdirAll(infraDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(infraDir, "main.tf"), []byte(`variable "name" {
   type    = string
   default = "test"
 }
-`), 0644)
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	tf := &TerraformLinter{}
 	if err := tf.Lint(dir); err != nil {
@@ -106,13 +122,17 @@ func TestTerraformLinter_FormattedFiles(t *testing.T) {
 func TestTerraformLinter_UnformattedFiles(t *testing.T) {
 	dir := t.TempDir()
 	infraDir := filepath.Join(dir, "infra")
-	os.MkdirAll(infraDir, 0755)
+	if err := os.MkdirAll(infraDir, 0755); err != nil {
+		t.Fatal(err)
+	}
 	// Intentionally bad formatting: extra spaces.
-	os.WriteFile(filepath.Join(infraDir, "main.tf"), []byte(`variable "name" {
+	if err := os.WriteFile(filepath.Join(infraDir, "main.tf"), []byte(`variable "name" {
   type =     string
   default =     "test"
 }
-`), 0644)
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	tf := &TerraformLinter{}
 	if err := tf.Lint(dir); err == nil {
@@ -124,13 +144,17 @@ func TestTerraformLinter_UnformattedFiles(t *testing.T) {
 func TestTerraformLinter_Fix(t *testing.T) {
 	dir := t.TempDir()
 	infraDir := filepath.Join(dir, "infra")
-	os.MkdirAll(infraDir, 0755)
+	if err := os.MkdirAll(infraDir, 0755); err != nil {
+		t.Fatal(err)
+	}
 	file := filepath.Join(infraDir, "main.tf")
-	os.WriteFile(file, []byte(`variable "name" {
+	if err := os.WriteFile(file, []byte(`variable "name" {
   type =     string
   default =     "test"
 }
-`), 0644)
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	tf := &TerraformLinter{}
 	if err := tf.Fix(dir); err != nil {
@@ -160,13 +184,17 @@ func TestTerraformLinter_NoInfraDir(t *testing.T) {
 func TestTerraformLinter_ValidateSkipsWithoutInit(t *testing.T) {
 	dir := t.TempDir()
 	infraDir := filepath.Join(dir, "infra")
-	os.MkdirAll(infraDir, 0755)
+	if err := os.MkdirAll(infraDir, 0755); err != nil {
+		t.Fatal(err)
+	}
 	// Well-formatted file, but no .terraform/ directory.
-	os.WriteFile(filepath.Join(infraDir, "main.tf"), []byte(`variable "name" {
+	if err := os.WriteFile(filepath.Join(infraDir, "main.tf"), []byte(`variable "name" {
   type    = string
   default = "test"
 }
-`), 0644)
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	tf := &TerraformLinter{}
 	// Should pass: format is correct, validate is skipped.
@@ -245,10 +273,18 @@ func TestFindCharts(t *testing.T) {
 	dir := t.TempDir()
 	chart1 := filepath.Join(dir, "core", "cert-manager")
 	chart2 := filepath.Join(dir, "apps", "vault")
-	os.MkdirAll(chart1, 0755)
-	os.MkdirAll(chart2, 0755)
-	os.WriteFile(filepath.Join(chart1, "Chart.yaml"), []byte("name: cert-manager"), 0644)
-	os.WriteFile(filepath.Join(chart2, "Chart.yaml"), []byte("name: vault"), 0644)
+	if err := os.MkdirAll(chart1, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(chart2, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(chart1, "Chart.yaml"), []byte("name: cert-manager"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(chart2, "Chart.yaml"), []byte("name: vault"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	charts, err := findCharts(dir)
 	if err != nil {

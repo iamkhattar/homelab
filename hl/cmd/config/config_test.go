@@ -58,8 +58,12 @@ func TestInitCmd_SkipsIfExists(t *testing.T) {
 	t.Setenv("HOME", tmpHome)
 
 	configDir := filepath.Join(tmpHome, ".homelab")
-	os.MkdirAll(configDir, 0755)
-	os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte("existing"), 0644)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte("existing"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
 
 	err := initCmd.RunE(initCmd, nil)
 	if err != nil {
@@ -91,15 +95,21 @@ func TestSetCmd_SetsViperValue(t *testing.T) {
 
 	// Create initial config so WriteConfig works.
 	configDir := filepath.Join(tmpHome, ".homelab")
-	os.MkdirAll(configDir, 0755)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
 	configFile := filepath.Join(configDir, "config.yaml")
-	os.WriteFile(configFile, []byte("cluster:\n  namespace: default\n"), 0644)
+	if err := os.WriteFile(configFile, []byte("cluster:\n  namespace: default\n"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
 
 	viper.Reset()
 	viper.AddConfigPath(configDir)
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.ReadInConfig()
+	if err := viper.ReadInConfig(); err != nil {
+		t.Fatalf("ReadInConfig: %v", err)
+	}
 
 	err := setCmd.RunE(setCmd, []string{"cluster.namespace", "production"})
 	if err != nil {

@@ -182,7 +182,9 @@ Already-installed tools are skipped.`,
 		}
 
 		// Ensure binDir is on PATH for subsequent tool checks.
-		os.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+		if err := os.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH")); err != nil {
+			return fmt.Errorf("setting PATH: %w", err)
+		}
 
 		ui.Step(fmt.Sprintf("Setting up tools in %s", binDir))
 
@@ -245,7 +247,7 @@ func downloadFile(url, dest string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
@@ -255,7 +257,7 @@ func downloadFile(url, dest string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	_, err = io.Copy(f, resp.Body)
 	return err
