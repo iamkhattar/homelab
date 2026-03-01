@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/iamkhattar/homelab/hl/internal/ui"
 )
@@ -38,13 +39,28 @@ func (h *HelmLinter) Lint(root string) error {
 	for _, chartDir := range charts {
 		rel, _ := filepath.Rel(root, chartDir)
 
-		// Build dependencies if Chart.lock exists.
-		if _, err := os.Stat(filepath.Join(chartDir, "Chart.lock")); err == nil {
-			dep := exec.Command("helm", "dependency", "build", chartDir)
-			dep.Stdout = os.Stdout
-			dep.Stderr = os.Stderr
-			if err := dep.Run(); err != nil {
-				ui.KeyValue("  dep build", fmt.Sprintf("%s (failed, continuing)", rel))
+		// Ensure dependencies are present so helm lint doesn't warn.
+		// Only run dependency commands for charts that actually declare dependencies.
+		hasDependencies := false
+		if b, err := os.ReadFile(filepath.Join(chartDir, "Chart.yaml")); err == nil {
+			hasDependencies = strings.Contains(string(b), "dependencies:")
+		}
+		if hasDependencies {
+			if _, err := os.Stat(filepath.Join(chartDir, "Chart.lock")); err == nil {
+				dep := exec.Command("helm", "dependency", "build", chartDir)
+				dep.Stdout = os.Stdout
+				dep.Stderr = os.Stderr
+				if err := dep.Run(); err != nil {
+					ui.KeyValue("  dep build", fmt.Sprintf("%s (failed, continuing)", rel))
+				}
+			} else {
+				// No lock file yet — generate one.
+				dep := exec.Command("helm", "dependency", "update", chartDir)
+				dep.Stdout = os.Stdout
+				dep.Stderr = os.Stderr
+				if err := dep.Run(); err != nil {
+					ui.KeyValue("  dep update", fmt.Sprintf("%s (failed, continuing)", rel))
+				}
 			}
 		}
 

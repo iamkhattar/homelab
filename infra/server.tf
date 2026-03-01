@@ -1,9 +1,8 @@
-data "template_file" "server_node_config" {
-  template = file("${path.module}/config/cloud-init-server.yml")
-  vars = {
+locals {
+  server_node_config = templatefile("${path.module}/config/cloud-init-server.yml", {
     local_ssh_public_key = var.ssh_public_key
     k3s_api_token        = var.k3s_api_token
-  }
+  })
 }
 
 resource "hcloud_server" "server_node" {
@@ -27,7 +26,7 @@ resource "hcloud_server" "server_node" {
 
   firewall_ids = [hcloud_firewall.public_nodes_firewall.id, hcloud_firewall.private_nodes_firewall.id]
 
-  user_data = data.template_file.server_node_config.rendered
+  user_data = local.server_node_config
 
   # If we don't specify this, Terraform will create the resources in parallel
   # We want this node to be created after the private network is created

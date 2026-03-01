@@ -1,9 +1,8 @@
-data "template_file" "agent_node_config" {
-  template = file("${path.module}/config/cloud-init-agent.yml")
-  vars = {
+locals {
+  agent_node_config = templatefile("${path.module}/config/cloud-init-agent.yml", {
     local_ssh_public_key = var.ssh_public_key
     k3s_api_token        = var.k3s_api_token
-  }
+  })
 }
 
 resource "hcloud_server" "agent_nodes" {
@@ -29,7 +28,7 @@ resource "hcloud_server" "agent_nodes" {
     network_id = hcloud_network.private_network.id
   }
 
-  user_data = data.template_file.agent_node_config.rendered
+  user_data = local.agent_node_config
 
   depends_on = [hcloud_network_subnet.private_network_subnet, hcloud_server.server_node]
 }
