@@ -8,9 +8,9 @@
 - name: Update and upgrade apt packages
   when: ansible_distribution in ['Ubuntu']
   become: true
-  apt:
-    upgrade: yes
-    update_cache: yes
+  ansible.builtin.apt:
+    upgrade: true
+    update_cache: true
     cache_valid_time: 86400
 
 - name: Install Dependent Ubuntu Packages
@@ -203,7 +203,7 @@
     msg:
       - "Warning: Iptables {{ ansible_facts.packages['iptables'][0]['version'] }} found."
       - "Add '--prefer-bundled-bin' to extra_server_args variable to use the bundled iptables binary."
-  ignore_errors: true
+  failed_when: false
 
 - name: Add /usr/local/bin to sudo secure_path
   ansible.builtin.lineinfile:
@@ -219,32 +219,41 @@
   when: ansible_distribution in ['Ubuntu']
   ansible.builtin.apt:
     name: open-iscsi
-    update_cache: yes
+    update_cache: true
 
 - name: Get all interfaces with 10.0.x.x addresses
-  shell: ip -4 addr show | grep -E "inet 10\.0\."
+  ansible.builtin.shell:
+    cmd: set -o pipefail && ip -4 addr show | grep -E "inet 10\.0\."
   register: all_private_ips
   changed_when: false
   failed_when: false
 
 - name: Get all public IP addresses (non-private ranges)
-  shell: ip -4 addr show | grep -E "inet " | grep -v -E "inet (10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|127\.)"
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail &&
+      ip -4 addr show | grep -E "inet " |
+      grep -v -E "inet (10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|127\.)"
   register: all_public_ips
   changed_when: false
   failed_when: false
 
 - name: Show all private IPs found
-  debug:
+  ansible.builtin.debug:
     msg: "Found private IPs: {{ all_private_ips.stdout_lines }}"
 
 - name: Show all public IPs found
-  debug:
+  ansible.builtin.debug:
     msg: "Found public IPs: {{ all_public_ips.stdout_lines }}"
 
 - name: Extract IP and interface manually
-  set_fact:
+  ansible.builtin.set_fact:
     private_ip: "{{ all_private_ips.stdout_lines[0].split()[1].split('/')[0] }}"
-    private_iface: "{{ (all_private_ips.stdout_lines[0].split()[-1] == 'scope') | ternary(all_private_ips.stdout_lines[0].split()[-2], all_private_ips.stdout_lines[0].split()[-1]) }}"
+    private_iface: >-
+      {{ (all_private_ips.stdout_lines[0].split()[-1] == 'scope')
+         | ternary(
+             all_private_ips.stdout_lines[0].split()[-2],
+             all_private_ips.stdout_lines[0].split()[-1]) }}
     public_ip: "{{ all_public_ips.stdout_lines[0].split()[1].split('/')[0] }}"
   when:
     - all_private_ips.stdout_lines | length > 0
