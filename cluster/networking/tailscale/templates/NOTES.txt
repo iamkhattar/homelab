@@ -1,0 +1,4 @@
+Tailscale operator has been deployed to the cluster.
+
+To expose a service via Tailscale, add this annotation to the Service:
+  tailscale.com/expose: "true"

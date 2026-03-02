@@ -1,0 +1,14 @@
+gha-runner-scale-set-controller:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# After deploying the controller, create a RunnerScaleSet CR
+# to register runners with your GitHub org/repo.
+# GitHub PAT or App credentials should be stored in Vault at:
+# secret/cicd/github-actions

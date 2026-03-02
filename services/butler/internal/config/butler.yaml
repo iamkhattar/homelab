@@ -1,0 +1,52 @@
+vault:
+  address: http://vault.security.svc.cluster.local:8200
+
+server:
+  port: "8080"
+
+reconcile:
+  interval: 5m
+
+# oidc:
+#   issuer: https://auth.example.com
+
+secrets:
+  []
+  # - path: databases/postgresql
+  #   keys:
+  #     postgres-password:
+  #       length: 32
+  # - path: databases/redis
+  #   keys:
+  #     redis-password:
+  #       length: 32
+  # - path: storage/garage
+  #   keys:
+  #     rpc-secret:
+  #       length: 32
+  # - path: monitoring/grafana
+  #   keys:
+  #     admin-user:
+  #       static: "admin"
+  #     admin-password:
+  #       length: 32
+  # - path: applications/paperless-ngx
+  #   keys:
+  #     db-password:
+  #       length: 32
+  #     secret-key:
+  #       length: 64
+  #     admin-user:
+  #       static: "admin"
+  #     admin-password:
+  #       length: 32
+  # - path: applications/kitchenowl
+  #   keys:
+  #     jwt-secret:
+  #       length: 64
+  # - path: applications/vaultwarden
+  #   keys:
+  #     admin-token:
+  #       length: 64
+  #     database-url:
+  #       template: "postgresql://vaultwarden:{{db-password}}@postgresql.databases.svc.cluster.local:5432/vaultwarden"

@@ -1,0 +1,10 @@
+apiVersion: v2
+name: crowdsec
+description: A Helm chart to deploy CrowdSec for the homelab k3s cluster
+type: application
+version: 0.1.0
+appVersion: "1.6.0"
+dependencies:
+  - name: crowdsec
+    version: "0.12.0"
+    repository: https://crowdsecurity.github.io/helm-charts

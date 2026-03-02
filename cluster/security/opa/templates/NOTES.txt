@@ -1,0 +1,4 @@
+OPA Gatekeeper has been deployed to the cluster.
+
+Webhook failure policy is set to Ignore (fail-open) for safe learning.
+Create ConstraintTemplates and Constraints to start enforcing policies.

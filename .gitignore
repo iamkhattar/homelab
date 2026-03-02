@@ -41,10 +41,10 @@ terraform.rc
 
 **/node_modules/**
 **/public/**
-megalinter-reports/
 
 infra/config/.ssh/id_rsa
 infra/config/.ssh/id_rsa.pub
 cluster/kubeconfig.yml
 
 *.tgz
+.terraform.lock.hcl

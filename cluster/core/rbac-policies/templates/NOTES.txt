@@ -26,11 +26,8 @@ RoleBindings created:
 {{- range .Values.roleBindings }}
 - **Name:** `{{ .name }}`
   - Namespace: `{{ .namespace }}`
-  - RoleRef: `{{ .roleRef.kind }} / {{ .roleRef.name }}`
-  - Subjects:
-    {{- range .subjects }}
-    - Kind: `{{ .kind }}` | Name: `{{ .name }}` | Namespace: `{{ .namespace }}`
-    {{- end }}
+  - Role: `{{ .role }}`
+  - ServiceAccount: `{{ .serviceAccount }}`
 {{- end }}
 
 Usage

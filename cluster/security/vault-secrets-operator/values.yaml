@@ -1,0 +1,28 @@
+vault-secrets-operator:
+  defaultVaultConnection:
+    enabled: false
+  defaultAuthMethod:
+    enabled: false
+  controller:
+    manager:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 250m
+          memory: 256Mi
+
+vaultConnection:
+  address: http://vault.security.svc.cluster.local:8200
+
+vaultAuth:
+  method: kubernetes
+  mount: kubernetes
+  role: vso
+  serviceAccount: default
+  allowedNamespaces:
+    - databases
+    - storage
+    - monitoring
+    - applications

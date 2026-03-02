@@ -1,0 +1,6 @@
+apiVersion: v2
+name: home-assistant
+description: A Helm chart to deploy Home Assistant for the homelab k3s cluster
+type: application
+version: 0.1.0
+appVersion: "2024.12.0"

@@ -1,0 +1,10 @@
+apiVersion: v2
+name: fluent-bit
+description: A Helm chart to deploy Fluent Bit for the homelab k3s cluster
+type: application
+version: 0.1.0
+appVersion: "3.2.0"
+dependencies:
+  - name: fluent-bit
+    version: "0.48.0"
+    repository: https://fluent.github.io/helm-charts

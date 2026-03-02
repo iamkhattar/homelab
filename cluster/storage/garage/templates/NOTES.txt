@@ -1,0 +1,10 @@
+Garage S3-compatible storage has been deployed to the cluster.
+
+S3 API: garage.storage.svc.cluster.local:{{ .Values.service.s3Port }}
+Web: garage.storage.svc.cluster.local:{{ .Values.service.webPort }}
+Admin: garage.storage.svc.cluster.local:{{ .Values.service.adminPort }}
+
+After first deploy, configure the cluster layout:
+  kubectl exec -n storage garage-xxx -- garage status
+  kubectl exec -n storage garage-xxx -- garage layout assign <node-id> -z dc1 -c 1G
+  kubectl exec -n storage garage-xxx -- garage layout apply --version 1

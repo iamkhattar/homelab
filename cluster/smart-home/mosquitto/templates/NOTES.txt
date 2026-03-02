@@ -1,0 +1,4 @@
+Mosquitto MQTT broker has been deployed to the cluster.
+
+MQTT: mosquitto.smart-home.svc.cluster.local:{{ .Values.service.mqttPort }}
+WebSocket: mosquitto.smart-home.svc.cluster.local:{{ .Values.service.websocketPort }}

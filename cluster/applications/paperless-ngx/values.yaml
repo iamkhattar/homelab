@@ -1,0 +1,51 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/paperless-ngx/paperless-ngx
+  tag: "2.14"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+  containerPort: 8000
+
+env:
+  PAPERLESS_URL: "https://paperless.example.com"  # Update with your domain
+  PAPERLESS_DBENGINE: postgresql
+  PAPERLESS_DBHOST: postgresql.databases.svc.cluster.local
+  PAPERLESS_DBPORT: "5432"
+  PAPERLESS_DBNAME: paperless
+  PAPERLESS_REDIS: "redis://redis-master.databases.svc.cluster.local:6379"
+  PAPERLESS_OCR_LANGUAGE: eng
+  PAPERLESS_TIME_ZONE: "UTC"  # Update with your timezone
+
+envFromSecrets:
+  - secretName: paperless-credentials
+    keys:
+      PAPERLESS_DBPASS: db-password
+      PAPERLESS_SECRET_KEY: secret-key
+      PAPERLESS_ADMIN_USER: admin-user
+      PAPERLESS_ADMIN_PASSWORD: admin-password
+
+persistence:
+  data:
+    enabled: true
+    size: 10Gi
+    accessMode: ReadWriteOnce
+    mountPath: /usr/src/paperless/data
+    storageClass: ""
+  media:
+    enabled: true
+    size: 20Gi
+    accessMode: ReadWriteOnce
+    mountPath: /usr/src/paperless/media
+    storageClass: ""
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi

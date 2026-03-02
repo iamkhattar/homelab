@@ -1,22 +1,29 @@
 serviceAccounts:
-  - name: monitoring-reader
+  - name: prometheus
     namespace: monitoring
-    clusterRole: monitoring-reader
-  - name: storage-admin
-    namespace: storage
-    clusterRole: storage-admin
+  - name: fluent-bit
+    namespace: monitoring
   - name: database-operator
     namespace: databases
-    clusterRole: database-operator
+  - name: storage-admin
+    namespace: storage
 
 clusterRoles:
-  - name: monitoring-reader
+  - name: prometheus
     rules:
       - apiGroups: [""]
-        resources: ["pods", "services", "endpoints"]
+        resources: ["nodes", "nodes/metrics", "services", "endpoints", "pods"]
         verbs: ["get", "list", "watch"]
-      - apiGroups: ["apps"]
-        resources: ["deployments", "replicasets"]
+      - apiGroups: ["networking.k8s.io"]
+        resources: ["ingresses"]
+        verbs: ["get", "list", "watch"]
+      - nonResourceURLs: ["/metrics"]
+        verbs: ["get"]
+
+  - name: fluent-bit
+    rules:
+      - apiGroups: [""]
+        resources: ["namespaces", "pods", "pods/log"]
         verbs: ["get", "list", "watch"]
 
   - name: storage-admin
@@ -25,20 +32,33 @@ clusterRoles:
         resources: ["persistentvolumes", "persistentvolumeclaims"]
         verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
+roles:
   - name: database-operator
+    namespace: databases
     rules:
       - apiGroups: [""]
-        resources: ["pods", "services", "configmaps", "secrets"]
+        resources: ["pods", "services", "configmaps", "secrets", "persistentvolumeclaims"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      - apiGroups: ["apps"]
+        resources: ["statefulsets", "deployments"]
         verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
-roleBindings:
-  - name: monitoring-reader-binding
+clusterRoleBindings:
+  - name: prometheus
+    serviceAccount: prometheus
     namespace: monitoring
-    subjects:
-      - kind: ServiceAccount
-        name: monitoring-reader
-        namespace: monitoring
-    roleRef:
-      kind: ClusterRole
-      name: monitoring-reader
-      apiGroup: rbac.authorization.k8s.io
+    clusterRole: prometheus
+  - name: fluent-bit
+    serviceAccount: fluent-bit
+    namespace: monitoring
+    clusterRole: fluent-bit
+  - name: storage-admin
+    serviceAccount: storage-admin
+    namespace: storage
+    clusterRole: storage-admin
+
+roleBindings:
+  - name: database-operator
+    namespace: databases
+    serviceAccount: database-operator
+    role: database-operator

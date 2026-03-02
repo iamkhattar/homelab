@@ -1,0 +1,36 @@
+replicaCount: 1
+
+image:
+  repository: eclipse-mosquitto
+  tag: "2.0.20"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  mqttPort: 1883
+  websocketPort: 9001
+
+persistence:
+  enabled: true
+  size: 1Gi
+  accessMode: ReadWriteOnce
+  mountPath: /mosquitto/data
+  storageClass: ""
+
+config:
+  mosquitto.conf: |
+    listener 1883
+    listener 9001
+    protocol websockets
+    allow_anonymous false
+    password_file /mosquitto/config/password_file
+    persistence true
+    persistence_location /mosquitto/data/
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi

@@ -1,0 +1,3 @@
+Home Assistant has been deployed to the cluster.
+
+Web UI: home-assistant.smart-home.svc.cluster.local:{{ .Values.service.port }}

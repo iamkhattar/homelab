@@ -1,0 +1,52 @@
+replicaCount: 1
+
+backend:
+  image:
+    repository: tombursch/kitchenowl-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  port: 5000
+
+frontend:
+  image:
+    repository: tombursch/kitchenowl-web
+    tag: latest
+    pullPolicy: IfNotPresent
+  port: 80
+
+service:
+  type: ClusterIP
+  port: 80
+  containerPort: 80
+
+env:
+  JWT_SECRET_KEY: ""  # Set via Vault secret
+  FRONT_URL: "https://kitchen.example.com"  # Update with your domain
+
+envFromSecrets:
+  - secretName: kitchenowl-credentials
+    keys:
+      JWT_SECRET_KEY: jwt-secret
+
+persistence:
+  enabled: true
+  size: 2Gi
+  accessMode: ReadWriteOnce
+  mountPath: /data
+  storageClass: ""
+
+resources:
+  backend:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  frontend:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

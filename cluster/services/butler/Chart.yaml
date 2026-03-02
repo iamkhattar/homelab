@@ -1,0 +1,6 @@
+apiVersion: v2
+name: butler
+description: A Helm chart to deploy Butler for the homelab k3s cluster
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

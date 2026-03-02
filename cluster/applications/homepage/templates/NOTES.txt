@@ -1,0 +1,3 @@
+Homepage dashboard has been deployed to the cluster.
+
+Dashboard: homepage.applications.svc.cluster.local:{{ .Values.service.port }}

@@ -1,0 +1,215 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  checks: write
+  security-events: write
+
+env:
+  GO_VERSION: "1.25"
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: hl/go.sum
+
+      - name: Build hl
+        run: go build -o "$GITHUB_WORKSPACE/bin/hl" .
+        working-directory: hl
+
+      - name: Upload hl
+        uses: actions/upload-artifact@v4
+        with:
+          name: hl
+          path: bin/hl
+          retention-days: 1
+
+  check:
+    name: Check
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: hl/go.sum
+
+      - name: Download hl
+        uses: actions/download-artifact@v4
+        with:
+          name: hl
+          path: bin/
+
+      - name: Prepare hl
+        run: |
+          chmod +x bin/hl
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
+
+      - name: Setup tools
+        run: hl ci setup helm helmfile terraform gotestsum golangci-lint ansible-lint
+
+      - name: Check
+        run: hl ci check
+        env:
+          CI: "true"
+
+      - name: Lint SARIF (golangci-lint, ansible-lint)
+        if: always()
+        run: hl ci lint-sarif --output-dir "$GITHUB_WORKSPACE/sarif"
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif/
+          category: lint
+
+      - name: Upload test reports
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Tests
+          path: test-results/*.xml
+          reporter: java-junit
+          fail-on-error: false
+
+  publish:
+    name: Publish
+    needs: [check, gitleaks, sbom]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download hl
+        uses: actions/download-artifact@v4
+        with:
+          name: hl
+          path: bin/
+
+      - name: Prepare hl
+        run: |
+          chmod +x bin/hl
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
+
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build images (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          hl ci docker \
+            --changed \
+            --base "origin/${{ github.base_ref }}" \
+            --tag "${{ github.sha }}"
+        env:
+          CI: "true"
+
+      - name: Build and push images (main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          hl ci docker \
+            --changed \
+            --base "${{ github.event.before }}" \
+            --push \
+            --tag latest \
+            --tag "${{ github.sha }}"
+        env:
+          CI: "true"
+
+  gitleaks:
+    name: Gitleaks
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download hl
+        uses: actions/download-artifact@v4
+        with:
+          name: hl
+          path: bin/
+
+      - name: Prepare hl
+        run: |
+          chmod +x bin/hl
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
+
+      - name: Setup tools
+        run: hl ci setup gitleaks
+
+      - name: Run gitleaks (SARIF)
+        run: hl ci gitleaks --output-dir "$GITHUB_WORKSPACE/sarif"
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif/
+          category: gitleaks
+
+  sbom:
+    name: SBOM & Vulnerability Scan
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download hl
+        uses: actions/download-artifact@v4
+        with:
+          name: hl
+          path: bin/
+
+      - name: Prepare hl
+        run: |
+          chmod +x bin/hl
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
+
+      - name: Setup tools
+        run: hl ci setup syft grype
+
+      - name: Generate SBOMs
+        run: hl ci sbom --output-dir "$GITHUB_WORKSPACE/sbom"
+
+      - name: Run vulnerability scan
+        run: hl ci vulnscan --sbom-dir "$GITHUB_WORKSPACE/sbom" --output-dir "$GITHUB_WORKSPACE/sarif"
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif/
+          category: grype
+
+      - name: Upload SBOMs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom/
