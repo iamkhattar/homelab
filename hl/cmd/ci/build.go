@@ -216,8 +216,9 @@ func runTerraformTests() error {
 var checkCmd = &cobra.Command{
 	Use:   "check",
 	Short: "Run all checks (lint + test) — single CI entry point",
-	Long: `Run lint and test sequentially. Exits on the first failure.
-This is the intended single entry point for CI pipelines.`,
+	Long: `Run lint and test sequentially, always executing both steps.
+Failures are collected and reported at the end so that test reports
+are always generated even when linting fails.`,
 	Example: `  hl ci check
   hl ci check --skip ansible,helmfile`,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -228,10 +229,16 @@ This is the intended single entry point for CI pipelines.`,
 			{"lint", lintCmd.RunE},
 			{"test", testCmd.RunE},
 		}
+		var failed []string
 		for _, step := range steps {
 			if err := step.fn(cmd, nil); err != nil {
-				return fmt.Errorf("%s failed: %w", step.name, err)
+				failed = append(failed, step.name)
 			}
+		}
+		if len(failed) > 0 {
+			fmt.Println()
+			ui.StepFail(fmt.Sprintf("Failed: %s", strings.Join(failed, ", ")))
+			return fmt.Errorf("check failed: %s", strings.Join(failed, ", "))
 		}
 		fmt.Println()
 		ui.StepDone(ui.SuccessStyle.Render("All checks passed"))

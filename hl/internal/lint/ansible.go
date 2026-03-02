@@ -24,6 +24,19 @@ func (a *AnsibleLinter) Lint(root string) error {
 		return nil
 	}
 
+	// Install collections if requirements.yml exists.
+	reqFile := filepath.Join(dir, "requirements.yml")
+	if _, err := os.Stat(reqFile); err == nil {
+		if _, err := exec.LookPath("ansible-galaxy"); err == nil {
+			ui.KeyValue("  collections", "installing from requirements.yml")
+			g := exec.Command("ansible-galaxy", "collection", "install", "-r", "requirements.yml")
+			g.Dir = dir
+			g.Stdout = os.Stdout
+			g.Stderr = os.Stderr
+			_ = g.Run()
+		}
+	}
+
 	// Prefer ansible-lint if installed.
 	if _, err := exec.LookPath("ansible-lint"); err == nil {
 		ui.KeyValue("tool", "ansible-lint")

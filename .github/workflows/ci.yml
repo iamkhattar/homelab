@@ -64,10 +64,7 @@ jobs:
           echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
 
       - name: Setup tools
-        run: hl ci setup helm helmfile terraform gotestsum golangci-lint
-
-      - name: Install ansible-lint
-        run: pip install ansible-lint
+        run: hl ci setup helm helmfile terraform gotestsum golangci-lint ansible-lint
 
       - name: Check
         run: hl ci check
