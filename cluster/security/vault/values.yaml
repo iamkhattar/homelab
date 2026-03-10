@@ -1,4 +1,6 @@
 vault:
+  global:
+    telemetryEnabled: false
   server:
     enabled: true
     dataStorage:

@@ -20,7 +20,14 @@ packages:
   - ansible
   - git
 
+write_files:
+  - path: /etc/network/interfaces.d/60-private-network.cfg
+    content: |
+      auto enp7s0
+      iface enp7s0 inet dhcp
+
 runcmd:
+  - systemctl restart networking
   - git clone -b new-homelab https://github.com/iamkhattar/homelab.git /opt/homelab
   - chown -R ansible:ansible /opt/homelab
   - su - ansible -s /bin/bash -c "cd /opt/homelab/ansible && ansible-playbook playbooks/site.yml -i inventory/inventory-agent.yml -e 'token=${k3s_api_token}'"

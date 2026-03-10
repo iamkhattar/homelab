@@ -26,13 +26,16 @@ spec:
             - name: http
               containerPort: {{ .Values.service.containerPort }}
               protocol: TCP
-          {{- if .Values.env }}
           env:
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-          {{- end }}
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pocket-id-credentials
+                  key: encryption-key
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- if .Values.persistence.enabled }}
@@ -40,6 +43,13 @@ spec:
             - name: data
               mountPath: {{ .Values.persistence.mountPath }}
           {{- end }}
+          livenessProbe:
+            exec:
+              command: ["/app/pocket-id", "healthcheck"]
+            initialDelaySeconds: 10
+            periodSeconds: 90
+            timeoutSeconds: 5
+            failureThreshold: 2
       {{- if .Values.persistence.enabled }}
       volumes:
         - name: data
