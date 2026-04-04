@@ -1,3 +1,10 @@
+environments:
+  default:
+    values:
+      - ./helmfile-values.yaml
+
+---
+
 repositories:
   - name: cert-manager
     url: https://charts.jetstack.io
@@ -45,12 +52,15 @@ releases:
     chart: ./security/vault-secrets-operator
     historyMax: 5
     namespace: security
+    disableValidation: true
     needs: [kube-system/namespaces, security/butler]
-  # - name: pocket-id
-  #   chart: ./security/pocket-id
-  #   historyMax: 5
-  #   namespace: security
-  #   needs: [kube-system/namespaces]
+  - name: pocket-id
+    chart: ./security/pocket-id
+    historyMax: 5
+    namespace: security
+    needs: [kube-system/namespaces, security/vault-secrets-operator]
+    values:
+      - ./security/pocket-id/helmfile-values.yaml.gotmpl
   # - name: crowdsec
   #   chart: ./security/crowdsec
   #   historyMax: 5

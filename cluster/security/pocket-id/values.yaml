@@ -1,8 +1,8 @@
 replicaCount: 1
 
 image:
-  repository: stonith404/pocket-id
-  tag: latest
+  repository: ghcr.io/pocket-id/pocket-id
+  tag: v2
   pullPolicy: IfNotPresent
 
 service:
@@ -11,14 +11,20 @@ service:
   containerPort: 1411
 
 env:
-  PUBLIC_APP_URL: "https://auth.example.com"  # Update with your domain
+  PUBLIC_APP_URL: ""  # Set via helmfile
   TRUST_PROXY: "true"
+  ANALYTICS_DISABLED: "true"
+  VERSION_CHECK_DISABLED: "true"
+
+ingress:
+  enabled: false
+  host: ""  # Set via helmfile
 
 persistence:
   enabled: true
   size: 1Gi
   accessMode: ReadWriteOnce
-  mountPath: /data
+  mountPath: /app/data
   storageClass: ""
 
 resources:

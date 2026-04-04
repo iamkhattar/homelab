@@ -1,0 +1,6 @@
+ingress:
+  enabled: true
+  host: "auth.{{ .Environment.Values.domain }}"
+
+env:
+  PUBLIC_APP_URL: "http://auth.{{ .Environment.Values.domain }}"

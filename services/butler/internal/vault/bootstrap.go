@@ -12,10 +12,15 @@ import (
 
 //go:embed policies/vso.hcl
 var vsoPolicy string
+//go:embed policies/vault_admin.hcl
+var vaultAdminPolicy string
+
+//go:embed policies/vault_read.hcl
+var vaultReadPolicy string
 
 // Bootstrap ensures all Vault server-side configuration is in place.
 // Every operation is idempotent.
-func (c *Client) Bootstrap(ctx context.Context) error {
+func (c *Client) Bootstrap(ctx context.Context, oidcIssuer string) error {
 	if err := c.ensureKVv2(ctx); err != nil {
 		return err
 	}
@@ -26,6 +31,15 @@ func (c *Client) Bootstrap(ctx context.Context) error {
 		return err
 	}
 	if err := c.ensureRole(ctx); err != nil {
+		return err
+	}
+	if err := c.ensureJWTAuth(ctx, oidcIssuer); err != nil {
+		return err
+	}
+	if err := c.ensureJWTPolicies(ctx, oidcIssuer); err != nil {
+		return err
+	}
+	if err := c.ensureJWTRoles(ctx, oidcIssuer); err != nil {
 		return err
 	}
 	return nil
@@ -122,5 +136,104 @@ func (c *Client) ensureRole(ctx context.Context) error {
 		return fmt.Errorf("writing vso role: %w", err)
 	}
 	slog.Info("wrote vso kubernetes auth role")
+	return nil
+}
+
+// ensureJWTAuth enables and configures the jwt auth method for OIDC-issued JWTs.
+// If oidcIssuer is empty, JWT auth bootstrapping is skipped.
+func (c *Client) ensureJWTAuth(ctx context.Context, oidcIssuer string) error {
+	if oidcIssuer == "" {
+		slog.Info("oidc issuer not configured, skipping vault jwt auth bootstrap")
+		return nil
+	}
+
+	auths, err := c.raw.Sys().ListAuthWithContext(ctx)
+	if err != nil {
+		return fmt.Errorf("listing auth methods: %w", err)
+	}
+
+	if _, ok := auths["jwt/"]; !ok {
+		err = c.raw.Sys().EnableAuthWithOptionsWithContext(ctx, "jwt", &vaultapi.EnableAuthOptions{
+			Type: "jwt",
+		})
+		if err != nil {
+			return fmt.Errorf("enabling jwt auth: %w", err)
+		}
+		slog.Info("enabled jwt auth method")
+	} else {
+		slog.Debug("jwt auth method already enabled")
+	}
+
+	_, err = c.raw.Logical().WriteWithContext(ctx, "auth/jwt/config", map[string]interface{}{
+		"oidc_discovery_url": oidcIssuer,
+		"bound_issuer":       oidcIssuer,
+	})
+	if err != nil {
+		return fmt.Errorf("configuring jwt auth: %w", err)
+	}
+
+	slog.Info("configured jwt auth method", "issuer", oidcIssuer)
+	return nil
+}
+
+// ensureJWTPolicies creates or updates policies used by JWT roles.
+// If oidcIssuer is empty, JWT policy bootstrapping is skipped.
+func (c *Client) ensureJWTPolicies(ctx context.Context, oidcIssuer string) error {
+	if oidcIssuer == "" {
+		return nil
+	}
+
+	if err := c.raw.Sys().PutPolicyWithContext(ctx, "vault-admin", vaultAdminPolicy); err != nil {
+		return fmt.Errorf("writing vault-admin policy: %w", err)
+	}
+	slog.Info("wrote vault-admin policy")
+
+	if err := c.raw.Sys().PutPolicyWithContext(ctx, "vault-read", vaultReadPolicy); err != nil {
+		return fmt.Errorf("writing vault-read policy: %w", err)
+	}
+	slog.Info("wrote vault-read policy")
+
+	return nil
+}
+
+// ensureJWTRoles creates or updates jwt roles mapping OIDC groups to policies.
+// If oidcIssuer is empty, JWT role bootstrapping is skipped.
+func (c *Client) ensureJWTRoles(ctx context.Context, oidcIssuer string) error {
+	if oidcIssuer == "" {
+		return nil
+	}
+
+	_, err := c.raw.Logical().WriteWithContext(ctx, "auth/jwt/role/vault-admin", map[string]interface{}{
+		"role_type":      "jwt",
+		"user_claim":     "sub",
+		"groups_claim":   "groups",
+		"bound_audiences": []string{"vault"},
+		"bound_claims": map[string]interface{}{
+			"groups": []string{"vault_admin"},
+		},
+		"policies": []string{"vault-admin"},
+		"ttl":      "1h",
+	})
+	if err != nil {
+		return fmt.Errorf("writing jwt role vault-admin: %w", err)
+	}
+	slog.Info("wrote jwt role", "role", "vault-admin")
+
+	_, err = c.raw.Logical().WriteWithContext(ctx, "auth/jwt/role/vault-read", map[string]interface{}{
+		"role_type":      "jwt",
+		"user_claim":     "sub",
+		"groups_claim":   "groups",
+		"bound_audiences": []string{"vault"},
+		"bound_claims": map[string]interface{}{
+			"groups": []string{"vault_read"},
+		},
+		"policies": []string{"vault-read"},
+		"ttl":      "1h",
+	})
+	if err != nil {
+		return fmt.Errorf("writing jwt role vault-read: %w", err)
+	}
+	slog.Info("wrote jwt role", "role", "vault-read")
+
 	return nil
 }

@@ -9,14 +9,15 @@ import (
 
 // VaultBootstrap ensures Vault is initialized, unsealed, and configured.
 type VaultBootstrap struct {
-	vault     *vault.Client
-	k8s       kubernetes.Interface
-	namespace string
+	vault      *vault.Client
+	k8s        kubernetes.Interface
+	namespace  string
+	oidcIssuer string
 }
 
 // NewVaultBootstrap creates a new VaultBootstrap reconciler.
-func NewVaultBootstrap(vc *vault.Client, k8s kubernetes.Interface, namespace string) *VaultBootstrap {
-	return &VaultBootstrap{vault: vc, k8s: k8s, namespace: namespace}
+func NewVaultBootstrap(vc *vault.Client, k8s kubernetes.Interface, namespace, oidcIssuer string) *VaultBootstrap {
+	return &VaultBootstrap{vault: vc, k8s: k8s, namespace: namespace, oidcIssuer: oidcIssuer}
 }
 
 func (r *VaultBootstrap) Name() string { return "vault-bootstrap" }
@@ -25,5 +26,5 @@ func (r *VaultBootstrap) Reconcile(ctx context.Context) error {
 	if err := r.vault.EnsureReady(ctx, r.k8s, r.namespace); err != nil {
 		return err
 	}
-	return r.vault.Bootstrap(ctx)
+	return r.vault.Bootstrap(ctx, r.oidcIssuer)
 }

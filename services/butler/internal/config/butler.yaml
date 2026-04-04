@@ -11,7 +11,10 @@ reconcile:
 #   issuer: https://auth.example.com
 
 secrets:
-  []
+  - path: security/pocket-id
+    keys:
+      encryption-key:
+        length: 32
   # - path: databases/postgresql
   #   keys:
   #     postgres-password:

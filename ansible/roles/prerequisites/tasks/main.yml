@@ -224,6 +224,7 @@
 - name: Get all interfaces with 10.0.x.x addresses
   ansible.builtin.shell:
     cmd: set -o pipefail && ip -4 addr show | grep -E "inet 10\.0\."
+    executable: /bin/bash
   register: all_private_ips
   changed_when: false
   failed_when: false
@@ -234,6 +235,7 @@
       set -o pipefail &&
       ip -4 addr show | grep -E "inet " |
       grep -v -E "inet (10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|127\.)"
+    executable: /bin/bash
   register: all_public_ips
   changed_when: false
   failed_when: false
