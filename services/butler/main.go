@@ -51,7 +51,7 @@ func main() {
 
 	// Build reconcilers — order matters: bootstrap must run before secrets.
 	reconcilers := []reconciler.Reconciler{
-		reconciler.NewVaultBootstrap(vc, k8s, cfg.Namespace),
+	reconciler.NewVaultBootstrap(vc, k8s, cfg.Namespace, cfg.OIDC.Issuer),
 	}
 	if len(cfg.Secrets) > 0 {
 		reconcilers = append(reconcilers, reconciler.NewSecrets(vc, cfg.Secrets))
