@@ -1,5 +1,7 @@
 FROM node:24-alpine AS build
 
+RUN apk add --no-cache git
+
 WORKDIR /site
 
 COPY package.json package-lock.json ./

@@ -135,7 +135,9 @@ Open `http://localhost:8080` and verify clean routes such as
 
 The Dockerfile has two stages:
 
-1. Node 24 runs `npm ci` and the VitePress production build.
+1. Node 24 installs Git in the disposable build stage, runs `npm ci`, and
+   creates the VitePress production build. VitePress invokes Git while
+   collecting page timestamps; Git is not copied into the runtime image.
 2. The official unprivileged Nginx image serves only the generated static files.
 
 The runtime container:
