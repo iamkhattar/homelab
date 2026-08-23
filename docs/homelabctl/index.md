@@ -17,7 +17,7 @@ This section is for two audiences:
 | Goal | Next page |
 | --- | --- |
 | Install the CLI and prepare a workstation | [Install and configure](/homelabctl/getting-started) |
-| Understand releases, Debian installation and self-update | [Releases and self-update](/homelabctl/releases-self-update) |
+| Understand releases, Debian installation and updates | [Releases and updates](/homelabctl/releases-update) |
 | Understand safety, subprocesses and Go-library boundaries | [Safety and execution model](/homelabctl/safety-internals) |
 | Prepare Titan and establish SSH trust | [Inventory and nodes](/homelabctl/inventory-nodes) |
 | Install, inspect, upgrade or recover K3s | [Cluster lifecycle and recovery](/homelabctl/cluster-lifecycle) |
@@ -66,6 +66,8 @@ shell text.
 
 ```text
 homelabctl/
+├── Dockerfile                non-root operator image contract
+├── .dockerignore             isolated image build context
 ├── .goreleaser.yaml         cross-platform release contract
 ├── cmd/homelabctl/          executable entry point
 └── internal/
@@ -92,12 +94,13 @@ API has a stable contract and a second real consumer.
 | Kubernetes inspection | kubectl subprocess |
 | Workload reconciliation | Helmfile subprocess |
 | Optional cloud planning | Terraform subprocess |
-| Container images | Docker subprocess |
+| Service, homelabctl and documentation images | Docker subprocess |
 | Documentation dependencies and build | npm subprocess |
 
-The default image tag is the full current Git commit SHA. Publication requires
-the `CI` environment marker, and CI publication does not imply deployment to
-Titan.
+The default image tag is the full current Git commit SHA. Main publication uses
+one semantic version for the homelabctl release, homelabctl image and Butler
+image, with SHA and `latest` as additional aliases. Publication requires the
+`CI` environment marker, and CI publication does not imply deployment to Titan.
 
 ## Contributor contract
 

@@ -67,8 +67,12 @@ func TestBuildServicesPushesEveryExplicitTagOnlyInCI(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
+	sha, err := repository.HeadSHA(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, fragment := range []string{
-		"docker build --tag example.test/home/api:revision --tag example.test/home/api:latest .",
+		"docker build --build-arg VERSION=revision --build-arg COMMIT=" + sha + " --build-arg BUILD_DATE=1970-01-01T00:00:01Z --tag example.test/home/api:revision --tag example.test/home/api:latest .",
 		"docker push example.test/home/api:revision",
 		"docker push example.test/home/api:latest",
 	} {
@@ -153,6 +157,62 @@ func TestCICheckGoTestRunsEveryDiscoveredModule(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "PASS  go-test") {
 		t.Fatalf("check output %q does not report go-test success", stdout.String())
+	}
+}
+
+func TestCICheckReportingModeGeneratesEveryReportThroughPinnedTools(t *testing.T) {
+	repo := testRepository(t)
+	for _, module := range []string{"homelabctl", filepath.Join("services", "butler")} {
+		directory := filepath.Join(repo, module)
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(directory, "go.mod"), []byte("module example.invalid/test\n\ngo 1.27.0\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var stderr bytes.Buffer
+	runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &stderr)
+	root := New(BuildInfo{}, runner)
+	root.SetArgs([]string{"--repo-root", repo, "--dry-run", "ci", "check", "--reports", "--only", "go-test,gosec,trivy,sbom"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	for _, fragment := range []string{
+		"gotestsum --format standard-quiet --junitfile " + filepath.Join(repo, "test-results", "homelabctl.xml"),
+		"gosec -track-suppressions -fmt sarif -out " + filepath.Join(repo, "sarif", "gosec-services-butler.sarif"),
+		"docker run --rm --volume " + repo + ":/workspace --workdir /workspace " + trivyImage + " fs --cache-dir /workspace/trivy-cache --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --format sarif --output /workspace/sarif/trivy.sarif",
+		"docker run --rm --volume " + repo + ":/workspace --workdir /workspace " + trivyImage + " fs --cache-dir /workspace/trivy-cache --format spdx-json --output /workspace/sbom/homelab.spdx.json",
+	} {
+		if !strings.Contains(stderr.String(), fragment) {
+			t.Errorf("reporting dry-run %q does not contain %q", stderr.String(), fragment)
+		}
+	}
+	for _, directory := range []string{testResultsDirectory, sarifDirectory, sbomDirectory} {
+		if _, err := os.Stat(filepath.Join(repo, directory)); !os.IsNotExist(err) {
+			t.Errorf("dry-run created report directory %s: %v", directory, err)
+		}
+	}
+}
+
+func TestSetupReportsInstallsPinnedTools(t *testing.T) {
+	var stderr bytes.Buffer
+	runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &stderr)
+	root := New(BuildInfo{}, runner)
+	root.SetArgs([]string{"--repo-root", testRepository(t), "--dry-run", "setup", "reports"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	for _, tool := range []string{
+		"gotest.tools/gotestsum@" + gotestsumVersion,
+		"github.com/securego/gosec/v2/cmd/gosec@" + gosecVersion,
+	} {
+		if !strings.Contains(stderr.String(), "go install "+tool) {
+			t.Errorf("setup reports output %q does not install %s", stderr.String(), tool)
+		}
 	}
 }
 

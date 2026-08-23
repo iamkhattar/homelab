@@ -1,0 +1,6 @@
+.git
+.goreleaser.yaml
+coverage.out
+dist
+/homelabctl
+*.test

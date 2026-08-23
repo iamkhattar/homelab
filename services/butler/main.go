@@ -17,6 +17,12 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
+)
+
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -28,7 +34,7 @@ func main() {
 	}
 
 	initLogging(cfg.LogLevel)
-	slog.Info("butler starting")
+	slog.Info("butler starting", "version", version, "commit", commit, "built", date)
 
 	// Kubernetes client (in-cluster).
 	k8sCfg, err := rest.InClusterConfig()

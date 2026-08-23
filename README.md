@@ -13,12 +13,12 @@ wraps the repository's native tools without replacing their configuration.
 
 Install a checksum-verified Linux or macOS binary from [GitHub
 Releases](https://github.com/iamkhattar/homelab/releases). The detailed
-[release guide](docs/homelabctl/releases-self-update.md) includes the Debian
+[release guide](docs/homelabctl/releases-update.md) includes the Debian
 install path and verification commands. Once installed:
 
 ```bash
 homelabctl version
-homelabctl self-update --check
+homelabctl update --check
 ```
 
 Contributors can build from `homelabctl/` with Go 1.27 or newer.
@@ -56,4 +56,11 @@ Build the internal Nginx image from the repository root with:
 
 ```bash
 homelabctl build docs --tag dev
+```
+
+Build the non-root CLI image intended as the base for a future runner or
+operator with:
+
+```bash
+homelabctl build homelabctl --tag dev
 ```

@@ -27,6 +27,7 @@ func newCICommand(s *state) *cobra.Command {
 
 	var skip []string
 	var only []string
+	var reports bool
 	checkCmd := &cobra.Command{
 		Use:   "check",
 		Short: "Run formatting, tests, docs, workflow, Ansible and Terraform checks",
@@ -43,11 +44,18 @@ func newCICommand(s *state) *cobra.Command {
 
 			steps := []checkStep{
 				{name: "go-format", run: func(cmd *cobra.Command) error { return checkGoFormat(cmd, s) }},
-				{name: "go-test", run: func(cmd *cobra.Command) error { return checkGoTests(cmd, s) }},
+				{name: "go-test", run: func(cmd *cobra.Command) error { return checkGoTests(cmd, s, reports) }},
 				{name: "docs", run: func(cmd *cobra.Command) error { return s.run(cmd.Context(), s.dir("docs"), "npm", "run", "build") }},
 				{name: "workflows", run: func(_ *cobra.Command) error { return workflow.ValidateDirectory(s.root) }},
 				{name: "ansible", run: func(cmd *cobra.Command) error { return checkAnsible(cmd, s) }},
 				{name: "terraform", run: func(cmd *cobra.Command) error { return checkTerraform(cmd, s) }},
+			}
+			if reports {
+				steps = append(steps,
+					checkStep{name: "gosec", run: func(cmd *cobra.Command) error { return generateGoSecurityReports(cmd, s) }},
+					checkStep{name: "trivy", run: func(cmd *cobra.Command) error { return generateTrivySecurityReport(cmd, s) }},
+					checkStep{name: "sbom", run: func(cmd *cobra.Command) error { return generateSBOM(cmd, s) }},
+				)
 			}
 
 			known := map[string]bool{}
@@ -88,8 +96,9 @@ func newCICommand(s *state) *cobra.Command {
 			return nil
 		},
 	}
-	checkCmd.Flags().StringSliceVar(&skip, "skip", nil, "checks to skip: go-format,go-test,docs,workflows,ansible,terraform")
-	checkCmd.Flags().StringSliceVar(&only, "only", nil, "run only selected checks: go-format,go-test,docs,workflows,ansible,terraform")
+	checkCmd.Flags().StringSliceVar(&skip, "skip", nil, "checks to skip; reporting mode also adds gosec,trivy,sbom")
+	checkCmd.Flags().StringSliceVar(&only, "only", nil, "run only selected checks; reporting mode also adds gosec,trivy,sbom")
+	checkCmd.Flags().BoolVar(&reports, "reports", false, "write JUnit, test JSON, SARIF and SPDX reports and run security scans")
 	cmd.AddCommand(checkCmd, newCIImageCommand(s, false), newCIImageCommand(s, true))
 	return cmd
 }
@@ -105,6 +114,7 @@ func newCIImageCommand(s *state, publish bool) *cobra.Command {
 	var tags []string
 	var registry string
 	var docsImage string
+	var homelabctlImage string
 	var changed bool
 	var base string
 	cmd := &cobra.Command{
@@ -123,6 +133,9 @@ func newCIImageCommand(s *state, publish bool) *cobra.Command {
 			if err := validateContainerValue(docsImage, "documentation image"); err != nil {
 				return err
 			}
+			if err := validateContainerValue(homelabctlImage, "homelabctl image"); err != nil {
+				return err
+			}
 			if err := validateTags(tags); err != nil {
 				return err
 			}
@@ -138,13 +151,19 @@ func newCIImageCommand(s *state, publish bool) *cobra.Command {
 			}); err != nil {
 				return err
 			}
+			if err := buildHomelabctl(cmd.Context(), s, homelabctlBuildOptions{
+				tags: resolvedTags, image: homelabctlImage, push: publish,
+			}); err != nil {
+				return err
+			}
 			return buildDocs(cmd.Context(), s, docsBuildOptions{tags: resolvedTags, image: docsImage, push: publish})
 		},
 	}
-	cmd.Flags().StringSliceVar(&tags, "tag", nil, "image tag; repeat for multiple tags (default: current Git SHA)")
+	cmd.Flags().StringSliceVar(&tags, "tag", nil, "image tag; repeat for multiple tags; first tag is the shared build version (default: current Git SHA)")
 	cmd.Flags().StringVar(&registry, "registry", "iamkhattar", "service image registry namespace")
 	cmd.Flags().StringVar(&docsImage, "docs-image", "iamkhattar/homelab-docs", "documentation image name")
-	cmd.Flags().BoolVar(&changed, "changed", false, "build only services changed from --base; docs are always built")
+	cmd.Flags().StringVar(&homelabctlImage, "homelabctl-image", "iamkhattar/homelabctl", "homelabctl image name")
+	cmd.Flags().BoolVar(&changed, "changed", false, "build only services changed from --base; homelabctl and docs are always built")
 	cmd.Flags().StringVar(&base, "base", "", "Git base revision used with --changed")
 	return cmd
 }
@@ -170,10 +189,13 @@ func checkGoFormat(cmd *cobra.Command, s *state) error {
 	return nil
 }
 
-func checkGoTests(cmd *cobra.Command, s *state) error {
+func checkGoTests(cmd *cobra.Command, s *state, reports bool) error {
 	modules, err := repository.GoModules(s.root)
 	if err != nil {
 		return err
+	}
+	if reports {
+		return generateGoTestReports(cmd, s, modules)
 	}
 	for _, module := range modules {
 		if err := s.run(cmd.Context(), module, "go", "test", "./..."); err != nil {

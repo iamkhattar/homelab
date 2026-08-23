@@ -89,7 +89,7 @@ Important flags:
 
 | Flag | Behaviour |
 | --- | --- |
-| `--tag TAG` | Add an image tag; repeat for multiple tags; defaults to the current full Git commit SHA |
+| `--tag TAG` | Add an image tag; repeat for multiple tags; the first tag is the embedded build version; defaults to the current full Git commit SHA |
 | `--registry NAME` | Set the image namespace; default `iamkhattar` |
 | `--changed` | Build services changed between `--base` and `HEAD` |
 | `--base REVISION` | Required with `--changed` |
@@ -98,6 +98,52 @@ Important flags:
 Explicit service names and `--changed` are mutually exclusive. Unknown service
 names fail before Docker is invoked. Use `--tag dev` deliberately when a stable
 local-development tag is more convenient than the immutable default.
+
+## Build the homelabctl image
+
+```bash
+homelabctl build homelabctl --tag dev
+```
+
+The image is built from the isolated `homelabctl/` context and defaults to
+`iamkhattar/homelabctl`. Override the complete name or add multiple tags with
+the same interface used by the docs image:
+
+```bash
+homelabctl build homelabctl \
+  --image iamkhattar/homelabctl \
+  --tag latest \
+  --tag revision-id
+```
+
+The multi-stage Dockerfile compiles a static Linux binary with Go 1.27. The
+runtime is an Alpine image containing trusted CA certificates, Git and the
+OpenSSH client. It runs as the unprivileged UID/GID `65532`, uses `/workspace`
+as its working directory, and starts `homelabctl` directly. The current Git SHA
+is embedded in the binary and OCI image metadata by the build command.
+
+Run a repository-independent command directly:
+
+```bash
+docker run --rm iamkhattar/homelabctl:dev version
+```
+
+Repository-aware commands require an explicit checkout mount:
+
+```bash
+docker run --rm \
+  --volume "$PWD:/workspace" \
+  iamkhattar/homelabctl:dev \
+  --repo-root /workspace ci check --only workflows
+```
+
+This is deliberately a minimal operator image, not yet a privileged CI runner.
+It does not contain Ansible, Docker, Helmfile, kubectl or Terraform, and it does
+not receive a Docker socket, kubeconfig or cluster-wide credentials by default.
+The future runner or Kubernetes operator must add only the tools and narrowly
+scoped credentials required by its execution model. Treat the container as
+immutable: deploy a newer image tag instead of running `homelabctl update`
+inside it.
 
 ## Build the docs image
 
@@ -148,14 +194,15 @@ homelabctl ci check --skip terraform
 
 ## Build and publish the complete CI image set
 
-Build every service image and the documentation image with one command:
+Build every service image plus the homelabctl and documentation images with one
+command:
 
 ```bash
 homelabctl ci build --tag dev
 ```
 
 For a pull-request-style incremental build, service selection uses the embedded
-`go-git` implementation while the docs image is always built:
+`go-git` implementation while the homelabctl and docs images are always built:
 
 ```bash
 homelabctl ci build --changed --base origin/main --tag revision-id
@@ -174,37 +221,47 @@ Add mutable or release tags explicitly when they are intended:
 CI=true homelabctl ci publish \
   --changed \
   --base previous-revision \
+  --tag v0.1.42 \
   --tag latest \
   --tag revision-id
 ```
 
+The first resolved tag is embedded as the build version in every Go image.
+Aggregate builds therefore give Butler and the homelabctl image exactly the
+same version. On `main`, GitHub Actions deliberately supplies the shared
+semantic `v0.1.<workflow run number>` tag first, followed by `latest` and the
+source SHA. Butler reports that version, commit and build date in its startup
+log; `homelabctl version` reports the same version and commit.
+
 `ci build` and `ci publish` call the same internal build operations exposed by
-`build services` and `build docs`. Publication adds Docker pushes; it does not
-deploy anything to Kubernetes. Use `--registry` to change the service image
-namespace and `--docs-image` to change the complete docs image name.
+`build services`, `build homelabctl` and `build docs`. Publication adds Docker
+pushes; it does not deploy anything to Kubernetes. Use `--registry` to change
+the service image namespace, `--homelabctl-image` to change the CLI image name,
+and `--docs-image` to change the complete docs image name.
 
 The default is the full commit SHA resolved from the repository by `go-git`.
 Dry-run mode resolves and displays the same real SHA without spawning the Git
-binary; only Docker execution is skipped. GitHub Actions supplies both the
-immutable event SHA and `latest` explicitly on main, so mutable-tag publication
-remains visible in workflow source.
+binary; only Docker execution is skipped. GitHub Actions defines one
+`RELEASE_VERSION`, uses it for both image publication and GoReleaser, and
+supplies the immutable event SHA and `latest` as additional tags. Mutable-tag
+publication therefore remains visible in workflow source.
 
 ## GitHub Actions flow
 
 The workflow bootstraps the CLI, then uses it to install repository dependencies
 and run checks. Pull requests invoke `homelabctl ci build` without pushing. The
-main branch invokes `homelabctl ci publish` to build immutable revision tags
-plus `latest` and push them after authentication. In parallel after checks, a
-main-only release job uses the pinned GoReleaser action to publish static
-`homelabctl` archives and `checksums.txt` under the immutable version
-`v0.1.<workflow run number>`.
+main branch invokes `homelabctl ci publish` with the shared semantic version,
+immutable revision and `latest` tags for services, homelabctl and docs, then
+pushes them after authentication. In parallel after checks, a main-only release
+job uses that same version with the pinned GoReleaser action to publish static
+`homelabctl` archives and `checksums.txt`.
 
 `homelabctl ci check --only workflows` parses every workflow and enforces the
 local contract: read-only default permissions, concurrency cancellation,
 bounded job timeouts, full Git history for merge-base selection, check-before-
 publish/release ordering, SHA-tagged PR builds, CI-gated main publication,
-main-only release execution, least-privilege release permissions, immutable
-semantic release tags, and the absence of deploy, Terraform apply/destroy,
+main-only release execution, least-privilege release permissions, one shared
+immutable semantic release version, and the absence of deploy, Terraform apply/destroy,
 Helmfile apply/sync and kubectl apply commands. GitHub remains responsible for
 validating its complete Actions schema.
 
@@ -220,5 +277,5 @@ If secure CD is added later, a trusted runner may invoke those same commands;
 there should not be separate hidden deployment logic inside the workflow.
 
 CLI release publication is also not deployment. Continue with [releases and
-self-update](/homelabctl/releases-self-update) for the artifact and update
+updates](/homelabctl/releases-update) for the artifact and update
 contract.

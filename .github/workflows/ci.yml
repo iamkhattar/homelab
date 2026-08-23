@@ -16,10 +16,14 @@ env:
   GO_VERSION: "1.27.0"
   NODE_VERSION: "24"
   TERRAFORM_VERSION: "1.14.6"
+  RELEASE_VERSION: "v0.1.${{ github.run_number }}"
 
 jobs:
   check:
     name: Check
+    permissions:
+      contents: read
+      security-events: write
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -62,12 +66,31 @@ jobs:
         run: bin/homelabctl setup
 
       - name: Run repository checks
-        run: bin/homelabctl ci check
+        run: bin/homelabctl ci check --reports
         env:
           CI: "true"
 
+      - name: Upload test, security and SBOM reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-${{ github.sha }}
+          path: |
+            test-results/
+            sarif/
+            sbom/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload security findings to code scanning
+        if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif
+          category: homelabctl
+
   publish:
-    name: Build service images
+    name: Build container images
     needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -107,6 +130,7 @@ jobs:
           bin/homelabctl ci publish \
             --changed \
             --base "${{ github.event.before }}" \
+            --tag "${{ env.RELEASE_VERSION }}" \
             --tag latest \
             --tag "${{ github.sha }}"
         env:
@@ -140,4 +164,4 @@ jobs:
           workdir: homelabctl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GORELEASER_CURRENT_TAG: v0.1.${{ github.run_number }}
+          GORELEASER_CURRENT_TAG: ${{ env.RELEASE_VERSION }}

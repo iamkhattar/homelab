@@ -32,10 +32,10 @@ func (f *fakeSelfUpdateClient) install(_ context.Context, _ availableRelease, pa
 	return f.installErr
 }
 
-func TestSelfUpdateChecksWithoutRepositoryOrMutation(t *testing.T) {
+func TestUpdateChecksWithoutRepositoryOrMutation(t *testing.T) {
 	client := &fakeSelfUpdateClient{release: availableRelease{version: "0.1.42", url: "https://example.invalid/release"}, found: true}
 	stdout, root := selfUpdateRoot(t, BuildInfo{Version: "0.1.41"}, client, "/usr/local/bin/homelabctl", "linux", "amd64")
-	root.SetArgs([]string{"self-update", "--check"})
+	root.SetArgs([]string{"update", "--check"})
 
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -50,10 +50,10 @@ func TestSelfUpdateChecksWithoutRepositoryOrMutation(t *testing.T) {
 	}
 }
 
-func TestSelfUpdateInstallsExactVersionAtExecutablePath(t *testing.T) {
+func TestUpdateInstallsExactVersionAtExecutablePath(t *testing.T) {
 	client := &fakeSelfUpdateClient{release: availableRelease{version: "0.1.40"}, found: true}
 	stdout, root := selfUpdateRoot(t, BuildInfo{Version: "0.1.41"}, client, "/opt/bin/homelabctl", "linux", "arm64")
-	root.SetArgs([]string{"self-update", "--version", "v0.1.40"})
+	root.SetArgs([]string{"update", "--version", "v0.1.40"})
 
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -69,10 +69,10 @@ func TestSelfUpdateInstallsExactVersionAtExecutablePath(t *testing.T) {
 	}
 }
 
-func TestSelfUpdateSkipsCurrentVersionUnlessForced(t *testing.T) {
+func TestUpdateSkipsCurrentVersionUnlessForced(t *testing.T) {
 	client := &fakeSelfUpdateClient{release: availableRelease{version: "0.1.42"}, found: true}
 	_, root := selfUpdateRoot(t, BuildInfo{Version: "v0.1.42"}, client, "/bin/homelabctl", "darwin", "arm64")
-	root.SetArgs([]string{"self-update"})
+	root.SetArgs([]string{"update"})
 
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -81,7 +81,7 @@ func TestSelfUpdateSkipsCurrentVersionUnlessForced(t *testing.T) {
 		t.Fatalf("install calls = %d, want 0", client.installCalls)
 	}
 
-	root.SetArgs([]string{"self-update", "--force"})
+	root.SetArgs([]string{"update", "--force"})
 	if err := root.Execute(); err != nil {
 		t.Fatalf("forced Execute() error = %v", err)
 	}
@@ -90,10 +90,10 @@ func TestSelfUpdateSkipsCurrentVersionUnlessForced(t *testing.T) {
 	}
 }
 
-func TestSelfUpdateDryRunChecksButDoesNotInstall(t *testing.T) {
+func TestUpdateDryRunChecksButDoesNotInstall(t *testing.T) {
 	client := &fakeSelfUpdateClient{release: availableRelease{version: "0.2.0"}, found: true}
 	_, root := selfUpdateRoot(t, BuildInfo{Version: "dev"}, client, "/bin/homelabctl", "linux", "amd64")
-	root.SetArgs([]string{"--dry-run", "self-update"})
+	root.SetArgs([]string{"--dry-run", "update"})
 
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -103,7 +103,18 @@ func TestSelfUpdateDryRunChecksButDoesNotInstall(t *testing.T) {
 	}
 }
 
-func TestSelfUpdateValidationAndFailures(t *testing.T) {
+func TestUpdateDoesNotExposeLegacySelfUpdateCommand(t *testing.T) {
+	client := &fakeSelfUpdateClient{}
+	_, root := selfUpdateRoot(t, BuildInfo{Version: "dev"}, client, "/bin/homelabctl", "linux", "amd64")
+	root.SetArgs([]string{"self-update"})
+
+	err := root.Execute()
+	if err == nil || !strings.Contains(err.Error(), "unknown command") {
+		t.Fatalf("Execute() error = %v, want unknown command", err)
+	}
+}
+
+func TestUpdateValidationAndFailures(t *testing.T) {
 	tests := []struct {
 		name      string
 		args      []string
@@ -133,7 +144,7 @@ func TestSelfUpdateValidationAndFailures(t *testing.T) {
 				},
 				goos: test.goos, goarch: test.goarch,
 			}
-			cmd := newSelfUpdateCommand(state, dependencies)
+			cmd := newUpdateCommand(state, dependencies)
 			cmd.SetArgs(test.args)
 			err := cmd.Execute()
 			if err == nil || !strings.Contains(err.Error(), test.want) {
@@ -170,6 +181,6 @@ func selfUpdateRoot(t *testing.T, build BuildInfo, client selfUpdateClient, path
 	}
 	root := &cobra.Command{Use: "homelabctl"}
 	root.PersistentFlags().BoolVar(&state.dryRun, "dry-run", false, "")
-	root.AddCommand(newSelfUpdateCommand(state, dependencies))
+	root.AddCommand(newUpdateCommand(state, dependencies))
 	return &stdout, root
 }

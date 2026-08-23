@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -64,6 +65,25 @@ func HeadSHA(root string) (string, error) {
 		return "", fmt.Errorf("resolving Git HEAD: commit hash is empty")
 	}
 	return hash.String(), nil
+}
+
+// HeadCommitDate returns the HEAD commit timestamp as deterministic RFC 3339
+// build metadata. Image builds use the commit time instead of wall-clock time
+// so every artifact for one revision reports the same date.
+func HeadCommitDate(root string) (string, error) {
+	repository, err := open(root)
+	if err != nil {
+		return "", err
+	}
+	reference, err := repository.Head()
+	if err != nil {
+		return "", fmt.Errorf("resolving Git HEAD: %w", err)
+	}
+	commit, err := repository.CommitObject(reference.Hash())
+	if err != nil {
+		return "", fmt.Errorf("loading Git HEAD commit: %w", err)
+	}
+	return commit.Committer.When.UTC().Format(time.RFC3339), nil
 }
 
 func ChangedServiceNames(root, base string) ([]string, error) {

@@ -64,6 +64,18 @@ func TestHeadSHAReadsCommittedHead(t *testing.T) {
 	}
 }
 
+func TestHeadCommitDateUsesCommittedTimestamp(t *testing.T) {
+	root, _ := initGitRepository(t)
+
+	got, err := HeadCommitDate(root)
+	if err != nil {
+		t.Fatalf("HeadCommitDate() error = %v", err)
+	}
+	if got != "1970-01-01T00:00:01Z" {
+		t.Fatalf("HeadCommitDate() = %q, want deterministic commit timestamp", got)
+	}
+}
+
 func TestHeadSHARejectsUnbornRepository(t *testing.T) {
 	root := t.TempDir()
 	if _, err := git.PlainInit(root, false); err != nil {

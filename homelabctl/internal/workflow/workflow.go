@@ -81,13 +81,15 @@ var majorVersionPattern = regexp.MustCompile(`@v([0-9]+)(?:\.|$)`)
 const pinnedGoReleaserAction = "goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94"
 
 var minimumActionMajors = map[string]int{
-	"actions/checkout":             7,
-	"actions/setup-go":             7,
-	"actions/setup-node":           7,
-	"actions/setup-python":         7,
-	"docker/login-action":          4,
-	"goreleaser/goreleaser-action": 7,
-	"hashicorp/setup-terraform":    4,
+	"actions/checkout":                  7,
+	"actions/upload-artifact":           7,
+	"actions/setup-go":                  7,
+	"actions/setup-node":                7,
+	"actions/setup-python":              7,
+	"docker/login-action":               4,
+	"goreleaser/goreleaser-action":      7,
+	"github/codeql-action/upload-sarif": 4,
+	"hashicorp/setup-terraform":         4,
 }
 
 func validateGeneral(path string, workflow definition) []error {
@@ -148,6 +150,9 @@ func validateCI(path string, workflow definition) []error {
 	if value(workflow.Env["NODE_VERSION"]) != "24" {
 		problem("must use Node 24")
 	}
+	if value(workflow.Env["RELEASE_VERSION"]) != "v0.1.${{ github.run_number }}" {
+		problem("must define the shared immutable release version as v0.1.${{ github.run_number }}")
+	}
 	if emptyNode(workflow.Concurrency) {
 		problem("must define concurrency so stale runs are cancelled")
 	}
@@ -157,11 +162,22 @@ func validateCI(path string, workflow definition) []error {
 		problem("must define the check job")
 	} else {
 		validateJob(path, "check", check, &problems)
-		if !hasRun(check.Steps, "bin/homelabctl ci check") {
-			problem("check job must run bin/homelabctl ci check")
+		if value(check.Permissions["security-events"]) != "write" {
+			problem("check job must grant security-events: write for SARIF upload")
+		}
+		if !hasRun(check.Steps, "bin/homelabctl ci check", "--reports") {
+			problem("check job must generate reports through bin/homelabctl ci check --reports")
 		}
 		if hasRun(check.Steps, "bin/homelabctl ci check", "--skip", "go-test") {
 			problem("check job must not skip Go tests")
+		}
+		artifactStep, found := findUses(check.Steps, "actions/upload-artifact@")
+		if !found || !strings.Contains(value(artifactStep.With["path"]), "test-results/") || !strings.Contains(value(artifactStep.With["path"]), "sarif/") || !strings.Contains(value(artifactStep.With["path"]), "sbom/") {
+			problem("check job must upload test, SARIF and SBOM report directories")
+		}
+		sarifStep, found := findUses(check.Steps, "github/codeql-action/upload-sarif@")
+		if !found || value(sarifStep.With["sarif_file"]) != "sarif" {
+			problem("check job must upload homelabctl-generated SARIF to code scanning")
 		}
 	}
 
@@ -176,8 +192,8 @@ func validateCI(path string, workflow definition) []error {
 		if !hasRun(publish.Steps, "ci build", "--changed", `origin/${{ github.base_ref }}`, `--tag "${{ github.sha }}"`) {
 			problem("publish job must build PR changes from the base branch with the commit SHA tag")
 		}
-		if !hasRun(publish.Steps, "ci publish", "--changed", `${{ github.event.before }}`, "--tag latest", `--tag "${{ github.sha }}"`) {
-			problem("publish job must publish main changes with latest and commit SHA tags")
+		if !hasRun(publish.Steps, "ci publish", "--changed", `${{ github.event.before }}`, `--tag "${{ env.RELEASE_VERSION }}"`, "--tag latest", `--tag "${{ github.sha }}"`) {
+			problem("publish job must publish main changes with the shared release version, latest, and commit SHA tags")
 		}
 		if !hasRunWithEnv(publish.Steps, "ci publish", "CI", "true") {
 			problem("image publication must set CI=true")
@@ -214,8 +230,8 @@ func validateCI(path string, workflow definition) []error {
 			if value(releaseStep.Env["GITHUB_TOKEN"]) != "${{ secrets.GITHUB_TOKEN }}" {
 				problem("release job must authenticate with GITHUB_TOKEN")
 			}
-			if value(releaseStep.Env["GORELEASER_CURRENT_TAG"]) != "v0.1.${{ github.run_number }}" {
-				problem("release job must derive an immutable semantic tag from github.run_number")
+			if value(releaseStep.Env["GORELEASER_CURRENT_TAG"]) != "${{ env.RELEASE_VERSION }}" {
+				problem("release job must use the same shared release version as container publication")
 			}
 		}
 	}

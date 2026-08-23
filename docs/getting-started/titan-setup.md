@@ -142,11 +142,11 @@ reservation for this network.
 
 Clone or open the repository on the operator workstation. Install the
 checksum-verified platform binary using the [release installation
-procedure](/homelabctl/releases-self-update), then confirm it:
+procedure](/homelabctl/releases-update), then confirm it:
 
 ```bash
 homelabctl version
-homelabctl self-update --check
+homelabctl update --check
 ```
 
 Building from source with Go 1.27 remains a contributor fallback, not the

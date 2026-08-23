@@ -13,8 +13,8 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 		example: "  homelabctl doctor\n  homelabctl --dry-run node prepare --check --limit titan",
 	},
 	"homelabctl setup": {
-		long:    "Install the repository's pinned Ansible and documentation dependencies. Select one environment while iterating, or omit the target to install both. For the ansible target, --uninstall removes only generated local runtime state and --reset removes then recreates it.",
-		example: "  homelabctl setup\n  homelabctl setup ansible\n  homelabctl setup ansible --reset\n  homelabctl setup ansible --uninstall\n  homelabctl setup docs",
+		long:    "Install the repository's pinned Ansible, documentation and CI reporting dependencies. Select one environment while iterating, or omit the target to install all three. For the ansible target, --uninstall removes only generated local runtime state and --reset removes then recreates it.",
+		example: "  homelabctl setup\n  homelabctl setup ansible\n  homelabctl setup ansible --reset\n  homelabctl setup ansible --uninstall\n  homelabctl setup docs\n  homelabctl setup reports",
 	},
 	"homelabctl inventory": {long: "Create and inspect the private, Git-ignored Ansible inventory used for local and future remote nodes."},
 	"homelabctl inventory init": {
@@ -110,7 +110,7 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 	"homelabctl infra fmt":      {long: "Check Terraform formatting recursively without rewriting source files.", example: "  homelabctl infra fmt"},
 	"homelabctl infra validate": {long: "Initialise Terraform with the backend disabled, then validate configuration.", example: "  homelabctl infra validate"},
 	"homelabctl infra plan":     {long: "Create a Terraform plan using the configured backend and provider credentials without applying it.", example: "  homelabctl infra plan"},
-	"homelabctl build":          {long: "Build service and documentation container artifacts using repository conventions."},
+	"homelabctl build":          {long: "Build service, homelabctl, and documentation container artifacts using repository conventions."},
 	"homelabctl build services": {
 		long:    "Discover Dockerfiles under services/ and build all or explicitly named images. Changed mode selects services from a Git comparison; pushing requires CI.",
 		example: "  homelabctl build services --tag dev\n  homelabctl build services api --registry example\n  homelabctl build services --changed --base origin/main --tag revision",
@@ -118,6 +118,10 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 	"homelabctl build docs": {
 		long:    "Build the isolated VitePress-to-Nginx documentation image from the docs/ Docker context. Pushing requires CI.",
 		example: "  homelabctl build docs --tag dev\n  homelabctl build docs --image example/homelab-docs --tag revision",
+	},
+	"homelabctl build homelabctl": {
+		long:    "Build the non-root homelabctl operator image from the isolated homelabctl/ Docker context. The image contains the CLI, Git, SSH, and trusted CA certificates; pushing requires CI.",
+		example: "  homelabctl build homelabctl --tag dev\n  homelabctl build homelabctl --image example/homelabctl --tag revision",
 	},
 	"homelabctl docs":         {long: "Install, develop, build, preview, and locally serve the isolated VitePress documentation site."},
 	"homelabctl docs setup":   {long: "Install exact documentation dependencies from docs/package-lock.json.", example: "  homelabctl docs setup"},
@@ -130,21 +134,21 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 	},
 	"homelabctl ci": {long: "Provide the same high-level validation and image workflows used by GitHub Actions."},
 	"homelabctl ci check": {
-		long:    "Run repository checks while aggregating failures. Select or skip named areas when iterating; --only and --skip are mutually exclusive.",
-		example: "  homelabctl ci check\n  homelabctl ci check --only go-format,go-test\n  homelabctl ci check --skip terraform",
+		long:    "Run repository checks while aggregating failures. Reporting mode replaces plain Go tests with JUnit/JSON output and adds gosec SARIF, Trivy SARIF and an SPDX SBOM. Select or skip named areas when iterating; --only and --skip are mutually exclusive.",
+		example: "  homelabctl ci check\n  homelabctl ci check --reports\n  homelabctl ci check --only go-format,go-test\n  homelabctl ci check --reports --only gosec,trivy,sbom",
 	},
 	"homelabctl ci build": {
-		long:    "Build every service image and the docs image without pushing. Changed mode limits service images while always building docs.",
+		long:    "Build every service image plus the homelabctl and docs images without pushing. Changed mode limits service images while always building homelabctl and docs.",
 		example: "  homelabctl ci build --tag dev\n  homelabctl ci build --changed --base origin/main --tag revision",
 	},
 	"homelabctl ci publish": {
-		long:    "Build and push service and documentation images. This command requires CI and defaults to the current Git commit SHA when no tag is supplied.",
+		long:    "Build and push service, homelabctl, and documentation images. This command requires CI and defaults to the current Git commit SHA when no tag is supplied.",
 		example: "  CI=true homelabctl ci publish --changed --base HEAD~1 --tag latest --tag revision",
 	},
 	"homelabctl version": {long: "Print the semantic version, source commit, and build date embedded in the binary.", example: "  homelabctl version"},
-	"homelabctl self-update": {
+	"homelabctl update": {
 		long:    "Resolve a compatible immutable release from GitHub, require its checksums.txt asset, verify the downloaded archive, and atomically replace the running executable. This command does not require a repository checkout.",
-		example: "  homelabctl self-update --check\n  sudo homelabctl self-update\n  sudo homelabctl self-update --version v0.1.42",
+		example: "  homelabctl update --check\n  sudo homelabctl update\n  sudo homelabctl update --version v0.1.42",
 	},
 }
 

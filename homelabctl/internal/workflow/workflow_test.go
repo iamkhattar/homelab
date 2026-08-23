@@ -73,6 +73,27 @@ func TestValidateDirectoryRejectsBrokenCIContracts(t *testing.T) {
 			wantInError: "check job must not skip Go tests",
 		},
 		{
+			name: "workflow disables reports",
+			transform: func(input string) string {
+				return strings.Replace(input, "ci check --reports", "ci check", 1)
+			},
+			wantInError: "must generate reports",
+		},
+		{
+			name: "workflow omits report artifacts",
+			transform: func(input string) string {
+				return strings.Replace(input, "actions/upload-artifact@v7", "example.invalid/no-upload@v7", 1)
+			},
+			wantInError: "must upload test, SARIF and SBOM",
+		},
+		{
+			name: "workflow omits SARIF upload",
+			transform: func(input string) string {
+				return strings.Replace(input, "github/codeql-action/upload-sarif@v4", "example.invalid/no-sarif@v4", 1)
+			},
+			wantInError: "must upload homelabctl-generated SARIF",
+		},
+		{
 			name: "publishes without CI guard",
 			transform: func(input string) string {
 				return strings.Replace(input, "          CI: \"true\"", "          CI: \"false\"", 1)
@@ -108,11 +129,25 @@ func TestValidateDirectoryRejectsBrokenCIContracts(t *testing.T) {
 			wantInError: "release job must grant contents: write",
 		},
 		{
-			name: "release uses a moving tag",
+			name: "shared release uses a moving tag",
 			transform: func(input string) string {
 				return strings.Replace(input, "v0.1.${{ github.run_number }}", "latest", 1)
 			},
-			wantInError: "immutable semantic tag",
+			wantInError: "shared immutable release version",
+		},
+		{
+			name: "container publication omits shared release version",
+			transform: func(input string) string {
+				return strings.Replace(input, ` --tag "${{ env.RELEASE_VERSION }}"`, "", 1)
+			},
+			wantInError: "shared release version",
+		},
+		{
+			name: "goreleaser does not use shared release version",
+			transform: func(input string) string {
+				return strings.Replace(input, "GORELEASER_CURRENT_TAG: ${{ env.RELEASE_VERSION }}", "GORELEASER_CURRENT_TAG: v9.9.9", 1)
+			},
+			wantInError: "same shared release version",
 		},
 		{
 			name: "release action uses a moving tag",
@@ -209,8 +244,12 @@ concurrency:
 env:
   GO_VERSION: "1.27.0"
   NODE_VERSION: "24"
+  RELEASE_VERSION: "v0.1.${{ github.run_number }}"
 jobs:
   check:
+    permissions:
+      contents: read
+      security-events: write
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -218,7 +257,18 @@ jobs:
         with:
           fetch-depth: 0
       - run: |
-          bin/homelabctl ci check
+          bin/homelabctl ci check --reports
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          path: |
+            test-results/
+            sarif/
+            sbom/
+      - if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif
   publish:
     needs: check
     runs-on: ubuntu-latest
@@ -232,7 +282,7 @@ jobs:
           bin/homelabctl ci build --changed --base "origin/${{ github.base_ref }}" --tag "${{ github.sha }}"
       - name: Publish changed images
         run: |
-          bin/homelabctl ci publish --changed --base "${{ github.event.before }}" --tag latest --tag "${{ github.sha }}"
+          bin/homelabctl ci publish --changed --base "${{ github.event.before }}" --tag "${{ env.RELEASE_VERSION }}" --tag latest --tag "${{ github.sha }}"
         env:
           CI: "true"
   release:
@@ -253,5 +303,5 @@ jobs:
           workdir: homelabctl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GORELEASER_CURRENT_TAG: v0.1.${{ github.run_number }}
+          GORELEASER_CURRENT_TAG: ${{ env.RELEASE_VERSION }}
 `

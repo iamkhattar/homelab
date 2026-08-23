@@ -161,7 +161,27 @@ func TestBuildDocsDryRunUsesIsolatedContext(t *testing.T) {
 	}
 }
 
-func TestCIBuildDryRunBuildsServicesAndDocs(t *testing.T) {
+func TestBuildHomelabctlDryRunUsesIsolatedContextAndRevision(t *testing.T) {
+	repo := testRepository(t)
+	sha, err := repository.HeadSHA(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &stderr)
+	root := New(BuildInfo{}, runner)
+	root.SetArgs([]string{"--repo-root", repo, "--dry-run", "build", "homelabctl", "--image", "example.test/homelabctl", "--tag", "test"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	want := "docker build --build-arg VERSION=test --build-arg COMMIT=" + sha + " --build-arg BUILD_DATE=1970-01-01T00:00:01Z --tag example.test/homelabctl:test homelabctl"
+	if got := stderr.String(); !strings.Contains(got, want) {
+		t.Fatalf("dry-run output did not contain the homelabctl build %q: %q", want, got)
+	}
+}
+
+func TestCIBuildDryRunBuildsServicesHomelabctlAndDocs(t *testing.T) {
 	repo := testRepository(t)
 	if err := writeEmpty(filepath.Join(repo, "services", "example", "Dockerfile")); err != nil {
 		t.Fatal(err)
@@ -179,8 +199,16 @@ func TestCIBuildDryRunBuildsServicesAndDocs(t *testing.T) {
 		t.Fatalf("Execute() error = %v", err)
 	}
 	got := stderr.String()
-	if !strings.Contains(got, "docker build --tag iamkhattar/example:revision .") {
+	sha, err := repository.HeadSHA(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata := "--build-arg VERSION=revision --build-arg COMMIT=" + sha + " --build-arg BUILD_DATE=1970-01-01T00:00:01Z"
+	if !strings.Contains(got, "docker build "+metadata+" --tag iamkhattar/example:revision .") {
 		t.Fatalf("dry-run output did not contain the service build: %q", got)
+	}
+	if !strings.Contains(got, "docker build "+metadata+" --tag iamkhattar/homelabctl:revision homelabctl") {
+		t.Fatalf("dry-run output did not contain the homelabctl build: %q", got)
 	}
 	if !strings.Contains(got, "docker build --tag iamkhattar/homelab-docs:revision docs") {
 		t.Fatalf("dry-run output did not contain the docs build: %q", got)
@@ -214,7 +242,7 @@ func TestCIPublishDefaultsToGitSHA(t *testing.T) {
 		t.Fatalf("Execute() error = %v", err)
 	}
 	got := stderr.String()
-	if strings.Contains(got, "git ") || !strings.Contains(got, "iamkhattar/homelab-docs:"+sha) {
+	if strings.Contains(got, "git ") || !strings.Contains(got, "iamkhattar/homelabctl:"+sha) || !strings.Contains(got, "iamkhattar/homelab-docs:"+sha) {
 		t.Fatalf("dry-run output did not use the Git SHA default: %q", got)
 	}
 }

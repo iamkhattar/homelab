@@ -1,4 +1,4 @@
-# Releases and self-update
+# Releases and updates
 
 `homelabctl` is distributed as a checksum-protected GitHub Release for Linux
 and macOS. The release binary is the normal bootstrap path; a source build is a
@@ -15,9 +15,12 @@ v0.1.<GitHub workflow run number>
 
 The run number is monotonically increasing for this workflow. Cancelled or
 failed runs can leave harmless gaps. A successful run never moves or replaces
-an older release tag.
+an older release tag. The same value is the canonical version for the
+`homelabctl` GitHub Release, the `homelabctl` container image and Butler's
+container image. Both images also receive the source SHA and `latest` tags, but
+those aliases do not define a second product version.
 
-GoReleaser builds static binaries with the semantic version, full source commit
+GoReleaser builds static binaries with the same `v0.1.<run number>` version, full source commit
 and build date embedded at link time. Each release contains:
 
 | Asset | Host |
@@ -26,7 +29,7 @@ and build date embedded at link time. Each release contains:
 | `homelabctl_linux_arm64.tar.gz` | 64-bit ARM Linux |
 | `homelabctl_darwin_amd64.tar.gz` | Intel macOS |
 | `homelabctl_darwin_arm64.tar.gz` | Apple silicon macOS |
-| `checksums.txt` | SHA-256 hashes used for initial installation and self-update |
+| `checksums.txt` | SHA-256 hashes used for initial installation and updates |
 
 The archive name deliberately excludes the version. The immutable release URL
 and checksum identify the exact content while the stable platform asset name is
@@ -71,8 +74,8 @@ unless there is a deliberate break-glass reason.
 Release lookup and update do not require a repository checkout:
 
 ```bash
-homelabctl self-update --check
-sudo homelabctl self-update
+homelabctl update --check
+sudo homelabctl update
 homelabctl version
 ```
 
@@ -82,7 +85,7 @@ drafts and pre-releases, downloads the matching archive, requires
 atomically. If the executable is user-owned, omit `sudo`. A binary installed in
 `/usr/local/bin` by the commands above is root-owned and therefore needs it.
 
-`--dry-run self-update` performs the same release check but suppresses binary
+`--dry-run update` performs the same release check but suppresses binary
 replacement. The public repository normally needs no credential. Set
 `GITHUB_TOKEN` only when GitHub API rate limits require authenticated lookup;
 do not store that token in the repository or shell history.
@@ -96,14 +99,14 @@ through a cluster operation.
 Install an exact published version when reproducing a workflow or rolling back:
 
 ```bash
-sudo homelabctl self-update --version v0.1.42
+sudo homelabctl update --version v0.1.42
 ```
 
 An exact older version is allowed. If the requested version already runs, the
 command performs no write; add `--force` to replace a damaged or suspect copy:
 
 ```bash
-sudo homelabctl self-update --version v0.1.42 --force
+sudo homelabctl update --version v0.1.42 --force
 ```
 
 Self-update changes only the local CLI executable. It does not update Debian,

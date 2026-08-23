@@ -95,18 +95,18 @@ func (c *githubSelfUpdateClient) install(ctx context.Context, release availableR
 	return c.updater.UpdateTo(ctx, release.native, path)
 }
 
-func newSelfUpdateCommand(s *state, dependencies selfUpdateDependencies) *cobra.Command {
+func newUpdateCommand(s *state, dependencies selfUpdateDependencies) *cobra.Command {
 	var checkOnly bool
 	var requestedVersion string
 	var force bool
 
 	cmd := &cobra.Command{
-		Use:   "self-update",
+		Use:   "update",
 		Short: "Update homelabctl from a verified GitHub Release",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if !supportedReleasePlatform(dependencies.goos, dependencies.goarch) {
-				return fmt.Errorf("self-update is not supported on %s/%s; supported platforms are linux and darwin on amd64 and arm64", dependencies.goos, dependencies.goarch)
+				return fmt.Errorf("update is not supported on %s/%s; supported platforms are linux and darwin on amd64 and arm64", dependencies.goos, dependencies.goarch)
 			}
 
 			version, err := normalizeRequestedVersion(requestedVersion)

@@ -22,7 +22,7 @@ strict doctor check.
 ## Bootstrap the binary
 
 Install the checksum-verified release binary into `/usr/local/bin`. The
-[release and self-update guide](/homelabctl/releases-self-update) gives exact
+[release and update guide](/homelabctl/releases-update) gives exact
 Linux and macOS asset names, Debian verification commands, update behaviour and
 rollback procedure.
 
@@ -125,7 +125,7 @@ different checkout:
 homelabctl --repo-root /path/to/homelab doctor
 ```
 
-`version`, `self-update`, help and shell-completion generation do not require a repository.
+`version`, `update`, help and shell-completion generation do not require a repository.
 All other current commands do. Future control-plane API commands will be able to
 run without a checkout.
 

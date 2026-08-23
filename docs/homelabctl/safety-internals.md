@@ -186,7 +186,7 @@ consistent.
 - almost every command still requires a repository checkout;
 - `--context` represents only a kubectl context, not a complete environment;
 - output is human-oriented; stable JSON output is planned;
-- self-update is operator-triggered rather than an unattended background process;
+- updates are operator-triggered rather than an unattended background process;
 - deployment has no confirmation or rollback command yet;
 - restore remains intentionally manual;
 - control-plane authentication and API-backed commands are not implemented.

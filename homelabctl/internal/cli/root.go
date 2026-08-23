@@ -45,7 +45,7 @@ without hiding the underlying commands. Mutating operations remain explicit.`,
 			if err := validateNonBlank(s.kubeContext, "Kubernetes context"); err != nil {
 				return err
 			}
-			if cmd.Name() == "version" || cmd.Name() == "self-update" || cmd.Name() == "completion" || cmd.Name() == "help" {
+			if cmd.Name() == "version" || cmd.Name() == "update" || cmd.Name() == "completion" || cmd.Name() == "help" {
 				return nil
 			}
 			resolved, err := repository.Root(cmd.Context(), s.repoFlag)
@@ -62,7 +62,7 @@ without hiding the underlying commands. Mutating operations remain explicit.`,
 	root.PersistentFlags().BoolVar(&s.dryRun, "dry-run", false, "print external commands without executing them")
 
 	root.AddCommand(newVersionCommand(s))
-	root.AddCommand(newSelfUpdateCommand(s, productionSelfUpdateDependencies()))
+	root.AddCommand(newUpdateCommand(s, productionSelfUpdateDependencies()))
 	root.AddCommand(newDoctorCommand(s))
 	root.AddCommand(newSetupCommand(s))
 	root.AddCommand(newInventoryCommand(s))

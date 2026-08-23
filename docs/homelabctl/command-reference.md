@@ -46,7 +46,7 @@ they never change command behaviour or exit status.
 | `inventory show` | Render effective group membership | Does not contact nodes |
 | `inventory check [-v]` | Render inventory and run Ansible ping | Native inventory parsing and SSH identity checks remain active |
 | `version` | Print version, commit and build date | Does not require a repository |
-| `self-update` | Check or install a verified GitHub Release | Does not require a repository; supports Linux/macOS on amd64/arm64 |
+| `update` | Check or install a verified GitHub Release | Does not require a repository; supports Linux/macOS on amd64/arm64 |
 | `completion SHELL` | Generate Cobra completion | Does not require a repository |
 
 Examples:
@@ -59,13 +59,13 @@ homelabctl inventory init
 homelabctl inventory show
 homelabctl inventory check --verbose
 homelabctl doctor --strict
-homelabctl self-update --check
+homelabctl update --check
 ```
 
-`self-update --version v0.1.42` selects an exact semantic release, including an
+`update --version v0.1.42` selects an exact semantic release, including an
 older rollback target. `--force` reinstalls an already-running version. Global
 dry-run performs release discovery but suppresses replacement. See [releases
-and self-update](/homelabctl/releases-self-update) for checksum and ownership
+and updates](/homelabctl/releases-update) for checksum and ownership
 details.
 
 ## Debian nodes
@@ -141,6 +141,7 @@ path remains unsafe until token delivery and Tailscale networking are replaced.
 | Command | Purpose | Important validation |
 | --- | --- | --- |
 | `build services [service...]` | Build discovered or selected service images | Tags follow Docker's 1–128 character tag shape; registry cannot be blank or contain whitespace |
+| `build homelabctl` | Build the non-root operator image | Image cannot be blank; the current Git SHA is embedded; pushing requires `CI` |
 | `build docs` | Build the VitePress Nginx image | Image cannot be blank or contain whitespace; tags are validated |
 | `docs setup` | Install locked docs dependencies | Runs only inside `docs/` |
 | `docs dev` | Start VitePress development | Node version guard runs first |
@@ -150,12 +151,13 @@ path remains unsafe until token delivery and Tailscale networking are replaced.
 
 `--changed` and explicit service names are mutually exclusive. Changed mode
 requires a non-empty `--base`. Any push through a build primitive requires the
-`CI` environment marker. When `--tag` is omitted, service, docs and aggregate CI
-builds resolve the full current Git commit SHA. An explicit `--tag dev` remains
-useful for local build-and-serve loops.
+`CI` environment marker. When `--tag` is omitted, service, homelabctl, docs and
+aggregate CI builds resolve the full current Git commit SHA. An explicit
+`--tag dev` remains useful for local build-and-serve loops.
 
 ```bash
 homelabctl build services --tag dev
+homelabctl build homelabctl --tag dev
 homelabctl build docs --tag dev
 homelabctl docs build
 homelabctl docs serve --image iamkhattar/homelab-docs:dev --port 8080
@@ -166,7 +168,7 @@ homelabctl docs serve --image iamkhattar/homelab-docs:dev --port 8080
 | Command | Purpose | Important validation |
 | --- | --- | --- |
 | `ci check` | Aggregate Go, docs, workflow, Ansible and Terraform checks | `--only` and `--skip` are mutually exclusive and accept known check names only |
-| `ci build` | Build all service and docs images without pushing | Uses the same tag, registry, image and Git-base validation as direct builds |
+| `ci build` | Build all service, homelabctl and docs images without pushing | Uses the same tag, registry, image and Git-base validation as direct builds |
 | `ci publish` | Build and push the complete image set | Requires `CI`; defaults to the current Git SHA when tags are omitted |
 
 ```bash
@@ -177,6 +179,7 @@ CI=true homelabctl ci publish
 CI=true homelabctl ci publish \
   --changed \
   --base HEAD~1 \
+  --tag v0.1.42 \
   --tag latest \
   --tag revision
 ```
@@ -184,8 +187,10 @@ CI=true homelabctl ci publish \
 Publication is not deployment. CI never gains an implicit path to mutate Titan;
 cluster reconciliation remains under the top-level `deploy` commands.
 
-The SHA default is immutable and reproducible. Mutable names such as `latest`
-are never added implicitly; request them with an explicit repeated `--tag`.
+The first tag is the version embedded into Go service and homelabctl binaries;
+aggregate builds therefore share one version. The SHA default is immutable and
+reproducible. Mutable names such as `latest` are never added implicitly; request
+them with an explicit repeated `--tag`.
 
 ## Validation ownership
 

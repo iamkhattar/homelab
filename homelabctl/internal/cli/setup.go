@@ -8,11 +8,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	gotestsumVersion = "v1.13.0"
+	gosecVersion     = "v2.28.0"
+)
+
 func newSetupCommand(s *state) *cobra.Command {
 	var resetAnsible bool
 	var uninstallAnsible bool
 	cmd := &cobra.Command{
-		Use:   "setup [all|ansible|docs]",
+		Use:   "setup [all|ansible|docs|reports]",
 		Short: "Install pinned workstation dependencies",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -31,7 +36,10 @@ func newSetupCommand(s *state) *cobra.Command {
 				if err := setupAnsible(cmd, s); err != nil {
 					return err
 				}
-				return setupDocs(cmd, s)
+				if err := setupDocs(cmd, s); err != nil {
+					return err
+				}
+				return setupReportTools(cmd, s)
 			case "ansible":
 				if uninstallAnsible {
 					return removeAnsibleRuntime(s)
@@ -44,8 +52,10 @@ func newSetupCommand(s *state) *cobra.Command {
 				return setupAnsible(cmd, s)
 			case "docs":
 				return setupDocs(cmd, s)
+			case "reports":
+				return setupReportTools(cmd, s)
 			default:
-				return fmt.Errorf("unknown setup target %q; expected all, ansible, or docs", target)
+				return fmt.Errorf("unknown setup target %q; expected all, ansible, docs, or reports", target)
 			}
 		},
 	}
@@ -85,4 +95,17 @@ func setupAnsible(cmd *cobra.Command, s *state) error {
 
 func setupDocs(cmd *cobra.Command, s *state) error {
 	return s.run(cmd.Context(), s.dir("docs"), "npm", "ci")
+}
+
+func setupReportTools(cmd *cobra.Command, s *state) error {
+	tools := []string{
+		"gotest.tools/gotestsum@" + gotestsumVersion,
+		"github.com/securego/gosec/v2/cmd/gosec@" + gosecVersion,
+	}
+	for _, tool := range tools {
+		if err := s.run(cmd.Context(), s.root, "go", "install", tool); err != nil {
+			return err
+		}
+	}
+	return nil
 }

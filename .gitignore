@@ -50,6 +50,7 @@ docs/.vitepress/dist/
 /test-results/
 /sarif/
 /sbom/
+/trivy-cache/
 
 infra/config/.ssh/id_rsa
 infra/config/.ssh/id_rsa.pub

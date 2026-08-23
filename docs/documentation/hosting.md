@@ -62,17 +62,18 @@ The handbook is organised by reader intent rather than repository directory:
 | Engineering | Explanation and contributor guide | How is a component designed and changed? |
 | Reference | Lookup material | What exactly does this command, role or decision mean? |
 
-VitePress uses route-specific sidebars. Their item order defines the previous
-and next-page flow within a section; do not restore one global sidebar that
-mixes tutorials, operations, references and future work. Section landing pages
-must state their audience, provide a reading path and link to the next useful
-page.
+VitePress uses one persistent grouped sidebar across the complete handbook.
+Readers keep the same navigation tree while moving between tutorials,
+runbooks, component manuals, references and future work. The active item shows
+the current location, while groups keep the distinct page types understandable.
+Section landing pages must still state their audience and provide a reading
+path.
 
 When adding content:
 
 1. choose one primary page type;
 2. place the page in the matching section;
-3. add it to that route's sidebar at the point it should be read;
+3. add it to `mainSidebar()` at the point it should be read;
 4. link to reference detail instead of copying it into a runbook;
 5. end tutorials and runbooks with an acceptance condition or explicit next
    step;
