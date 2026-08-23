@@ -110,7 +110,7 @@ func buildServices(cmd *cobra.Command, s *state, names []string, options service
 		return err
 	}
 	if len(selected) == 0 {
-		s.print("No service images need to be built.\n")
+		s.info("no service images need to be built")
 		return nil
 	}
 

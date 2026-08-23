@@ -6,6 +6,7 @@ production change, begin with a tutorial or runbook instead.
 ## Operator interface
 
 - [homelabctl command reference](/homelabctl/command-reference)
+- [homelabctl releases and self-update](/homelabctl/releases-self-update)
 - [Inventory and node workflows](/homelabctl/inventory-nodes)
 - [Cluster lifecycle commands](/homelabctl/cluster-lifecycle)
 - [Safety and execution model](/homelabctl/safety-internals)

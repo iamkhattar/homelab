@@ -129,23 +129,24 @@ func newSelfUpdateCommand(s *state, dependencies selfUpdateDependencies) *cobra.
 			}
 
 			current := strings.TrimPrefix(strings.TrimSpace(s.build.Version), "v")
-			s.print("Current version: %s\n", displayVersion(current))
-			s.print("Target version:  v%s\n", release.version)
+			s.heading("homelabctl update")
+			s.keyValue("Current version", displayVersion(current))
+			s.keyValue("Target version", "v"+release.version)
 			if release.url != "" {
-				s.print("Release:         %s\n", release.url)
+				s.keyValue("Release", release.url)
 			}
 
 			sameVersion := semanticVersionsEqual(current, release.version)
 			if checkOnly || s.dryRun {
 				if sameVersion {
-					s.print("Status:          up to date\n")
+					s.success("homelabctl is up to date")
 				} else {
-					s.print("Status:          update available\n")
+					s.info("update available")
 				}
 				return nil
 			}
 			if sameVersion && !force {
-				s.print("homelabctl is already up to date; use --force to reinstall it.\n")
+				s.success("homelabctl is already up to date; use --force to reinstall it")
 				return nil
 			}
 
@@ -156,7 +157,7 @@ func newSelfUpdateCommand(s *state, dependencies selfUpdateDependencies) *cobra.
 			if err := client.install(cmd.Context(), release, path); err != nil {
 				return fmt.Errorf("installing homelabctl v%s at %s: %w (if the binary is root-owned, rerun with sudo)", release.version, path, err)
 			}
-			s.print("Updated %s to homelabctl v%s.\n", path, release.version)
+			s.success(fmt.Sprintf("updated %s to homelabctl v%s", path, release.version))
 			return nil
 		},
 	}

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"path/filepath"
 
@@ -10,6 +9,7 @@ import (
 
 	"github.com/iamkhattar/homelab/homelabctl/internal/command"
 	"github.com/iamkhattar/homelab/homelabctl/internal/repository"
+	"github.com/iamkhattar/homelab/homelabctl/internal/ui"
 )
 
 type BuildInfo struct {
@@ -25,10 +25,11 @@ type state struct {
 	kubeContext string
 	dryRun      bool
 	root        string
+	ui          *ui.Printer
 }
 
 func New(build BuildInfo, runner *command.Runner) *cobra.Command {
-	s := &state{runner: runner, build: build}
+	s := &state{runner: runner, build: build, ui: ui.New(runner.Stdout)}
 
 	root := &cobra.Command{
 		Use:           "homelabctl",
@@ -101,5 +102,50 @@ func (s *state) outputEnv(ctx context.Context, dir string, environment map[strin
 func (s *state) out() io.Writer { return s.runner.Stdout }
 
 func (s *state) print(format string, args ...any) {
-	_, _ = fmt.Fprintf(s.out(), format, args...)
+	if s.ui == nil {
+		s.ui = ui.New(s.runner.Stdout)
+	}
+	s.ui.Printf(format, args...)
+}
+
+func (s *state) heading(title string) {
+	if s.ui == nil {
+		s.ui = ui.New(s.runner.Stdout)
+	}
+	s.ui.Heading(title)
+}
+
+func (s *state) status(status ui.Status, label, message string) {
+	if s.ui == nil {
+		s.ui = ui.New(s.runner.Stdout)
+	}
+	s.ui.Status(status, label, message)
+}
+
+func (s *state) keyValue(key, value string) {
+	if s.ui == nil {
+		s.ui = ui.New(s.runner.Stdout)
+	}
+	s.ui.KeyValue(key, value)
+}
+
+func (s *state) success(message string) {
+	if s.ui == nil {
+		s.ui = ui.New(s.runner.Stdout)
+	}
+	s.ui.Success(message)
+}
+
+func (s *state) info(message string) {
+	if s.ui == nil {
+		s.ui = ui.New(s.runner.Stdout)
+	}
+	s.ui.Info(message)
+}
+
+func (s *state) warning(message string) {
+	if s.ui == nil {
+		s.ui = ui.New(s.runner.Stdout)
+	}
+	s.ui.Warning(message)
 }

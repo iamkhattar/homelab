@@ -16,7 +16,8 @@ This section is for two audiences:
 
 | Goal | Next page |
 | --- | --- |
-| Build the CLI and prepare a workstation | [Install and configure](/homelabctl/getting-started) |
+| Install the CLI and prepare a workstation | [Install and configure](/homelabctl/getting-started) |
+| Understand releases, Debian installation and self-update | [Releases and self-update](/homelabctl/releases-self-update) |
 | Understand safety, subprocesses and Go-library boundaries | [Safety and execution model](/homelabctl/safety-internals) |
 | Prepare Titan and establish SSH trust | [Inventory and nodes](/homelabctl/inventory-nodes) |
 | Install, inspect, upgrade or recover K3s | [Cluster lifecycle and recovery](/homelabctl/cluster-lifecycle) |
@@ -35,6 +36,7 @@ understood.
 - validation that can be completed safely before contacting an external
   system;
 - repository discovery, Git revision handling and changed-service selection;
+- checksum-verified discovery and installation of its own GitHub Releases;
 - fixed working directories and environment passed to external tools;
 - dry-run behavior and explicit mutation boundaries;
 - the high-level sequence used both locally and by GitHub Actions.
@@ -64,6 +66,7 @@ shell text.
 
 ```text
 homelabctl/
+├── .goreleaser.yaml         cross-platform release contract
 ├── cmd/homelabctl/          executable entry point
 └── internal/
     ├── cli/                 Cobra commands, validation and workflows
@@ -83,6 +86,8 @@ API has a stable contract and a second real consumer.
 | --- | --- |
 | Repository root, SHA and merge-base diff | `go-git` in process |
 | Workflow parsing and repository CI policy | Go YAML parsing in process |
+| CLI release discovery, checksums and atomic replacement | `go-selfupdate` in process |
+| Terminal status, colour degradation and plain-text output | Lip Gloss in process |
 | Debian and K3s lifecycle | Ansible subprocess |
 | Kubernetes inspection | kubectl subprocess |
 | Workload reconciliation | Helmfile subprocess |

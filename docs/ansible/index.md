@@ -19,6 +19,7 @@ changing automation.
 | Change SSH policy safely | [Debian hardening](/ansible/hardening) |
 | Understand an operational entry point | [Playbook reference](/ansible/playbooks) |
 | Upgrade dependencies or validate changes | [Testing and upgrades](/ansible/testing-upgrades) |
+| Rebuild or remove the local Ansible environment | [Reset or uninstall](/ansible/reset-uninstall) |
 
 Read architecture before editing a role or importing another upstream
 playbook. The repository deliberately keeps K3s mechanics out of local roles.

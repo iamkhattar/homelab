@@ -194,15 +194,19 @@ remains visible in workflow source.
 The workflow bootstraps the CLI, then uses it to install repository dependencies
 and run checks. Pull requests invoke `homelabctl ci build` without pushing. The
 main branch invokes `homelabctl ci publish` to build immutable revision tags
-plus `latest` and push them after authentication.
+plus `latest` and push them after authentication. In parallel after checks, a
+main-only release job uses the pinned GoReleaser action to publish static
+`homelabctl` archives and `checksums.txt` under the immutable version
+`v0.1.<workflow run number>`.
 
 `homelabctl ci check --only workflows` parses every workflow and enforces the
 local contract: read-only default permissions, concurrency cancellation,
 bounded job timeouts, full Git history for merge-base selection, check-before-
-publish ordering, SHA-tagged PR builds, CI-gated main publication, and the
-absence of deploy, Terraform apply/destroy, Helmfile apply/sync and kubectl
-apply commands. GitHub remains responsible for validating its complete Actions
-schema.
+publish/release ordering, SHA-tagged PR builds, CI-gated main publication,
+main-only release execution, least-privilege release permissions, immutable
+semantic release tags, and the absence of deploy, Terraform apply/destroy,
+Helmfile apply/sync and kubectl apply commands. GitHub remains responsible for
+validating its complete Actions schema.
 
 Image publication is not deployment. Titan is not automatically mutated by the
 current workflow. Deployment remains an explicit top-level operation:
@@ -214,3 +218,7 @@ homelabctl deploy apply
 
 If secure CD is added later, a trusted runner may invoke those same commands;
 there should not be separate hidden deployment logic inside the workflow.
+
+CLI release publication is also not deployment. Continue with [releases and
+self-update](/homelabctl/releases-self-update) for the artifact and update
+contract.

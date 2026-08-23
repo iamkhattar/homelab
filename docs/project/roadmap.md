@@ -193,6 +193,6 @@ Acceptance criteria:
 - a UPS and clean-shutdown behaviour for Titan and network equipment;
 - automatic Debian security updates with controlled reboot reporting;
 - SMART/NVMe health and temperature monitoring;
-- release artifacts and shell completion for `homelabctl`;
+- signed provenance or attestations for the checksum-protected `homelabctl` release artifacts;
 - SBOM, vulnerability and secret scanning with actionable CI output;
 - a concise change log recording upgrades, restore tests and hardware changes.

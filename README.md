@@ -11,16 +11,17 @@ wraps the repository's native tools without replacing their configuration.
 
 ## Bootstrap the operator CLI
 
-Building `homelabctl` itself is the one repository bootstrap command that cannot
-go through `homelabctl`. Install Go 1.27 or newer; until versioned binaries are
-published, run once:
+Install a checksum-verified Linux or macOS binary from [GitHub
+Releases](https://github.com/iamkhattar/homelab/releases). The detailed
+[release guide](docs/homelabctl/releases-self-update.md) includes the Debian
+install path and verification commands. Once installed:
 
 ```bash
-cd homelabctl
-go build -o ../bin/homelabctl ./cmd/homelabctl
-cd ..
-export PATH="$PWD/bin:$PATH"
+homelabctl version
+homelabctl self-update --check
 ```
+
+Contributors can build from `homelabctl/` with Go 1.27 or newer.
 
 All normal repository and homelab procedures use the CLI after that point:
 

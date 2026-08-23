@@ -23,7 +23,7 @@ func newInventoryCommand(s *state) *cobra.Command {
 			source := s.dir("ansible", "inventory", "hosts.example.yml")
 			destination := s.dir("ansible", "inventory", "hosts.yml")
 			if s.dryRun {
-				s.print("Would create %s from %s\n", destination, source)
+				s.info(fmt.Sprintf("would create %s from %s", destination, source))
 				return nil
 			}
 			if _, err := os.Stat(destination); err == nil {

@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/iamkhattar/homelab/homelabctl/internal/ui"
 )
 
 func newDoctorCommand(s *state) *cobra.Command {
@@ -17,36 +19,37 @@ func newDoctorCommand(s *state) *cobra.Command {
 		Short: "Check the repository and local operator toolchain",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			s.heading("Operator environment")
 			tools := []string{"go", "node", "npm", "ssh", "ssh-copy-id", "ansible-playbook", "ansible-lint", "kubectl", "helm", "helmfile", "terraform", "docker"}
 			missing := 0
 			for _, tool := range tools {
 				path, err := s.runner.LookPath(tool)
 				if err != nil {
-					s.print("MISSING  %-20s\n", tool)
+					s.status(ui.Failure, "missing", tool)
 					missing++
 					continue
 				}
 				if tool == "go" {
 					version, err := s.output(cmd.Context(), s.root, path, "version")
 					if err != nil || !goVersionSupported(version) {
-						s.print("OLD      %-20s %s (need >=1.27)\n", tool, version)
+						s.status(ui.Warning, "old", fmt.Sprintf("%-20s %s (need >=1.27)", tool, version))
 						missing++
 						continue
 					}
-					s.print("OK       %-20s %s (%s)\n", tool, path, version)
+					s.status(ui.Success, "ok", fmt.Sprintf("%-20s %s (%s)", tool, path, version))
 					continue
 				}
 				if tool == "node" {
 					version, err := s.output(cmd.Context(), s.root, path, "--version")
 					if err != nil || !nodeVersionSupported(version) {
-						s.print("OLD      %-20s %s (need >=24)\n", tool, version)
+						s.status(ui.Warning, "old", fmt.Sprintf("%-20s %s (need >=24)", tool, version))
 						missing++
 						continue
 					}
-					s.print("OK       %-20s %s (%s)\n", tool, path, version)
+					s.status(ui.Success, "ok", fmt.Sprintf("%-20s %s (%s)", tool, path, version))
 					continue
 				}
-				s.print("OK       %-20s %s\n", tool, path)
+				s.status(ui.Success, "ok", fmt.Sprintf("%-20s %s", tool, path))
 			}
 
 			files := []string{
@@ -58,18 +61,18 @@ func newDoctorCommand(s *state) *cobra.Command {
 			}
 			for _, file := range files {
 				if _, err := os.Stat(filepath.Join(s.root, file)); err != nil {
-					s.print("MISSING  %s\n", file)
+					s.status(ui.Failure, "missing", file)
 					missing++
 					continue
 				}
-				s.print("OK       %s\n", file)
+				s.status(ui.Success, "ok", file)
 			}
 
 			if strict && missing > 0 {
 				return fmt.Errorf("doctor found %d missing requirement(s)", missing)
 			}
 			if missing > 0 {
-				s.print("\n%d optional or required item(s) are missing; use --strict to fail.\n", missing)
+				s.warning(fmt.Sprintf("%d optional or required item(s) are missing; use --strict to fail", missing))
 			}
 			return nil
 		},

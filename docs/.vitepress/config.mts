@@ -75,6 +75,7 @@ export default defineConfig({
           items: [
             { text: 'Introduction', link: '/homelabctl/' },
             { text: 'Install and configure', link: '/homelabctl/getting-started' },
+            { text: 'Releases and self-update', link: '/homelabctl/releases-self-update' },
             { text: 'Safety and execution model', link: '/homelabctl/safety-internals' },
           ],
         },
@@ -111,6 +112,7 @@ export default defineConfig({
             { text: 'Debian hardening', link: '/ansible/hardening' },
             { text: 'Playbooks', link: '/ansible/playbooks' },
             { text: 'Testing and upgrades', link: '/ansible/testing-upgrades' },
+            { text: 'Reset or uninstall', link: '/ansible/reset-uninstall' },
           ],
         },
       ],

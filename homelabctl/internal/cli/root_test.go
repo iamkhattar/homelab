@@ -234,6 +234,75 @@ func TestSetupAnsibleDryRunUsesLocalVirtualEnvironment(t *testing.T) {
 	}
 }
 
+func TestSetupAnsibleUninstallRemovesOnlyGeneratedRuntime(t *testing.T) {
+	repo := testRepository(t)
+	for _, path := range []string{
+		"ansible/.venv/bin/ansible",
+		"ansible/.ansible/tmp/item",
+		"ansible/collections/ansible_collections/item",
+		"ansible/inventory/hosts.yml",
+		"ansible/requirements.yml",
+	} {
+		if err := writeEmpty(filepath.Join(repo, path)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var stdout bytes.Buffer
+	runner := command.NewRunner(strings.NewReader(""), &stdout, &bytes.Buffer{})
+	root := New(BuildInfo{}, runner)
+	root.SetArgs([]string{"--repo-root", repo, "setup", "ansible", "--uninstall"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	for _, path := range []string{"ansible/.venv", "ansible/.ansible", "ansible/collections"} {
+		if _, err := os.Stat(filepath.Join(repo, path)); !os.IsNotExist(err) {
+			t.Errorf("generated path %s still exists or returned unexpected error: %v", path, err)
+		}
+	}
+	for _, path := range []string{"ansible/inventory/hosts.yml", "ansible/requirements.yml"} {
+		if _, err := os.Stat(filepath.Join(repo, path)); err != nil {
+			t.Errorf("preserved path %s: %v", path, err)
+		}
+	}
+}
+
+func TestSetupAnsibleResetDryRunRemovesAndReinstalls(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	runner := command.NewRunner(strings.NewReader(""), &stdout, &stderr)
+	root := New(BuildInfo{}, runner)
+	root.SetArgs([]string{"--repo-root", testRepository(t), "--dry-run", "setup", "ansible", "--reset"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if !strings.Contains(stdout.String(), "would remove generated Ansible path") {
+		t.Fatalf("reset output did not describe removal: %q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "python3 -m venv") || !strings.Contains(stderr.String(), "ansible-galaxy collection install") {
+		t.Fatalf("reset dry-run did not reinstall dependencies: %q", stderr.String())
+	}
+}
+
+func TestSetupAnsibleCleanupFlagsAreGuarded(t *testing.T) {
+	tests := []struct {
+		args []string
+		want string
+	}{
+		{args: []string{"setup", "ansible", "--reset", "--uninstall"}, want: "mutually exclusive"},
+		{args: []string{"setup", "docs", "--reset"}, want: "require the ansible setup target"},
+		{args: []string{"setup", "--uninstall"}, want: "require the ansible setup target"},
+	}
+	for _, test := range tests {
+		runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+		root := New(BuildInfo{}, runner)
+		root.SetArgs(append([]string{"--repo-root", testRepository(t)}, test.args...))
+		if err := root.Execute(); err == nil || !strings.Contains(err.Error(), test.want) {
+			t.Errorf("Execute(%v) error = %v, want %q", test.args, err, test.want)
+		}
+	}
+}
+
 func TestInventoryInitCreatesPrivateFileWithoutOverwrite(t *testing.T) {
 	repo := testRepository(t)
 	example := repo + "/ansible/inventory/hosts.example.yml"

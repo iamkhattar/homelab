@@ -140,15 +140,17 @@ reservation for this network.
 
 ## 7. Bootstrap homelabctl on the operator workstation
 
-Clone or open the repository. Building the CLI is the only source-build
-exception before normal operations move behind `homelabctl`:
+Clone or open the repository on the operator workstation. Install the
+checksum-verified platform binary using the [release installation
+procedure](/homelabctl/releases-self-update), then confirm it:
 
 ```bash
-cd homelabctl
-go build -trimpath -o ../bin/homelabctl ./cmd/homelabctl
-cd ..
-export PATH="$PWD/bin:$PATH"
+homelabctl version
+homelabctl self-update --check
 ```
+
+Building from source with Go 1.27 remains a contributor fallback, not the
+normal Titan bootstrap path.
 
 Install the pinned Ansible environment and validate the automation:
 
@@ -160,7 +162,7 @@ homelabctl doctor
 
 `doctor` reports tooling for the whole repository, so missing Docker, Node,
 Terraform or Helm components do not block host preparation. This stage requires
-Git, Go for the initial build, Python, SSH, `ssh-copy-id` and the Ansible
+Git, Python, SSH, `ssh-copy-id` and the Ansible
 environment installed by `setup ansible`.
 
 ## 8. Prepare an operator SSH key

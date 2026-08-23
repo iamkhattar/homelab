@@ -43,7 +43,7 @@ func TestSelfUpdateChecksWithoutRepositoryOrMutation(t *testing.T) {
 	if client.installCalls != 0 {
 		t.Fatalf("install calls = %d, want 0", client.installCalls)
 	}
-	for _, expected := range []string{"Current version: v0.1.41", "Target version:  v0.1.42", "update available"} {
+	for _, expected := range []string{"◆ homelabctl update", "Current version   v0.1.41", "Target version    v0.1.42", "update available"} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Errorf("output %q does not contain %q", stdout.String(), expected)
 		}
@@ -64,7 +64,7 @@ func TestSelfUpdateInstallsExactVersionAtExecutablePath(t *testing.T) {
 	if client.installCalls != 1 || client.installedPath != "/opt/bin/homelabctl" {
 		t.Fatalf("install calls/path = %d/%q", client.installCalls, client.installedPath)
 	}
-	if !strings.Contains(stdout.String(), "Updated /opt/bin/homelabctl to homelabctl v0.1.40") {
+	if !strings.Contains(stdout.String(), "updated /opt/bin/homelabctl to homelabctl v0.1.40") {
 		t.Fatalf("unexpected output: %q", stdout.String())
 	}
 }

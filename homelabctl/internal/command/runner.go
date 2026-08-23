@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/iamkhattar/homelab/homelabctl/internal/ui"
 )
 
 // Runner executes external tools without involving a shell. Keeping process
@@ -100,10 +102,10 @@ func (r *Runner) print(dir, name string, args []string) {
 		parts = append(parts, quote(arg))
 	}
 	if dir == "" {
-		_, _ = fmt.Fprintf(r.Stderr, "+ %s\n", strings.Join(parts, " "))
+		ui.New(r.Stderr).Command("", strings.Join(parts, " "))
 		return
 	}
-	_, _ = fmt.Fprintf(r.Stderr, "+ (%s) %s\n", dir, strings.Join(parts, " "))
+	ui.New(r.Stderr).Command(dir, strings.Join(parts, " "))
 }
 
 func quote(value string) string {

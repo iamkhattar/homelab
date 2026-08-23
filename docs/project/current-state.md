@@ -24,7 +24,7 @@ known.
 | SSH hardening | Ready in repo | Key-only policy is opt-in so password access is not disabled before the key is proven. |
 | K3s server | Not deployed | Installation and verification runbooks exist; run them only after the host baseline succeeds. |
 | Cluster recovery | Not deployed | Embedded-etcd snapshots are configured, but an off-node export and restore test are still required. |
-| `homelabctl` | Ready in repo | The Go CLI is the documented operator interface for setup, inventory, SSH access, Debian/K3s lifecycle, diagnostics, snapshots, recovery export, docs, deployments, builds and checks. Control-plane API commands remain future work. |
+| `homelabctl` | Ready in repo | The Go CLI is the documented operator interface for setup, inventory, SSH access, Debian/K3s lifecycle, diagnostics, snapshots, recovery export, docs, deployments, builds and checks. Successful main builds publish checksum-protected Linux/macOS releases with self-update support. Control-plane API commands remain future work. |
 | Documentation site | Ready in repo | Isolated VitePress project, intent-based handbook navigation, ordered section flows, unprivileged Nginx image and component engineering manuals are implemented. Internal cluster hosting waits on ingress and authentication. |
 
 ## Workload snapshot

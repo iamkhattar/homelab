@@ -7,12 +7,14 @@ separate gates.
 ## Recreate pinned dependencies
 
 ```bash
-homelabctl setup ansible
+homelabctl setup ansible --reset
 ```
 
 Run this after changing Python or collection requirements and on a new
-workstation. It creates the local virtual environment and installs collections
-under the repository; it does not contact Titan.
+workstation. It removes generated runtime state, recreates the local virtual
+environment and installs collections under the repository; it does not contact
+Titan or remove private inventory. See [reset or uninstall](/ansible/reset-uninstall)
+for the exact boundary.
 
 ## Static validation
 

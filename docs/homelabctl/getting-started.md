@@ -8,7 +8,7 @@ operations. It is run from the operator workstation, not installed on Titan.
 The initial workstation needs:
 
 - Git and a checkout of this repository;
-- Go 1.27 or newer, matching `homelabctl/go.mod`, until binary releases exist;
+- Go 1.27 or newer, matching `homelabctl/go.mod`, only when building or testing the CLI from source;
 - Python 3 with virtual-environment support;
 - OpenSSH, including `ssh-copy-id`, for first-node trust bootstrap;
 - Node.js 24 or newer for documentation development;
@@ -21,8 +21,13 @@ strict doctor check.
 
 ## Bootstrap the binary
 
-The CLI cannot build itself. Until release binaries are published, this is the
-single repository bootstrap exception:
+Install the checksum-verified release binary into `/usr/local/bin`. The
+[release and self-update guide](/homelabctl/releases-self-update) gives exact
+Linux and macOS asset names, Debian verification commands, update behaviour and
+rollback procedure.
+
+Contributors can instead build the current checkout. This is the one bootstrap
+exception that cannot go through the CLI itself:
 
 ```bash
 cd homelabctl
@@ -39,8 +44,7 @@ homelabctl --help
 ```
 
 The `version` output is `dev` for a local build unless version, commit and build
-date are injected at link time. A later release pipeline will provide signed,
-versioned macOS and Linux binaries.
+date are injected at link time. Release builds contain all three values.
 
 ## Install shell completion
 
@@ -88,6 +92,17 @@ activated manually when using `homelabctl`.
 Re-run setup after changing either requirements file or lockfile. Setup never
 creates the private node inventory.
 
+To rebuild a suspect Ansible environment or remove it from this checkout:
+
+```bash
+homelabctl setup ansible --reset
+homelabctl setup ansible --uninstall
+```
+
+Both operations preserve private inventory and remote node state. The complete
+[reset and uninstall runbook](/ansible/reset-uninstall) explains the boundary
+between local dependencies, inventory and changes already applied to Titan.
+
 ## Run workstation checks
 
 ```bash
@@ -110,7 +125,7 @@ different checkout:
 homelabctl --repo-root /path/to/homelab doctor
 ```
 
-`version`, help and shell-completion generation do not require a repository.
+`version`, `self-update`, help and shell-completion generation do not require a repository.
 All other current commands do. Future control-plane API commands will be able to
 run without a checkout.
 

@@ -30,27 +30,43 @@ homelabctl [--repo-root PATH] [--context NAME] [--dry-run] COMMAND
 Argument validation happens before an external process is started. Native tools
 still perform authoritative semantic validation of their own configuration.
 
+Interactive status output uses colour and semantic glyphs while retaining text
+labels. Redirected output and CI logs automatically become plain text. Set
+`NO_COLOR=1` to disable styling explicitly or `CLICOLOR_FORCE=1` to exercise
+styled output in a non-terminal. These variables change presentation only;
+they never change command behaviour or exit status.
+
 ## Workstation and inventory
 
 | Command | Purpose | Important validation |
 | --- | --- | --- |
-| `setup [all\|ansible\|docs]` | Install exact repository dependencies | Rejects unknown targets before installation |
+| `setup [all\|ansible\|docs]` | Install exact repository dependencies | `ansible --reset` recreates generated runtime; `ansible --uninstall` removes it; the flags are mutually exclusive |
 | `doctor [--strict]` | Report tools and repository files | Strict mode fails on every missing or unsupported item |
 | `inventory init` | Create private `hosts.yml` with mode `0600` | Refuses to overwrite an existing inventory |
 | `inventory show` | Render effective group membership | Does not contact nodes |
 | `inventory check [-v]` | Render inventory and run Ansible ping | Native inventory parsing and SSH identity checks remain active |
 | `version` | Print version, commit and build date | Does not require a repository |
+| `self-update` | Check or install a verified GitHub Release | Does not require a repository; supports Linux/macOS on amd64/arm64 |
 | `completion SHELL` | Generate Cobra completion | Does not require a repository |
 
 Examples:
 
 ```bash
 homelabctl setup ansible
+homelabctl setup ansible --reset
+homelabctl setup ansible --uninstall
 homelabctl inventory init
 homelabctl inventory show
 homelabctl inventory check --verbose
 homelabctl doctor --strict
+homelabctl self-update --check
 ```
+
+`self-update --version v0.1.42` selects an exact semantic release, including an
+older rollback target. `--force` reinstalls an already-running version. Global
+dry-run performs release discovery but suppresses replacement. See [releases
+and self-update](/homelabctl/releases-self-update) for checksum and ownership
+details.
 
 ## Debian nodes
 

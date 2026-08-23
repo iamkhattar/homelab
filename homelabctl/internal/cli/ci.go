@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/iamkhattar/homelab/homelabctl/internal/repository"
+	"github.com/iamkhattar/homelab/homelabctl/internal/ui"
 	"github.com/iamkhattar/homelab/homelabctl/internal/workflow"
 )
 
@@ -31,6 +32,7 @@ func newCICommand(s *state) *cobra.Command {
 		Short: "Run formatting, tests, docs, workflow, Ansible and Terraform checks",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			s.heading("Repository checks")
 			if len(skip) > 0 && len(only) > 0 {
 				return fmt.Errorf("--only and --skip cannot be used together")
 			}
@@ -69,16 +71,16 @@ func newCICommand(s *state) *cobra.Command {
 			var failed []string
 			for _, step := range steps {
 				if skipped[step.name] || (len(selected) > 0 && !selected[step.name]) {
-					s.print("SKIP  %s\n", step.name)
+					s.status(ui.Skipped, "skip", step.name)
 					continue
 				}
-				s.print("RUN   %s\n", step.name)
+				s.status(ui.Running, "run", step.name)
 				if err := step.run(cmd); err != nil {
-					s.print("FAIL  %s: %v\n", step.name, err)
+					s.status(ui.Failure, "fail", fmt.Sprintf("%s: %v", step.name, err))
 					failed = append(failed, step.name)
 					continue
 				}
-				s.print("PASS  %s\n", step.name)
+				s.status(ui.Success, "pass", step.name)
 			}
 			if len(failed) > 0 {
 				return fmt.Errorf("checks failed: %s", strings.Join(failed, ", "))

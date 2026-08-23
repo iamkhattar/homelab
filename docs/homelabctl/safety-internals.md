@@ -39,6 +39,7 @@ The infrastructure engines intentionally remain external processes:
 | --- | --- | --- |
 | Repository SHA, refs, merge-base diff | `go-git` inside `homelabctl` | Stable Go API and no shell parsing |
 | Workflow YAML and repository CI policy | Go YAML parser inside `homelabctl` | Fast local validation with focused tests |
+| Human terminal presentation | Lip Gloss inside `homelabctl` | Consistent semantic styling with automatic plain-text fallback |
 | K3s host lifecycle | Ansible | Inventory, idempotence, privilege escalation and check mode |
 | Kubernetes resources | kubectl and Helmfile | Native contexts, plugins, diffs and release semantics |
 | Hetzner infrastructure | Terraform | Provider graph, state locking and plans |
@@ -94,6 +95,44 @@ Standard input, output and error remain attached to the terminal so sudo,
 Ansible and SSH prompts work normally. A non-zero child exit becomes a non-zero
 `homelabctl` exit with the failed executable identified.
 
+## Output contract
+
+Human-facing output goes through one presentation package under `internal/ui`.
+Interactive terminals receive a restrained colour palette, aligned labels and
+semantic markers:
+
+```text
+◆ Repository checks
+– SKIP  go-format
+◆ RUN   workflows
+✓ PASS  workflows
+✗ FAIL  go-test: exit status 1
+```
+
+Green means completed successfully, cyan means active or informational, amber
+means attention is required, red means failure, and muted text means skipped or
+supporting context. External commands retain the leading `+` and working
+directory so they remain easy to distinguish from CLI status.
+
+Lip Gloss detects the terminal's colour profile and removes ANSI sequences when
+output is redirected to a file, pipe, test buffer or CI log. It also follows the
+standard environment controls:
+
+```bash
+NO_COLOR=1 homelabctl doctor
+CLICOLOR_FORCE=1 homelabctl ci check --only workflows
+```
+
+Use `NO_COLOR` for accessibility, terminal incompatibility or plain captured
+logs. `CLICOLOR_FORCE` is mainly useful while testing presentation; do not use
+it for machine parsing. Text labels such as `PASS`, `FAIL`, `RUN`, `SKIP`,
+`MISSING` and `OLD` remain present without relying on colour alone.
+
+Output is still a human interface, not a stable data API. Automation should use
+exit codes and native structured output where a command explicitly provides
+it. A future JSON mode must bypass presentation styles and define its own
+versioned schema.
+
 ## Mutation boundaries
 
 Read-only or preview operations include:
@@ -147,7 +186,7 @@ consistent.
 - almost every command still requires a repository checkout;
 - `--context` represents only a kubectl context, not a complete environment;
 - output is human-oriented; stable JSON output is planned;
-- there is no release installer or automatic CLI self-update;
+- self-update is operator-triggered rather than an unattended background process;
 - deployment has no confirmation or rollback command yet;
 - restore remains intentionally manual;
 - control-plane authentication and API-backed commands are not implemented.

@@ -13,8 +13,8 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 		example: "  homelabctl doctor\n  homelabctl --dry-run node prepare --check --limit titan",
 	},
 	"homelabctl setup": {
-		long:    "Install the repository's pinned Ansible and documentation dependencies. Select one environment while iterating, or omit the target to install both.",
-		example: "  homelabctl setup\n  homelabctl setup ansible\n  homelabctl setup docs",
+		long:    "Install the repository's pinned Ansible and documentation dependencies. Select one environment while iterating, or omit the target to install both. For the ansible target, --uninstall removes only generated local runtime state and --reset removes then recreates it.",
+		example: "  homelabctl setup\n  homelabctl setup ansible\n  homelabctl setup ansible --reset\n  homelabctl setup ansible --uninstall\n  homelabctl setup docs",
 	},
 	"homelabctl inventory": {long: "Create and inspect the private, Git-ignored Ansible inventory used for local and future remote nodes."},
 	"homelabctl inventory init": {

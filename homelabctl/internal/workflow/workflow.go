@@ -78,6 +78,8 @@ func ValidateDirectory(root string) error {
 
 var majorVersionPattern = regexp.MustCompile(`@v([0-9]+)(?:\.|$)`)
 
+const pinnedGoReleaserAction = "goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94"
+
 var minimumActionMajors = map[string]int{
 	"actions/checkout":             7,
 	"actions/setup-go":             7,
@@ -200,6 +202,9 @@ func validateCI(path string, workflow definition) []error {
 		if !found {
 			problem("release job must use goreleaser/goreleaser-action")
 		} else {
+			if releaseStep.Uses != pinnedGoReleaserAction {
+				problem("release job must pin goreleaser/goreleaser-action to the reviewed commit")
+			}
 			if value(releaseStep.With["version"]) != "v2.17.1" {
 				problem("release job must pin GoReleaser v2.17.1")
 			}

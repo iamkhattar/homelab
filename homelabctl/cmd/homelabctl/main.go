@@ -7,6 +7,7 @@ import (
 
 	"github.com/iamkhattar/homelab/homelabctl/internal/cli"
 	"github.com/iamkhattar/homelab/homelabctl/internal/command"
+	"github.com/iamkhattar/homelab/homelabctl/internal/ui"
 )
 
 var (
@@ -24,7 +25,7 @@ func main() {
 	}, runner)
 
 	if err := root.ExecuteContext(context.Background()); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		ui.New(os.Stderr).Error(fmt.Sprint(err))
 		os.Exit(1)
 	}
 }

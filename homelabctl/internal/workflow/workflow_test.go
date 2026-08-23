@@ -115,6 +115,13 @@ func TestValidateDirectoryRejectsBrokenCIContracts(t *testing.T) {
 			wantInError: "immutable semantic tag",
 		},
 		{
+			name: "release action uses a moving tag",
+			transform: func(input string) string {
+				return strings.Replace(input, pinnedGoReleaserAction, "goreleaser/goreleaser-action@v7", 1)
+			},
+			wantInError: "reviewed commit",
+		},
+		{
 			name: "release runs on pull requests",
 			transform: func(input string) string {
 				return strings.Replace(input, "    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n", "", 1)

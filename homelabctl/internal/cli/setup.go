@@ -2,13 +2,16 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
 
 func newSetupCommand(s *state) *cobra.Command {
-	return &cobra.Command{
+	var resetAnsible bool
+	var uninstallAnsible bool
+	cmd := &cobra.Command{
 		Use:   "setup [all|ansible|docs]",
 		Short: "Install pinned workstation dependencies",
 		Args:  cobra.MaximumNArgs(1),
@@ -17,6 +20,12 @@ func newSetupCommand(s *state) *cobra.Command {
 			if len(args) == 1 {
 				target = args[0]
 			}
+			if resetAnsible && uninstallAnsible {
+				return fmt.Errorf("--reset and --uninstall are mutually exclusive")
+			}
+			if (resetAnsible || uninstallAnsible) && target != "ansible" {
+				return fmt.Errorf("--reset and --uninstall require the ansible setup target")
+			}
 			switch target {
 			case "all":
 				if err := setupAnsible(cmd, s); err != nil {
@@ -24,6 +33,14 @@ func newSetupCommand(s *state) *cobra.Command {
 				}
 				return setupDocs(cmd, s)
 			case "ansible":
+				if uninstallAnsible {
+					return removeAnsibleRuntime(s)
+				}
+				if resetAnsible {
+					if err := removeAnsibleRuntime(s); err != nil {
+						return err
+					}
+				}
 				return setupAnsible(cmd, s)
 			case "docs":
 				return setupDocs(cmd, s)
@@ -32,6 +49,24 @@ func newSetupCommand(s *state) *cobra.Command {
 			}
 		},
 	}
+	cmd.Flags().BoolVar(&resetAnsible, "reset", false, "remove generated Ansible runtime state, then reinstall pinned dependencies")
+	cmd.Flags().BoolVar(&uninstallAnsible, "uninstall", false, "remove generated Ansible runtime state without reinstalling it")
+	return cmd
+}
+
+func removeAnsibleRuntime(s *state) error {
+	for _, relative := range []string{".venv", ".ansible", "collections"} {
+		path := s.dir("ansible", relative)
+		if s.dryRun {
+			s.info("would remove generated Ansible path " + path)
+			continue
+		}
+		if err := os.RemoveAll(path); err != nil {
+			return fmt.Errorf("removing generated Ansible path %s: %w", path, err)
+		}
+		s.success("removed generated Ansible path " + path)
+	}
+	return nil
 }
 
 func setupAnsible(cmd *cobra.Command, s *state) error {
