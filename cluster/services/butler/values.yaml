@@ -104,7 +104,9 @@ config:
     hostNamespace: kube-system
     tokenReviewerNamespace: security
     tokenReviewerSA: vault-k8s-token-reviewer
-    tokenReviewerSecret: vault-k8s-token-reviewer-token
+    # Reference to the Kubernetes Secret object that holds the reviewer token;
+    # this ConfigMap contains only the object name, never the token value.
+    tokenReviewerRef: vault-k8s-token-reviewer-token
     roles:
       - name: homelab-admin
         serviceAccountName: vault-managed-admin

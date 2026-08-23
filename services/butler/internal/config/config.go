@@ -109,7 +109,7 @@ type K8sIssuanceConfig struct {
 	HostNamespace          string                `yaml:"hostNamespace"`          // where vault-managed-{admin,operator,viewer} live (kube-system)
 	TokenReviewerNamespace string                `yaml:"tokenReviewerNamespace"` // where vault-k8s-token-reviewer lives (security)
 	TokenReviewerSA        string                `yaml:"tokenReviewerSA"`        // name of the token-reviewer SA
-	TokenReviewerSecret    string                `yaml:"tokenReviewerSecret"`    // name of the long-lived token Secret
+	TokenReviewerSecret    string                `yaml:"tokenReviewerRef"`       // reference to the long-lived token Secret object
 	Roles                  []K8sIssuanceRoleSpec `yaml:"roles"`
 }
 

@@ -42,13 +42,6 @@ misconfigurations:
     expired_at: 2026-11-30
     statement: Temporary USB passthrough baseline pending Titan device-group validation.
 
-  # This names a Kubernetes Secret; the ConfigMap does not contain its token.
-  - id: KSV-0109
-    paths:
-      - cluster/services/butler/templates/configmap.yaml
-    expired_at: 2026-11-30
-    statement: tokenReviewerSecret is a Kubernetes Secret object name, not secret material.
-
   # The namespace-scoped database operator intentionally manages Services for
   # databases. Split and narrow this role when its controller contract is set.
   - id: KSV-0056

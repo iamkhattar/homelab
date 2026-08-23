@@ -44,7 +44,7 @@ k8sIssuance:
   hostNamespace: kube-system
   tokenReviewerNamespace: security
   tokenReviewerSA: vault-k8s-token-reviewer
-  tokenReviewerSecret: vault-k8s-token-reviewer-token
+  tokenReviewerRef: vault-k8s-token-reviewer-token
   roles:
     - name: homelab-admin
       serviceAccountName: vault-managed-admin

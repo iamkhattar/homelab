@@ -256,8 +256,7 @@ job. Accepted debt remains visible in the unfiltered SARIF and in the baseline
 file's required statements. The initial baseline expires on 30 November 2026
 and covers only workload security contexts that need runtime validation on
 Titan, the Zigbee USB privilege transition, the database operator's intentional
-Service lifecycle permission and a Butler false positive where a ConfigMap
-stores a Kubernetes Secret object name rather than secret material.
+Service lifecycle permission.
 
 Security findings are gating failures. The aggregate runner continues after a
 failed stage, however, so all possible reports are produced. GitHub Actions
