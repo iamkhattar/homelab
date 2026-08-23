@@ -234,6 +234,13 @@ scope, as do homelab code, Dockerfiles, Terraform source, Helm charts and the
 VitePress configuration and custom components. This prevents upstream Ansible
 integration-test fixtures from being reported as if they were homelab source.
 
+The Trivy stage first writes SARIF without allowing a finding to interrupt
+report generation. It then repeats the same scan with the warm cache, renders a
+human-readable table in the job log and uses that invocation as the
+HIGH/CRITICAL policy gate. A failed Trivy stage therefore shows the affected
+file or package, advisory and installed/fixed versions directly in Actions;
+the SARIF remains available for code scanning.
+
 Security findings are gating failures. The aggregate runner continues after a
 failed stage, however, so all possible reports are produced. GitHub Actions
 uses `if: always()` to retain `test-results/`, `sarif/` and `sbom/` for 14 days

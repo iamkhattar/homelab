@@ -76,19 +76,37 @@ func generateTrivySecurityReport(cmd *cobra.Command, s *state) error {
 	if _, err := ensureReportDirectory(s, trivyCacheDirectory); err != nil {
 		return err
 	}
-	args := trivyContainerArguments(s, sarifDirectory)
-	args = append(args,
+	sarifArgs := trivyContainerArguments(s, sarifDirectory)
+	sarifArgs = append(sarifArgs,
+		"fs",
+		"--cache-dir", "/cache",
+		"--scanners", "vuln,misconfig,secret",
+		"--severity", "HIGH,CRITICAL",
+		"--exit-code", "0",
+		"--format", "sarif",
+		"--output", "/reports/trivy.sarif",
+	)
+	sarifArgs = append(sarifArgs, trivySkipArguments()...)
+	sarifArgs = append(sarifArgs, "/workspace")
+	if err := s.run(cmd.Context(), s.root, "docker", sarifArgs...); err != nil {
+		return fmt.Errorf("generating Trivy SARIF: %w", err)
+	}
+
+	// A SARIF file is intended for code-scanning ingestion and does not make
+	// findings readable in the job log. Repeat the cached scan as a table and
+	// use that invocation as the policy gate so a failure is actionable.
+	tableArgs := trivyContainerArguments(s, sarifDirectory)
+	tableArgs = append(tableArgs,
 		"fs",
 		"--cache-dir", "/cache",
 		"--scanners", "vuln,misconfig,secret",
 		"--severity", "HIGH,CRITICAL",
 		"--exit-code", "1",
-		"--format", "sarif",
-		"--output", "/reports/trivy.sarif",
+		"--format", "table",
 	)
-	args = append(args, trivySkipArguments()...)
-	args = append(args, "/workspace")
-	return s.run(cmd.Context(), s.root, "docker", args...)
+	tableArgs = append(tableArgs, trivySkipArguments()...)
+	tableArgs = append(tableArgs, "/workspace")
+	return s.run(cmd.Context(), s.root, "docker", tableArgs...)
 }
 
 func generateSBOM(cmd *cobra.Command, s *state) error {
