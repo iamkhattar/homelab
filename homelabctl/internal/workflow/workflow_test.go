@@ -80,30 +80,37 @@ func TestValidateDirectoryRejectsBrokenCIContracts(t *testing.T) {
 			wantInError: "must generate reports",
 		},
 		{
-			name: "workflow disables Go cache",
+			name: "workflow omits Go cache restore",
 			transform: func(input string) string {
-				return strings.Replace(input, "          cache: true", "          cache: false", 1)
+				return strings.Replace(input, "      - id: go-runtime-cache\n        uses: actions/cache/restore@v6", "      - id: go-runtime-cache\n        uses: example.invalid/no-go-cache-restore@v6", 1)
 			},
-			wantInError: "must explicitly cache Go modules and build output",
+			wantInError: "must restore Go modules and build output",
 		},
 		{
 			name: "workflow omits Butler from Go cache key",
 			transform: func(input string) string {
-				return strings.Replace(input, "            services/butler/go.sum\n", "", 1)
+				return strings.Replace(input, ", 'services/butler/go.sum'", "", 1)
 			},
-			wantInError: "must explicitly cache Go modules and build output",
+			wantInError: "must restore Go modules and build output",
+		},
+		{
+			name: "workflow omits Go cache save",
+			transform: func(input string) string {
+				return strings.Replace(input, "      - if: steps.go-runtime-cache.outputs.cache-hit != 'true'\n        uses: actions/cache/save@v6", "      - if: steps.go-runtime-cache.outputs.cache-hit != 'true'\n        uses: example.invalid/no-go-cache-save@v6", 1)
+			},
+			wantInError: "must save a missing Go cache",
 		},
 		{
 			name: "workflow omits Ansible runtime restore",
 			transform: func(input string) string {
-				return strings.Replace(input, "actions/cache/restore@v6", "example.invalid/no-cache-restore@v6", 1)
+				return strings.Replace(input, "      - id: ansible-runtime-cache\n        uses: actions/cache/restore@v6", "      - id: ansible-runtime-cache\n        uses: example.invalid/no-cache-restore@v6", 1)
 			},
 			wantInError: "must restore the pinned Ansible runtime",
 		},
 		{
 			name: "workflow omits Ansible runtime save",
 			transform: func(input string) string {
-				return strings.Replace(input, "actions/cache/save@v6", "example.invalid/no-cache-save@v6", 1)
+				return strings.Replace(input, "      - if: steps.ansible-runtime-cache.outputs.cache-hit != 'true'\n        uses: actions/cache/save@v6", "      - if: steps.ansible-runtime-cache.outputs.cache-hit != 'true'\n        uses: example.invalid/no-cache-save@v6", 1)
 			},
 			wantInError: "must save a missing Ansible runtime",
 		},
@@ -294,10 +301,14 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: |
-            homelabctl/go.sum
-            services/butler/go.sum
+          cache: false
+      - id: go-runtime-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ runner.arch }}-${{ env.GO_VERSION }}-${{ hashFiles('homelabctl/go.sum', 'services/butler/go.sum') }}
       - id: ansible-runtime-cache
         uses: actions/cache/restore@v6
         with:
@@ -316,7 +327,15 @@ jobs:
           key: ${{ steps.ansible-runtime-cache.outputs.cache-primary-key }}
       - run: |
           bin/homelabctl setup docs
+          bin/homelabctl setup go
           bin/homelabctl setup reports
+      - if: steps.go-runtime-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ steps.go-runtime-cache.outputs.cache-primary-key }}
       - run: |
           bin/homelabctl ci check --reports
       - if: always()

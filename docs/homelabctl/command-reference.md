@@ -40,7 +40,7 @@ they never change command behaviour or exit status.
 
 | Command | Purpose | Important validation |
 | --- | --- | --- |
-| `setup [all\|ansible\|docs\|reports]` | Install exact repository dependencies and reporting tools | `ansible --reset` recreates generated runtime; `ansible --uninstall` removes it; the flags are mutually exclusive |
+| `setup [all\|ansible\|docs\|go\|reports]` | Install exact repository dependencies and reporting tools | `setup ansible --reset` recreates generated runtime; `setup ansible --uninstall` removes it; the flags are mutually exclusive |
 | `doctor [--strict]` | Report tools and repository files | Strict mode fails on every missing or unsupported item |
 | `inventory init` | Create private `hosts.yml` with mode `0600` | Refuses to overwrite an existing inventory |
 | `inventory show` | Render effective group membership | Does not contact nodes |
@@ -55,6 +55,7 @@ Examples:
 homelabctl setup ansible
 homelabctl setup ansible --reset
 homelabctl setup ansible --uninstall
+homelabctl setup go
 homelabctl setup reports
 homelabctl inventory init
 homelabctl inventory show

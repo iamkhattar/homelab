@@ -219,9 +219,9 @@ paths are stable and Git-ignored:
 | `sbom/homelab.spdx.json` | Repository-wide SPDX JSON software bill of materials | Report artifact and downstream tooling |
 
 `gotestsum` and `gosec` are installed from exact Go module versions. Trivy
-runs from `ghcr.io/aquasecurity/trivy:0.74.0` pinned to an immutable digest;
-its version-notice check is disabled because upgrades are reviewed and pinned
-in this repository rather than selected dynamically during CI.
+runs from `ghcr.io/aquasecurity/trivy:0.74.0` pinned to an immutable digest.
+Upgrades are reviewed and pinned in this repository rather than selected
+dynamically during CI.
 The checkout is mounted read-only at `/workspace`; only `sarif/`, `sbom/` and
 the ignored `trivy-cache/` receive writable mounts. The cache avoids downloading
 the vulnerability databases twice during the security and SBOM stages.
@@ -321,18 +321,21 @@ pushes them after authentication. In parallel after checks, a main-only release
 job uses that same version with the pinned GoReleaser action to publish static
 `homelabctl` archives and `checksums.txt`.
 
-Every `actions/setup-go` step enables its module and build-output cache
-explicitly. The check job keys that cache from both `homelabctl/go.sum` and
-`services/butler/go.sum`; image-publication and release jobs key their local CLI
-build from `homelabctl/go.sum`. Cache misses affect duration, never correctness.
+The check job restores Go modules and compiler output with granular cache
+actions keyed by the operating system, architecture, Go version and both
+`homelabctl/go.sum` and `services/butler/go.sum`. `homelabctl setup go` downloads
+both modules before the cache is saved, and the save happens before tests or
+scans can fail. The publication and release jobs use setup-go's built-in cache
+for their local CLI build because those jobs only run after checks succeed.
+Cache misses affect duration, never correctness.
 
 The check job also restores `ansible/.venv` and `ansible/collections` from an
 exact operating-system, architecture, Python-version and requirements hash. On
 a cache hit, CI skips `homelabctl setup ansible`; on a miss, it installs through
 homelabctl and saves the completed runtime immediately, before any test or scan
 can fail the job. Documentation and reporting setup still run every time: npm
-and setup-go provide their package/build caches, while the commands continue to
-verify their locked dependency contracts.
+and the pre-check Go cache provide their package/build caches, while the
+commands continue to verify their locked dependency contracts.
 
 `homelabctl ci check --only workflows` parses every workflow and enforces the
 local contract: read-only default permissions, concurrency cancellation,

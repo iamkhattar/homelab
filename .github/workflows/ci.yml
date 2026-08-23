@@ -35,10 +35,16 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: |
-            homelabctl/go.sum
-            services/butler/go.sum
+          cache: false
+
+      - name: Restore Go modules and build cache
+        id: go-runtime-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ runner.arch }}-${{ env.GO_VERSION }}-${{ hashFiles('homelabctl/go.sum', 'services/butler/go.sum') }}
 
       - name: Set up Node
         uses: actions/setup-node@v7
@@ -88,7 +94,17 @@ jobs:
       - name: Install documentation and reporting dependencies
         run: |
           bin/homelabctl setup docs
+          bin/homelabctl setup go
           bin/homelabctl setup reports
+
+      - name: Save Go modules and build cache
+        if: steps.go-runtime-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ steps.go-runtime-cache.outputs.cache-primary-key }}
 
       - name: Run repository checks
         run: bin/homelabctl ci check --reports

@@ -170,12 +170,21 @@ func validateCI(path string, workflow definition) []error {
 			problem("check job must grant security-events: write for SARIF upload")
 		}
 		setupGo, found := findUses(check.Steps, "actions/setup-go@")
-		goCacheDependencies := value(setupGo.With["cache-dependency-path"])
-		if !found || value(setupGo.With["cache"]) != "true" || !strings.Contains(goCacheDependencies, "homelabctl/go.sum") || !strings.Contains(goCacheDependencies, "services/butler/go.sum") {
-			problem("check job must explicitly cache Go modules and build output for every Go module")
+		if !found || value(setupGo.With["cache"]) != "false" {
+			problem("check job must use the pre-check Go cache instead of setup-go post-job caching")
 		}
-		ansibleRestore, restored := findUses(check.Steps, "actions/cache/restore@")
-		ansibleSave, saved := findUses(check.Steps, "actions/cache/save@")
+		goRestore, goRestored := findUsesWithPath(check.Steps, "actions/cache/restore@", "~/go/pkg/mod")
+		goSave, goSaved := findUsesWithPath(check.Steps, "actions/cache/save@", "~/go/pkg/mod")
+		goCachePaths := value(goRestore.With["path"])
+		goCacheKey := value(goRestore.With["key"])
+		if !goRestored || !strings.Contains(goCachePaths, "~/.cache/go-build") || !strings.Contains(goCacheKey, "homelabctl/go.sum") || !strings.Contains(goCacheKey, "services/butler/go.sum") {
+			problem("check job must restore Go modules and build output using every Go module checksum")
+		}
+		if !goSaved || !strings.Contains(goSave.If, "cache-hit != 'true'") || value(goSave.With["key"]) != "${{ steps.go-runtime-cache.outputs.cache-primary-key }}" {
+			problem("check job must save a missing Go cache before repository checks")
+		}
+		ansibleRestore, restored := findUsesWithPath(check.Steps, "actions/cache/restore@", "ansible/.venv")
+		ansibleSave, saved := findUsesWithPath(check.Steps, "actions/cache/save@", "ansible/.venv")
 		ansibleCachePaths := value(ansibleRestore.With["path"])
 		ansibleCacheKey := value(ansibleRestore.With["key"])
 		if !restored || !strings.Contains(ansibleCachePaths, "ansible/.venv") || !strings.Contains(ansibleCachePaths, "ansible/collections") || !strings.Contains(ansibleCacheKey, "ansible/requirements.txt") || !strings.Contains(ansibleCacheKey, "ansible/requirements.yml") {
@@ -184,8 +193,8 @@ func validateCI(path string, workflow definition) []error {
 		if !saved || !strings.Contains(ansibleSave.If, "cache-hit != 'true'") || value(ansibleSave.With["key"]) != "${{ steps.ansible-runtime-cache.outputs.cache-primary-key }}" {
 			problem("check job must save a missing Ansible runtime before repository checks")
 		}
-		if !hasRun(check.Steps, "bin/homelabctl setup ansible") || !hasRun(check.Steps, "bin/homelabctl setup docs") || !hasRun(check.Steps, "bin/homelabctl setup reports") {
-			problem("check job must install Ansible, docs and reporting dependencies through homelabctl")
+		if !hasRun(check.Steps, "bin/homelabctl setup ansible") || !hasRun(check.Steps, "bin/homelabctl setup docs") || !hasRun(check.Steps, "bin/homelabctl setup go") || !hasRun(check.Steps, "bin/homelabctl setup reports") {
+			problem("check job must install Ansible, docs, Go and reporting dependencies through homelabctl")
 		}
 		if !hasRun(check.Steps, "bin/homelabctl ci check", "--reports") {
 			problem("check job must generate reports through bin/homelabctl ci check --reports")
@@ -362,6 +371,15 @@ func hasRunWithEnv(steps []step, runFragment, key, expected string) bool {
 func findUses(steps []step, prefix string) (step, bool) {
 	for _, candidate := range steps {
 		if strings.HasPrefix(candidate.Uses, prefix) {
+			return candidate, true
+		}
+	}
+	return step{}, false
+}
+
+func findUsesWithPath(steps []step, prefix, pathFragment string) (step, bool) {
+	for _, candidate := range steps {
+		if strings.HasPrefix(candidate.Uses, prefix) && strings.Contains(value(candidate.With["path"]), pathFragment) {
 			return candidate, true
 		}
 	}

@@ -81,6 +81,7 @@ The default target is `all`. More focused forms are available:
 ```bash
 homelabctl setup ansible
 homelabctl setup docs
+homelabctl setup go
 homelabctl setup reports
 ```
 
@@ -88,10 +89,10 @@ The Ansible setup creates `ansible/.venv`, installs
 `ansible/requirements.txt`, and installs the collections pinned by
 `ansible/requirements.yml` under `ansible/collections`. The docs setup runs the
 locked package installation inside `docs/`. Neither environment needs to be
-activated manually when using `homelabctl`. Reporting setup installs the pinned
-`gotestsum` and `gosec` Go tools. Trivy runs from an immutable digest-pinned
-container, so reporting setup does not compile or install its large dependency
-graph.
+activated manually when using `homelabctl`. Go setup downloads the modules from
+every discovered `go.mod`; reporting setup installs the pinned `gotestsum` and
+`gosec` Go tools. Trivy runs from an immutable digest-pinned container, so
+reporting setup does not compile or install its large dependency graph.
 
 Re-run setup after changing either requirements file or lockfile. Setup never
 creates the private node inventory.

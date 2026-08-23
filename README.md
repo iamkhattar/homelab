@@ -41,8 +41,8 @@ homelabctl setup
 homelabctl doctor
 ```
 
-`homelabctl setup` installs the repository's pinned Ansible, documentation and
-reporting dependencies. Contributors can instead build the CLI from
+`homelabctl setup` installs the repository's pinned Ansible, documentation, Go
+module and reporting dependencies. Contributors can instead build the CLI from
 `homelabctl/` with Go 1.27. The documentation toolchain uses Node.js 24 and is
 fully contained under `docs/`.
 

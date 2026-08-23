@@ -183,8 +183,8 @@ func TestCICheckReportingModeGeneratesEveryReportThroughPinnedTools(t *testing.T
 	for _, fragment := range []string{
 		"gotestsum --format standard-quiet --junitfile " + filepath.Join(repo, "test-results", "homelabctl.xml"),
 		"gosec -track-suppressions -fmt sarif -out " + filepath.Join(repo, "sarif", "gosec-services-butler.sarif"),
-		"docker run --rm --volume " + repo + ":/workspace:ro --volume " + filepath.Join(repo, "sarif") + ":/reports --volume " + filepath.Join(repo, "trivy-cache") + ":/cache --workdir /workspace " + trivyImage + " --skip-version-check fs --cache-dir /cache --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --format sarif --output /reports/trivy.sarif",
-		"docker run --rm --volume " + repo + ":/workspace:ro --volume " + filepath.Join(repo, "sbom") + ":/reports --volume " + filepath.Join(repo, "trivy-cache") + ":/cache --workdir /workspace " + trivyImage + " --skip-version-check fs --cache-dir /cache --format spdx-json --output /reports/homelab.spdx.json",
+		"docker run --rm --volume " + repo + ":/workspace:ro --volume " + filepath.Join(repo, "sarif") + ":/reports --volume " + filepath.Join(repo, "trivy-cache") + ":/cache --workdir /workspace " + trivyImage + " fs --cache-dir /cache --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --format sarif --output /reports/trivy.sarif",
+		"docker run --rm --volume " + repo + ":/workspace:ro --volume " + filepath.Join(repo, "sbom") + ":/reports --volume " + filepath.Join(repo, "trivy-cache") + ":/cache --workdir /workspace " + trivyImage + " fs --cache-dir /cache --format spdx-json --output /reports/homelab.spdx.json",
 		"--skip-dirs ansible/.ansible --skip-dirs ansible/.venv --skip-dirs ansible/collections --skip-dirs bin",
 		"--skip-dirs docs/node_modules --skip-dirs docs/.vitepress/cache --skip-dirs docs/.vitepress/dist --skip-dirs infra/.terraform --skip-dirs node_modules",
 	} {
@@ -214,6 +214,30 @@ func TestSetupReportsInstallsPinnedTools(t *testing.T) {
 	} {
 		if !strings.Contains(stderr.String(), "go install "+tool) {
 			t.Errorf("setup reports output %q does not install %s", stderr.String(), tool)
+		}
+	}
+}
+
+func TestSetupGoDownloadsEveryModule(t *testing.T) {
+	repo := testRepository(t)
+	for _, module := range []string{"homelabctl", filepath.Join("services", "butler")} {
+		if err := writeEmpty(filepath.Join(repo, module, "go.mod")); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var stderr bytes.Buffer
+	runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &stderr)
+	root := New(BuildInfo{}, runner)
+	root.SetArgs([]string{"--repo-root", repo, "--dry-run", "setup", "go"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	for _, module := range []string{"homelabctl", filepath.Join("services", "butler")} {
+		fragment := "+ (" + filepath.Join(repo, module) + ") go mod download"
+		if !strings.Contains(stderr.String(), fragment) {
+			t.Errorf("setup go output %q does not contain %q", stderr.String(), fragment)
 		}
 	}
 }

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+
+	"github.com/iamkhattar/homelab/homelabctl/internal/repository"
 )
 
 const (
@@ -17,7 +19,7 @@ func newSetupCommand(s *state) *cobra.Command {
 	var resetAnsible bool
 	var uninstallAnsible bool
 	cmd := &cobra.Command{
-		Use:   "setup [all|ansible|docs|reports]",
+		Use:   "setup [all|ansible|docs|go|reports]",
 		Short: "Install pinned workstation dependencies",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -39,6 +41,9 @@ func newSetupCommand(s *state) *cobra.Command {
 				if err := setupDocs(cmd, s); err != nil {
 					return err
 				}
+				if err := setupGoModules(cmd, s); err != nil {
+					return err
+				}
 				return setupReportTools(cmd, s)
 			case "ansible":
 				if uninstallAnsible {
@@ -52,10 +57,12 @@ func newSetupCommand(s *state) *cobra.Command {
 				return setupAnsible(cmd, s)
 			case "docs":
 				return setupDocs(cmd, s)
+			case "go":
+				return setupGoModules(cmd, s)
 			case "reports":
 				return setupReportTools(cmd, s)
 			default:
-				return fmt.Errorf("unknown setup target %q; expected all, ansible, docs, or reports", target)
+				return fmt.Errorf("unknown setup target %q; expected all, ansible, docs, go, or reports", target)
 			}
 		},
 	}
@@ -95,6 +102,19 @@ func setupAnsible(cmd *cobra.Command, s *state) error {
 
 func setupDocs(cmd *cobra.Command, s *state) error {
 	return s.run(cmd.Context(), s.dir("docs"), "npm", "ci")
+}
+
+func setupGoModules(cmd *cobra.Command, s *state) error {
+	modules, err := repository.GoModules(s.root)
+	if err != nil {
+		return err
+	}
+	for _, module := range modules {
+		if err := s.run(cmd.Context(), module, "go", "mod", "download"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func setupReportTools(cmd *cobra.Command, s *state) error {

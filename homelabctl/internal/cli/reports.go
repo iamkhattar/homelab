@@ -119,7 +119,6 @@ func trivyContainerArguments(s *state, reportDirectory string) []string {
 		"--volume", s.dir(trivyCacheDirectory) + ":/cache",
 		"--workdir", "/workspace",
 		trivyImage,
-		"--skip-version-check",
 	}
 }
 
