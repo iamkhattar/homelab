@@ -103,6 +103,8 @@ func generateTrivySecurityReport(cmd *cobra.Command, s *state) error {
 		"--severity", "HIGH,CRITICAL",
 		"--exit-code", "1",
 		"--format", "table",
+		"--ignorefile", "/workspace/.trivyignore.yaml",
+		"--show-suppressed",
 	)
 	tableArgs = append(tableArgs, trivySkipArguments()...)
 	tableArgs = append(tableArgs, "/workspace")

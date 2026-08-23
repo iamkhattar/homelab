@@ -29,4 +29,7 @@ LABEL org.opencontainers.image.title="butler" \
 
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /butler /butler
+
+USER 65532:65532
+
 ENTRYPOINT ["/butler"]

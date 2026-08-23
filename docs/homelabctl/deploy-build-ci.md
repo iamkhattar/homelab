@@ -240,12 +240,22 @@ scope, as do homelab code, Dockerfiles, Terraform source, Helm charts and the
 VitePress configuration and custom components. This prevents upstream Ansible
 integration-test fixtures from being reported as if they were homelab source.
 
-The Trivy stage first writes SARIF without allowing a finding to interrupt
-report generation. It then repeats the same scan with the warm cache, renders a
-human-readable table in the job log and uses that invocation as the
+The Trivy stage first writes unfiltered SARIF without allowing a finding to
+interrupt report generation. It then repeats the same scan with the warm cache,
+renders a human-readable table in the job log and uses that invocation as the
 HIGH/CRITICAL policy gate. A failed Trivy stage therefore shows the affected
 file or package, advisory and installed/fixed versions directly in Actions;
-the SARIF remains available for code scanning.
+the complete SARIF remains available for code scanning.
+
+The gating pass reads the root `.trivyignore.yaml`. It is a reviewed baseline,
+not a global rule disable: each exception specifies an exact finding ID, exact
+repository paths, a rationale and an expiry date. The table requests suppressed
+results so accepted debt remains visible in CI, while new findings and expired
+exceptions fail the job. The initial baseline expires on 30 November 2026 and
+covers only workload security contexts that need runtime validation on Titan,
+the Zigbee USB privilege transition, the database operator's intentional
+Service lifecycle permission and a Butler false positive where a ConfigMap
+stores a Kubernetes Secret object name rather than secret material.
 
 Security findings are gating failures. The aggregate runner continues after a
 failed stage, however, so all possible reports are produced. GitHub Actions
