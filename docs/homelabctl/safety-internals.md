@@ -79,6 +79,11 @@ Run the supported test entry point from the repository root:
 homelabctl ci check --only go-test
 ```
 
+CI reporting is also owned by the CLI rather than encoded as scanner arguments
+inside workflow YAML. `homelabctl ci check --reports` constructs JUnit, raw test
+JSON, gosec SARIF, Trivy SARIF and SPDX output. Trivy receives a read-only
+checkout mount plus narrowly writable report and cache mounts.
+
 Dry-run tests prove validation and command construction. They deliberately do
 not claim that a remote Debian node, registry, cloud account or Kubernetes API
 is available; Ansible syntax checks, Terraform tests and explicit operator

@@ -40,7 +40,7 @@ they never change command behaviour or exit status.
 
 | Command | Purpose | Important validation |
 | --- | --- | --- |
-| `setup [all\|ansible\|docs]` | Install exact repository dependencies | `ansible --reset` recreates generated runtime; `ansible --uninstall` removes it; the flags are mutually exclusive |
+| `setup [all\|ansible\|docs\|reports]` | Install exact repository dependencies and reporting tools | `ansible --reset` recreates generated runtime; `ansible --uninstall` removes it; the flags are mutually exclusive |
 | `doctor [--strict]` | Report tools and repository files | Strict mode fails on every missing or unsupported item |
 | `inventory init` | Create private `hosts.yml` with mode `0600` | Refuses to overwrite an existing inventory |
 | `inventory show` | Render effective group membership | Does not contact nodes |
@@ -55,6 +55,7 @@ Examples:
 homelabctl setup ansible
 homelabctl setup ansible --reset
 homelabctl setup ansible --uninstall
+homelabctl setup reports
 homelabctl inventory init
 homelabctl inventory show
 homelabctl inventory check --verbose
@@ -167,13 +168,15 @@ homelabctl docs serve --image iamkhattar/homelab-docs:dev --port 8080
 
 | Command | Purpose | Important validation |
 | --- | --- | --- |
-| `ci check` | Aggregate Go, docs, workflow, Ansible and Terraform checks | `--only` and `--skip` are mutually exclusive and accept known check names only |
+| `ci check` | Aggregate checks and optionally generate CI reports | `--reports` writes test/SARIF/SBOM evidence and adds gosec, Trivy and SBOM checks |
 | `ci build` | Build all service, homelabctl and docs images without pushing | Uses the same tag, registry, image and Git-base validation as direct builds |
 | `ci publish` | Build and push the complete image set | Requires `CI`; defaults to the current Git SHA when tags are omitted |
 
 ```bash
 homelabctl ci check --only go-format,go-test
 homelabctl ci check --only workflows
+homelabctl ci check --reports
+homelabctl ci check --reports --only gosec,trivy,sbom
 homelabctl ci build --changed --base origin/main --tag revision
 CI=true homelabctl ci publish
 CI=true homelabctl ci publish \

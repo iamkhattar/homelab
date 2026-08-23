@@ -192,6 +192,56 @@ homelabctl ci check --skip terraform
 `--only` and `--skip` cannot be combined. Supported names are `go-format`,
 `go-test`, `docs`, `workflows`, `ansible` and `terraform`.
 
+### Generate CI reports and run security scans
+
+Install the pinned reporting tools through the same operator interface:
+
+```bash
+homelabctl setup reports
+```
+
+Then run reporting mode:
+
+```bash
+homelabctl ci check --reports
+```
+
+Reporting mode keeps every normal check, replaces plain `go test` execution
+with `gotestsum`, and appends three security/reporting stages. Its generated
+paths are stable and Git-ignored:
+
+| Path | Format and contents | CI consumer |
+| --- | --- | --- |
+| `test-results/<module>.xml` | JUnit result for each Go module | Downloadable report artifact |
+| `test-results/<module>.json` | Complete line-delimited `go test -json` stream | Debugging, timing and flaky-test analysis |
+| `sarif/gosec-<module>.sarif` | Go AST/SSA findings with tracked suppressions | GitHub code scanning and report artifact |
+| `sarif/trivy.sarif` | High/critical dependency, IaC and secret findings | GitHub code scanning and report artifact |
+| `sbom/homelab.spdx.json` | Repository-wide SPDX JSON software bill of materials | Report artifact and downstream tooling |
+
+`gotestsum` and `gosec` are installed from exact Go module versions. Trivy
+runs from `ghcr.io/aquasecurity/trivy:0.73.0` pinned to an immutable digest.
+The checkout is mounted read-only at `/workspace`; only `sarif/`, `sbom/` and
+the ignored `trivy-cache/` receive writable mounts. The cache avoids downloading
+the vulnerability databases twice during the security and SBOM stages.
+
+Security findings are gating failures. The aggregate runner continues after a
+failed stage, however, so all possible reports are produced. GitHub Actions
+uses `if: always()` to retain `test-results/`, `sarif/` and `sbom/` for 14 days
+even when checks fail, and uploads SARIF to code scanning when the event has
+permission. Fork pull requests still receive the downloadable artifact but do
+not receive elevated `security-events` access.
+
+Use focused reporting during development:
+
+```bash
+homelabctl ci check --reports --only go-test
+homelabctl ci check --reports --only gosec,trivy,sbom
+```
+
+Without `--reports`, the six normal check names remain the complete selection
+set and Go tests use the native `go test` command. With `--reports`, the
+additional selectable names are `gosec`, `trivy` and `sbom`.
+
 ## Build and publish the complete CI image set
 
 Build every service image plus the homelabctl and documentation images with one

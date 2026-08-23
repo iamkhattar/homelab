@@ -30,6 +30,13 @@ homelabctl setup
 homelabctl doctor
 ```
 
+Generate CI-compatible test, SARIF and SPDX reports and run the pinned security
+scanners with:
+
+```bash
+homelabctl ci check --reports
+```
+
 ## Documentation
 
 The operational guide lives in [`docs/`](docs/index.md) and covers Debian
