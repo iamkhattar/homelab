@@ -1,0 +1,15 @@
+---
+- name: Reboot managed Debian nodes before K3s installation
+  hosts: k3s_cluster
+  gather_facts: false
+  become: true
+  serial: 1
+  tasks:
+    - name: Reboot the node and wait for it to return
+      ansible.builtin.reboot:
+        reboot_timeout: 600
+        connect_timeout: 10
+        post_reboot_delay: 10
+
+    - name: Verify the node is reachable after reboot
+      ansible.builtin.ping:

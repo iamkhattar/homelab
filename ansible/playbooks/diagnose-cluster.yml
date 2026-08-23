@@ -1,0 +1,31 @@
+---
+- name: Collect K3s cluster diagnostics
+  hosts: "server[0]"
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Run read-only K3s diagnostic commands
+      ansible.builtin.command:
+        cmd: "{{ item }}"
+      loop:
+        - systemctl status k3s --no-pager
+        - k3s --version
+        - k3s etcd-snapshot ls
+        - k3s kubectl get nodes -o wide
+        - k3s kubectl get pods --all-namespaces -o wide
+        - k3s kubectl get events --all-namespaces --sort-by=.lastTimestamp
+        - journalctl -u k3s --since=-30min --no-pager
+      register: homelab_cluster_diagnostics
+      changed_when: false
+      failed_when: false
+
+    - name: Report K3s diagnostics
+      ansible.builtin.debug:
+        msg:
+          command: "{{ item.item }}"
+          return_code: "{{ item.rc }}"
+          stdout: "{{ item.stdout_lines | default([]) }}"
+          stderr: "{{ item.stderr_lines | default([]) }}"
+      loop: "{{ homelab_cluster_diagnostics.results }}"
+      loop_control:
+        label: "{{ item.item }}"

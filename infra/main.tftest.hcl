@@ -1,8 +1,8 @@
 variables {
   # hcloud provider validates token length; it must be exactly 64 characters.
   hetzner_cloud_api_token = "0000000000000000000000000000000000000000000000000000000000000000"
-  k3s_api_token          = "test-k3s-token"
-  ssh_public_key         = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"
+  k3s_api_token           = "test-k3s-token"
+  ssh_public_key          = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"
 }
 
 # Test default configuration with no agents

@@ -2,3 +2,13 @@ cert-manager:
   crds:
     enabled: true
     keep: false
+
+# Vault-backed ClusterIssuer config. Butler bootstraps the matching Vault
+# PKI mount + kubernetes auth role on first reconcile; until then the
+# issuer is NotReady and cert-manager retries.
+vaultIssuer:
+  server: http://vault.security.svc.cluster.local:8200
+  path: pki_int/sign/homelab-default
+  mountPath: /v1/auth/kubernetes
+  role: cert-manager
+  serviceAccountName: cert-manager

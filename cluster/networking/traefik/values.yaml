@@ -1,0 +1,85 @@
+traefik:
+  # K3s ships its own Traefik by default. We disabled it via the
+  # --disable=traefik flag in ansible/inventory/inventory-server.yml so
+  # this release owns ingress duties.
+
+  deployment:
+    kind: Deployment
+    replicas: 1
+
+  # Run as DaemonSet would also be valid for a single-node cluster, but
+  # Deployment is friendlier for the upcoming multi-node case (we just
+  # bump replicas).
+
+  service:
+    type: LoadBalancer
+    # K3s' built-in servicelb (klipper-lb) handles the LoadBalancer in the
+    # single-node Hetzner setup. Replaced by MetalLB later if/when needed.
+
+  ports:
+    web:
+      port: 8000
+      expose:
+        default: true
+      exposedPort: 80
+      protocol: TCP
+      # Redirect all HTTP to HTTPS by default; individual IngressRoutes
+      # can opt out if needed.
+      redirectTo:
+        port: websecure
+        scheme: https
+    websecure:
+      port: 8443
+      expose:
+        default: true
+      exposedPort: 443
+      protocol: TCP
+      tls:
+        enabled: true
+
+  # Default to permissive ingress class so existing
+  # ingressClassName: traefik manifests keep working.
+  ingressClass:
+    enabled: true
+    isDefaultClass: true
+    name: traefik
+
+  ingressRoute:
+    dashboard:
+      # Dashboard disabled by default — it'll be exposed via an OIDC-
+      # protected IngressRoute in a later phase when oauth2-proxy lands.
+      enabled: false
+
+  providers:
+    kubernetesCRD:
+      enabled: true
+      # Allow IngressRoutes from any namespace (the default).
+      allowCrossNamespace: false
+      allowExternalNameServices: false
+    kubernetesIngress:
+      enabled: true
+      allowExternalNameServices: false
+      # Honor existing Ingress objects (Pocket-ID etc.) across all namespaces.
+
+  rbac:
+    enabled: true
+    namespaced: false
+
+  logs:
+    general:
+      level: INFO
+    access:
+      enabled: true
+      # Sent to stdout for Loki/promtail to pick up in Phase 4.
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  # No persistence — Traefik is stateless when using the K8s CRD provider.
+  persistence:
+    enabled: false

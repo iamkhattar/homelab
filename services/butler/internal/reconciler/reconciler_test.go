@@ -9,9 +9,9 @@ import (
 
 // mockReconciler is a test double for the Reconciler interface.
 type mockReconciler struct {
-	name    string
-	err     error
-	called  int
+	name   string
+	err    error
+	called int
 }
 
 func (m *mockReconciler) Name() string { return m.name }

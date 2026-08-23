@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  # Rendered as YAML by Helm's toYaml so structured fields (oauthClients,
+  # k8sIssuance.roles) come out correctly. Butler reads this file in
+  # config.Load() if BUTLER_CONFIG_PATH isn't set; the deployment mounts
+  # this ConfigMap at /etc/butler/config.yaml.
+  config.yaml: |
+{{ toYaml .Values.config | indent 4 }}

@@ -24,6 +24,8 @@ repositories:
     url: https://open-policy-agent.github.io/gatekeeper/charts
   - name: tailscale
     url: https://pkgs.tailscale.com/helmcharts
+  - name: traefik
+    url: https://traefik.github.io/charts
 
 releases:
 ###  CORE  ###
@@ -40,7 +42,18 @@ releases:
     chart: ./core/cert-manager
     historyMax: 5
     namespace: cert-manager
+    # The Vault ClusterIssuer template references the cert-manager SA
+    # (created by the cert-manager subchart) and butler's Vault PKI setup
+    # (created on butler's first reconcile). The issuer reports NotReady
+    # until both are present; cert-manager retries automatically.
     needs: [kube-system/namespaces]
+
+###  NETWORKING  ###
+  - name: traefik
+    chart: ./networking/traefik
+    historyMax: 5
+    namespace: networking
+    needs: [kube-system/namespaces, kube-system/rbac-policies]
 
 ###  SECURITY  ###
   - name: vault
@@ -58,7 +71,13 @@ releases:
     chart: ./security/pocket-id
     historyMax: 5
     namespace: security
-    needs: [kube-system/namespaces, security/vault-secrets-operator]
+    # pocket-id needs cert-manager (TLS cert), traefik (ingress), and VSO
+    # (Vault-managed encryption-key Secret).
+    needs:
+      - kube-system/namespaces
+      - cert-manager/cert-manager
+      - networking/traefik
+      - security/vault-secrets-operator
     values:
       - ./security/pocket-id/helmfile-values.yaml.gotmpl
   # - name: crowdsec
@@ -73,11 +92,11 @@ releases:
   #   needs: [kube-system/namespaces]
 
 ###  SERVICES  ###
-  - name: butler
-    chart: ./services/butler
-    historyMax: 5
-    namespace: security
-    needs: [kube-system/namespaces, security/vault]
+  # - name: butler
+  #   chart: ./services/butler
+  #   historyMax: 5
+  #   namespace: security
+  #   needs: [kube-system/namespaces, security/vault]
 
 ###  DATABASES  ###
   # - name: postgresql

@@ -19,6 +19,13 @@ env:
 ingress:
   enabled: false
   host: ""  # Set via helmfile
+  # TLS via the Vault-backed ClusterIssuer (provisioned by cert-manager once
+  # butler has bootstrapped Vault's PKI). cert-manager creates the Secret
+  # referenced by tlsSecretName containing the issued cert + chain.
+  tls:
+    enabled: true
+    clusterIssuer: vault
+    tlsSecretName: pocket-id-tls
 
 persistence:
   enabled: true

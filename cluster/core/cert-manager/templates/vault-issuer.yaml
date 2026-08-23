@@ -1,0 +1,25 @@
+{{- /*
+ClusterIssuer that asks the in-cluster Vault PKI to sign certs. Butler
+bootstraps the pki/, pki_int/, the role 'homelab-default', and the
+kubernetes auth role 'cert-manager' on its first reconcile. Until then
+this issuer reports NotReady and cert-manager retries with backoff -
+that's expected; no manual intervention required.
+*/ -}}
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: vault
+  labels:
+    app.kubernetes.io/name: vault-issuer
+    app.kubernetes.io/managed-by: helmfile
+    homelab.io/issuer: "true"
+spec:
+  vault:
+    server: {{ .Values.vaultIssuer.server | default "http://vault.security.svc.cluster.local:8200" | quote }}
+    path: {{ .Values.vaultIssuer.path | default "pki_int/sign/homelab-default" | quote }}
+    auth:
+      kubernetes:
+        mountPath: {{ .Values.vaultIssuer.mountPath | default "/v1/auth/kubernetes" | quote }}
+        role: {{ .Values.vaultIssuer.role | default "cert-manager" | quote }}
+        serviceAccountRef:
+          name: {{ .Values.vaultIssuer.serviceAccountName | default "cert-manager" | quote }}

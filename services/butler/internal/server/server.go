@@ -33,6 +33,9 @@ func (s *Server) routes() {
 	// Unauthenticated.
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
 	s.mux.HandleFunc("GET /readyz", s.handleReadyz)
+	// PKI CA chain is non-secret public PEM; safe to expose unauthenticated
+	// so a future homelabctl trust command can fetch it before authentication.
+	s.mux.HandleFunc("GET /api/v1/pki/ca-chain", s.handleCAChain)
 
 	// Authenticated.
 	s.mux.Handle("POST /api/v1/reconcile", s.protected(http.HandlerFunc(s.handleReconcile)))
@@ -75,6 +78,29 @@ func (s *Server) handleReconcile(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.scheduler.Statuses())
+}
+
+// handleCAChain serves the Vault PKI CA chain (root + intermediate, PEM
+// encoded) so operators can fetch it via homelabctl or curl and trust
+// the homelab root CA in their platform trust store.
+//
+// Returns 503 while butler is still bootstrapping Vault (no token yet) or
+// while PKI hasn't been set up. Clients should treat 503 as "retry".
+func (s *Server) handleCAChain(w http.ResponseWriter, r *http.Request) {
+	if s.vault.Token() == "" {
+		http.Error(w, "vault not authenticated yet, retry", http.StatusServiceUnavailable)
+		return
+	}
+	chain, err := s.vault.CAChain(r.Context())
+	if err != nil {
+		slog.Warn("ca chain not yet available", "error", err)
+		http.Error(w, "ca chain not yet available, retry", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-pem-file")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(chain))
 }
 
 func writeJSON(w http.ResponseWriter, code int, v interface{}) {

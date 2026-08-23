@@ -1,0 +1,19 @@
+{
+  "name": "homelab-docs",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "predev": "node ./scripts/check-node.mjs",
+    "dev": "vitepress dev .",
+    "prebuild": "node ./scripts/check-node.mjs",
+    "build": "vitepress build .",
+    "prepreview": "node ./scripts/check-node.mjs",
+    "preview": "vitepress preview ."
+  },
+  "devDependencies": {
+    "vitepress": "2.0.0-alpha.19"
+  }
+}

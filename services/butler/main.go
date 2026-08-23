@@ -17,6 +17,12 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
+)
+
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -28,7 +34,7 @@ func main() {
 	}
 
 	initLogging(cfg.LogLevel)
-	slog.Info("butler starting")
+	slog.Info("butler starting", "version", version, "commit", commit, "built", date)
 
 	// Kubernetes client (in-cluster).
 	k8sCfg, err := rest.InClusterConfig()
@@ -49,12 +55,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Build reconcilers — order matters: bootstrap must run before secrets.
+	// Build reconcilers — order matters:
+	//   1. vault-bootstrap: init + unseal + enable all engines/auth methods.
+	//   2. ca-bundle: publish PKI CA chain to a ConfigMap (depends on #1).
+	//   3. secrets: materialize KV-v2 secrets (depends on #1).
+	//   4. oauth-clients: provision OAuth clients in Pocket-ID, persist
+	//      creds to Vault (depends on #1 + Pocket-ID being reachable).
 	reconcilers := []reconciler.Reconciler{
-	reconciler.NewVaultBootstrap(vc, k8s, cfg.Namespace, cfg.OIDC.Issuer),
+		reconciler.NewVaultBootstrap(vc, k8s, cfg.Namespace, cfg),
+		reconciler.NewCABundle(vc, k8s),
 	}
 	if len(cfg.Secrets) > 0 {
 		reconcilers = append(reconcilers, reconciler.NewSecrets(vc, cfg.Secrets))
+	}
+	if len(cfg.OAuthClients) > 0 {
+		// Pocket-ID's admin API lives on the same host as the OIDC issuer
+		// (it's the same app). Derived from cfg.OIDC.Issuer so operators
+		// only configure one URL.
+		reconcilers = append(reconcilers,
+			reconciler.NewOAuthClients(vc, cfg.OIDC.Issuer, cfg.OAuthClients),
+		)
 	}
 
 	sched := reconciler.NewScheduler(cfg.ReconcileInterval, reconcilers...)
@@ -73,8 +93,9 @@ func main() {
 
 	// Start HTTP server.
 	httpSrv := &http.Server{
-		Addr:    ":" + cfg.Server.Port,
-		Handler: srv,
+		Addr:              ":" + cfg.Server.Port,
+		Handler:           srv,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {

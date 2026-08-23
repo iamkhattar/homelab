@@ -1,0 +1,29 @@
+---
+- name: Collect Debian node diagnostics
+  hosts: k3s_cluster
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Run read-only host diagnostic commands
+      ansible.builtin.command:
+        cmd: "{{ item }}"
+      loop:
+        - hostnamectl
+        - systemctl --failed --no-pager
+        - sshd -t
+        - df -h
+        - timedatectl status
+      register: homelab_node_diagnostics
+      changed_when: false
+      failed_when: false
+
+    - name: Report host diagnostics
+      ansible.builtin.debug:
+        msg:
+          command: "{{ item.item }}"
+          return_code: "{{ item.rc }}"
+          stdout: "{{ item.stdout_lines | default([]) }}"
+          stderr: "{{ item.stderr_lines | default([]) }}"
+      loop: "{{ homelab_node_diagnostics.results }}"
+      loop_control:
+        label: "{{ item.item }}"

@@ -1,0 +1,33 @@
+---
+homelab_base_apply_package_upgrades: true
+homelab_base_disable_swap: true
+homelab_base_disable_sleep: true
+homelab_base_manage_hostname: false
+homelab_base_hostname: "{{ inventory_hostname }}"
+homelab_base_timezone: Etc/UTC
+homelab_base_journal_max_use: 1G
+homelab_base_journal_retention: 14day
+homelab_base_shell_prompt_enabled: false
+homelab_base_shell_prompt_environment: HOMELAB
+
+homelab_base_packages:
+  - acl
+  - apparmor
+  - apparmor-utils
+  - apt-listchanges
+  - ca-certificates
+  - chrony
+  - curl
+  - needrestart
+  - openssh-server
+  - smartmontools
+  - sudo
+  - unattended-upgrades
+
+homelab_admin_user: "{{ ansible_user }}"
+homelab_admin_authorized_keys: []
+
+# This is deliberately false until a public key has been installed and tested.
+homelab_ssh_hardening_enabled: false
+homelab_ssh_allowed_users:
+  - "{{ homelab_admin_user }}"

@@ -2,7 +2,9 @@ replicaCount: 1
 
 image:
   repository: iamkhattar/butler
-  tag: latest
+  # Pin to a real version; CI tags images with the git SHA. Use 'latest' only
+  # for local dev. The homelabctl build command sets production image tags.
+  tag: "0.1.0"
   pullPolicy: IfNotPresent
 
 service:
@@ -10,8 +12,19 @@ service:
   port: 8080
   containerPort: 8080
 
+# Environment variables passed to the butler container. Tiny set — anything
+# substantive lives in the config ConfigMap below. These are kept here as
+# escape hatches for log level + alt config path overrides.
 env:
   LOG_LEVEL: "info"
+
+# When true, mount VAULT_TOKEN from the butler-vault-init Secret created by
+# the lifecycle reconciler after first init. optional: true means the pod
+# doesn't crashloop before init has happened.
+vaultInitSecret:
+  enabled: true
+  name: butler-vault-init
+  rootTokenKey: root-token
 
 resources:
   requests:
@@ -23,3 +36,104 @@ resources:
 
 serviceAccount:
   name: butler
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 0
+
+# Egress is locked down to Vault (in security/), Pocket-ID (in security/),
+# and the K8s API. Ingress allowed from anywhere in-cluster (HTTP API).
+networkPolicy:
+  enabled: true
+  vaultNamespace: security
+  pocketIdNamespace: security
+
+# Butler's runtime configuration. Rendered into a ConfigMap and mounted at
+# /etc/butler/config.yaml inside the container. This replaces the embedded
+# butler.yaml fallback at runtime.
+#
+# Everything butler used to require a rebuild for (PKI domain, OAuth clients,
+# Vault JWT roles, K8s issuance roles) lives here.
+config:
+  vault:
+    address: http://vault.security.svc.cluster.local:8200
+  server:
+    port: "8080"
+  reconcile:
+    interval: 5m
+  oidc:
+    # Set to https://auth.<domain> once Pocket-ID is reachable; empty disables
+    # OIDC bootstrap of Vault auth/jwt and butler API authz.
+    issuer: ""
+    audience: butler
+  oauthClients: []
+  # Example: enable in Phase 1B once Pocket-ID admin API is reachable.
+  #  - name: vault
+  #    kind: confidential
+  #    redirectURIs:
+  #      - http://localhost:8250/oidc/callback
+  #      - https://vault.shivlab.com/ui/vault/auth/oidc/oidc/callback
+  #  - name: butler
+  #    kind: confidential
+  #    redirectURIs:
+  #      - http://localhost:8251/oidc/callback
+  pki:
+    rootCN: "Homelab Root CA"
+    intCN: "Homelab Intermediate CA"
+    organization: homelab
+    allowedDomains:
+      - shivlab.com
+    roleMaxTTL: 720h
+  k8sIssuance:
+    enabled: false
+    hostNamespace: kube-system
+    tokenReviewerNamespace: security
+    tokenReviewerSA: vault-k8s-token-reviewer
+    # Reference to the Kubernetes Secret object that holds the reviewer token;
+    # this ConfigMap contains only the object name, never the token value.
+    tokenReviewerRef: vault-k8s-token-reviewer-token
+    roles:
+      - name: homelab-admin
+        serviceAccountName: vault-managed-admin
+        ttl: 1h
+        maxTTL: 8h
+        pocketIdGroup: homelab-admin
+        vaultPolicies:
+          - vault-admin
+          - k8s-admin
+      - name: homelab-operator
+        serviceAccountName: vault-managed-operator
+        ttl: 1h
+        maxTTL: 8h
+        pocketIdGroup: homelab-operator
+        vaultPolicies:
+          - vault-read
+          - k8s-operator
+      - name: homelab-viewer
+        serviceAccountName: vault-managed-viewer
+        ttl: 1h
+        maxTTL: 4h
+        pocketIdGroup: homelab-viewer
+        vaultPolicies:
+          - vault-read
+          - k8s-viewer
+  secrets:
+    - path: security/pocket-id
+      keys:
+        encryption-key:
+          length: 32

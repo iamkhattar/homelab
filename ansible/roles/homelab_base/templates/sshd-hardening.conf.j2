@@ -1,0 +1,9 @@
+# Managed by Ansible. Change homelab_base variables instead of editing this file.
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+X11Forwarding no
+AllowAgentForwarding no
+PermitTunnel no
+AllowUsers {{ homelab_ssh_allowed_users | join(' ') }}

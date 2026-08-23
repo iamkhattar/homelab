@@ -7,49 +7,72 @@ server:
 reconcile:
   interval: 5m
 
-# oidc:
-#   issuer: https://auth.example.com
+# OIDC issuer (Pocket-ID). Wired up to Vault's auth/jwt mount AND used to
+# validate tokens hitting butler's own API in Phase 2.
+oidc:
+  issuer: ""        # e.g. https://auth.shivlab.com — set via chart values
+  audience: butler
+
+# OAuth clients butler provisions in Pocket-ID. Disabled until issuer above
+# is set + the Pocket-ID OAuthClients reconciler ships in Phase 1B.
+oauthClients: []
+# Example shape (uncomment + edit via chart values):
+#  - name: vault
+#    kind: confidential
+#    redirectURIs:
+#      - http://localhost:8250/oidc/callback
+#      - https://vault.shivlab.com/ui/vault/auth/oidc/oidc/callback
+#  - name: butler
+#    kind: confidential
+#    redirectURIs:
+#      - http://localhost:8251/oidc/callback
+
+# Vault PKI knobs. Defaults map to the Phase 1A constants but everything is
+# overridable here so changing the domain doesn't require rebuilding butler.
+pki:
+  rootCN: "Homelab Root CA"
+  intCN: "Homelab Intermediate CA"
+  organization: homelab
+  allowedDomains:
+    - shivlab.com
+  roleMaxTTL: 720h
+
+# Vault Kubernetes secrets engine — Vault as the universal credential broker
+# for K8s. enabled: false until Phase 1B lands the supporting SAs/policies.
+k8sIssuance:
+  enabled: false
+  hostNamespace: kube-system
+  tokenReviewerNamespace: security
+  tokenReviewerSA: vault-k8s-token-reviewer
+  tokenReviewerRef: vault-k8s-token-reviewer-token
+  roles:
+    - name: homelab-admin
+      serviceAccountName: vault-managed-admin
+      ttl: 1h
+      maxTTL: 8h
+      pocketIdGroup: homelab-admin
+      vaultPolicies:
+        - vault-admin
+        - k8s-admin
+    - name: homelab-operator
+      serviceAccountName: vault-managed-operator
+      ttl: 1h
+      maxTTL: 8h
+      pocketIdGroup: homelab-operator
+      vaultPolicies:
+        - vault-read
+        - k8s-operator
+    - name: homelab-viewer
+      serviceAccountName: vault-managed-viewer
+      ttl: 1h
+      maxTTL: 4h
+      pocketIdGroup: homelab-viewer
+      vaultPolicies:
+        - vault-read
+        - k8s-viewer
 
 secrets:
   - path: security/pocket-id
     keys:
       encryption-key:
         length: 32
-  # - path: databases/postgresql
-  #   keys:
-  #     postgres-password:
-  #       length: 32
-  # - path: databases/redis
-  #   keys:
-  #     redis-password:
-  #       length: 32
-  # - path: storage/garage
-  #   keys:
-  #     rpc-secret:
-  #       length: 32
-  # - path: monitoring/grafana
-  #   keys:
-  #     admin-user:
-  #       static: "admin"
-  #     admin-password:
-  #       length: 32
-  # - path: applications/paperless-ngx
-  #   keys:
-  #     db-password:
-  #       length: 32
-  #     secret-key:
-  #       length: 64
-  #     admin-user:
-  #       static: "admin"
-  #     admin-password:
-  #       length: 32
-  # - path: applications/kitchenowl
-  #   keys:
-  #     jwt-secret:
-  #       length: 64
-  # - path: applications/vaultwarden
-  #   keys:
-  #     admin-token:
-  #       length: 64
-  #     database-url:
-  #       template: "postgresql://vaultwarden:{{db-password}}@postgresql.databases.svc.cluster.local:5432/vaultwarden"

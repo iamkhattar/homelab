@@ -1,0 +1,5 @@
+Managed Traefik ingress controller installed. K3s' built-in Traefik must be
+disabled at the K3s level (--disable=traefik in ansible/inventory/inventory-server.yml)
+or both will fight for ingress traffic.
+
+Existing Ingress objects with ingressClassName: traefik will continue to work.

@@ -1,0 +1,51 @@
+misconfigurations:
+  # These workloads predate the security baseline. Enabling an immutable root
+  # filesystem and non-root execution needs per-image writable-path and UID/GID
+  # validation on Titan. Keep the exception path-scoped and time-bounded so a
+  # new workload or a missed review still fails CI.
+  - id: KSV-0014
+    paths:
+      - cluster/applications/homepage/templates/deployment.yaml
+      - cluster/applications/kitchenowl/templates/deployment.yaml
+      - cluster/applications/ntfy/templates/deployment.yaml
+      - cluster/applications/paperless-ngx/templates/deployment.yaml
+      - cluster/applications/vaultwarden/templates/deployment.yaml
+      - cluster/security/pocket-id/templates/deployment.yaml
+      - cluster/smart-home/home-assistant/templates/deployment.yaml
+      - cluster/smart-home/mosquitto/templates/deployment.yaml
+      - cluster/smart-home/zigbee2mqtt/templates/deployment.yaml
+      - cluster/storage/garage/templates/deployment.yaml
+    expired_at: 2026-11-30
+    statement: Existing workloads require image-specific read-only filesystem validation on Titan.
+
+  - id: KSV-0118
+    paths:
+      - cluster/applications/homepage/templates/deployment.yaml
+      - cluster/applications/kitchenowl/templates/deployment.yaml
+      - cluster/applications/ntfy/templates/deployment.yaml
+      - cluster/applications/paperless-ngx/templates/deployment.yaml
+      - cluster/applications/vaultwarden/templates/deployment.yaml
+      - cluster/security/pocket-id/templates/deployment.yaml
+      - cluster/smart-home/home-assistant/templates/deployment.yaml
+      - cluster/smart-home/mosquitto/templates/deployment.yaml
+      - cluster/smart-home/zigbee2mqtt/templates/deployment.yaml
+      - cluster/storage/garage/templates/deployment.yaml
+    expired_at: 2026-11-30
+    statement: Existing workloads require image-specific non-root UID and GID validation on Titan.
+
+  # Zigbee2MQTT currently opens Titan's Sonoff USB device through a hostPath.
+  # Replace privileged mode with device ownership/supplementalGroups after the
+  # dongle's stable /dev/serial/by-id path and group are known on Titan.
+  - id: KSV-0017
+    paths:
+      - cluster/smart-home/zigbee2mqtt/templates/deployment.yaml
+    expired_at: 2026-11-30
+    statement: Temporary USB passthrough baseline pending Titan device-group validation.
+
+  # The namespace-scoped database operator intentionally manages Services for
+  # databases. Split and narrow this role when its controller contract is set.
+  - id: KSV-0056
+    paths:
+      - cluster/core/rbac-policies/templates/roles.yaml
+    expired_at: 2026-11-30
+    statement: Existing namespace-scoped database operator requires Service lifecycle permissions.

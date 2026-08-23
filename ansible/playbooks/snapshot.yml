@@ -1,0 +1,41 @@
+---
+- name: Manage embedded-etcd snapshots
+  hosts: "server[0]"
+  gather_facts: false
+  become: true
+  vars:
+    homelab_snapshot_action: list
+    homelab_snapshot_name: manual
+  tasks:
+    - name: Validate the requested snapshot operation
+      ansible.builtin.assert:
+        that:
+          - homelab_snapshot_action in ['list', 'save']
+          - homelab_snapshot_action != 'save' or homelab_snapshot_name is match('^[A-Za-z0-9][A-Za-z0-9._-]*$')
+        fail_msg: Invalid snapshot action or name
+
+    - name: List embedded-etcd snapshots
+      ansible.builtin.command:
+        argv:
+          - k3s
+          - etcd-snapshot
+          - list
+      register: homelab_snapshot_result
+      changed_when: false
+      when: homelab_snapshot_action == 'list'
+
+    - name: Save an embedded-etcd snapshot
+      ansible.builtin.command:
+        argv:
+          - k3s
+          - etcd-snapshot
+          - save
+          - --name
+          - "{{ homelab_snapshot_name }}"
+      register: homelab_snapshot_result
+      changed_when: true
+      when: homelab_snapshot_action == 'save'
+
+    - name: Report snapshot result
+      ansible.builtin.debug:
+        var: homelab_snapshot_result.stdout_lines
