@@ -126,8 +126,15 @@ func trivyContainerArguments(s *state, reportDirectory string) []string {
 func trivySkipArguments() []string {
 	return []string{
 		"--skip-dirs", ".git",
+		"--skip-dirs", "ansible/.ansible",
+		"--skip-dirs", "ansible/.venv",
+		"--skip-dirs", "ansible/collections",
+		"--skip-dirs", "bin",
 		"--skip-dirs", "docs/node_modules",
-		"--skip-dirs", "docs/.vitepress",
+		"--skip-dirs", "docs/.vitepress/cache",
+		"--skip-dirs", "docs/.vitepress/dist",
+		"--skip-dirs", "infra/.terraform",
+		"--skip-dirs", "node_modules",
 		"--skip-dirs", testResultsDirectory,
 		"--skip-dirs", sarifDirectory,
 		"--skip-dirs", sbomDirectory,

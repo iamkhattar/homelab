@@ -226,6 +226,14 @@ The checkout is mounted read-only at `/workspace`; only `sarif/`, `sbom/` and
 the ignored `trivy-cache/` receive writable mounts. The cache avoids downloading
 the vulnerability databases twice during the security and SBOM stages.
 
+The filesystem scan excludes generated controller dependencies and build
+output: the Ansible virtual environment and downloaded collections, Terraform
+provider cache, npm modules, VitePress cache/output, compiled `bin/` artifacts
+and report directories. Their committed manifests and lockfiles remain in
+scope, as do homelab code, Dockerfiles, Terraform source, Helm charts and the
+VitePress configuration and custom components. This prevents upstream Ansible
+integration-test fixtures from being reported as if they were homelab source.
+
 Security findings are gating failures. The aggregate runner continues after a
 failed stage, however, so all possible reports are produced. GitHub Actions
 uses `if: always()` to retain `test-results/`, `sarif/` and `sbom/` for 14 days

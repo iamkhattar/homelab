@@ -185,6 +185,8 @@ func TestCICheckReportingModeGeneratesEveryReportThroughPinnedTools(t *testing.T
 		"gosec -track-suppressions -fmt sarif -out " + filepath.Join(repo, "sarif", "gosec-services-butler.sarif"),
 		"docker run --rm --volume " + repo + ":/workspace:ro --volume " + filepath.Join(repo, "sarif") + ":/reports --volume " + filepath.Join(repo, "trivy-cache") + ":/cache --workdir /workspace " + trivyImage + " --skip-version-check fs --cache-dir /cache --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --format sarif --output /reports/trivy.sarif",
 		"docker run --rm --volume " + repo + ":/workspace:ro --volume " + filepath.Join(repo, "sbom") + ":/reports --volume " + filepath.Join(repo, "trivy-cache") + ":/cache --workdir /workspace " + trivyImage + " --skip-version-check fs --cache-dir /cache --format spdx-json --output /reports/homelab.spdx.json",
+		"--skip-dirs ansible/.ansible --skip-dirs ansible/.venv --skip-dirs ansible/collections --skip-dirs bin",
+		"--skip-dirs docs/node_modules --skip-dirs docs/.vitepress/cache --skip-dirs docs/.vitepress/dist --skip-dirs infra/.terraform --skip-dirs node_modules",
 	} {
 		if !strings.Contains(stderr.String(), fragment) {
 			t.Errorf("reporting dry-run %q does not contain %q", stderr.String(), fragment)
