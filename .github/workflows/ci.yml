@@ -106,10 +106,31 @@ jobs:
             ~/.cache/go-build
           key: ${{ steps.go-runtime-cache.outputs.cache-primary-key }}
 
+      - name: Determine Trivy cache day
+        id: trivy-cache-epoch
+        shell: bash
+        run: echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Trivy databases and checks
+        id: trivy-runtime-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: trivy-cache
+          key: trivy-${{ runner.os }}-${{ runner.arch }}-0.74.0-${{ steps.trivy-cache-epoch.outputs.day }}
+          restore-keys: |
+            trivy-${{ runner.os }}-${{ runner.arch }}-0.74.0-
+
       - name: Run repository checks
         run: bin/homelabctl ci check --reports
         env:
           CI: "true"
+
+      - name: Save Trivy databases and checks
+        if: always() && steps.trivy-runtime-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: trivy-cache
+          key: ${{ steps.trivy-runtime-cache.outputs.cache-primary-key }}
 
       - name: Upload test, security and SBOM reports
         if: always()

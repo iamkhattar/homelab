@@ -101,6 +101,20 @@ func TestValidateDirectoryRejectsBrokenCIContracts(t *testing.T) {
 			wantInError: "must save a missing Go cache",
 		},
 		{
+			name: "workflow omits Trivy cache restore",
+			transform: func(input string) string {
+				return strings.Replace(input, "      - id: trivy-runtime-cache\n        uses: actions/cache/restore@v6", "      - id: trivy-runtime-cache\n        uses: example.invalid/no-trivy-cache-restore@v6", 1)
+			},
+			wantInError: "must restore the daily Trivy database",
+		},
+		{
+			name: "workflow omits Trivy cache save",
+			transform: func(input string) string {
+				return strings.Replace(input, "      - if: always() && steps.trivy-runtime-cache.outputs.cache-hit != 'true'\n        uses: actions/cache/save@v6", "      - if: always() && steps.trivy-runtime-cache.outputs.cache-hit != 'true'\n        uses: example.invalid/no-trivy-cache-save@v6", 1)
+			},
+			wantInError: "must save the Trivy cache",
+		},
+		{
 			name: "workflow omits Ansible runtime restore",
 			transform: func(input string) string {
 				return strings.Replace(input, "      - id: ansible-runtime-cache\n        uses: actions/cache/restore@v6", "      - id: ansible-runtime-cache\n        uses: example.invalid/no-cache-restore@v6", 1)
@@ -336,8 +350,21 @@ jobs:
             ~/go/pkg/mod
             ~/.cache/go-build
           key: ${{ steps.go-runtime-cache.outputs.cache-primary-key }}
+      - id: trivy-cache-epoch
+        run: echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+      - id: trivy-runtime-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: trivy-cache
+          key: trivy-${{ runner.os }}-${{ runner.arch }}-0.74.0-${{ steps.trivy-cache-epoch.outputs.day }}
+          restore-keys: trivy-${{ runner.os }}-${{ runner.arch }}-0.74.0-
       - run: |
           bin/homelabctl ci check --reports
+      - if: always() && steps.trivy-runtime-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: trivy-cache
+          key: ${{ steps.trivy-runtime-cache.outputs.cache-primary-key }}
       - if: always()
         uses: actions/upload-artifact@v7
         with:

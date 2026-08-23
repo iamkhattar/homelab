@@ -225,6 +225,12 @@ dynamically during CI.
 The checkout is mounted read-only at `/workspace`; only `sarif/`, `sbom/` and
 the ignored `trivy-cache/` receive writable mounts. The cache avoids downloading
 the vulnerability databases twice during the security and SBOM stages.
+The check workflow also restores that directory from an Actions cache keyed by
+Trivy version and UTC day. It can fall back to the most recent cache, refreshes
+it when required, and saves the current daily cache with `if: always()` even
+when a finding fails the check. Normal reruns therefore do not fetch the roughly
+109 MB vulnerability database again, while the daily key avoids pinning a stale
+database indefinitely.
 
 The filesystem scan excludes generated controller dependencies and build
 output: the Ansible virtual environment and downloaded collections, Terraform

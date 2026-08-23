@@ -183,6 +183,15 @@ func validateCI(path string, workflow definition) []error {
 		if !goSaved || !strings.Contains(goSave.If, "cache-hit != 'true'") || value(goSave.With["key"]) != "${{ steps.go-runtime-cache.outputs.cache-primary-key }}" {
 			problem("check job must save a missing Go cache before repository checks")
 		}
+		trivyRestore, trivyRestored := findUsesWithPath(check.Steps, "actions/cache/restore@", "trivy-cache")
+		trivySave, trivySaved := findUsesWithPath(check.Steps, "actions/cache/save@", "trivy-cache")
+		trivyCacheKey := value(trivyRestore.With["key"])
+		if !trivyRestored || !strings.Contains(trivyCacheKey, "0.74.0") || !strings.Contains(trivyCacheKey, "steps.trivy-cache-epoch.outputs.day") || !strings.Contains(value(trivyRestore.With["restore-keys"]), "trivy-${{ runner.os }}-${{ runner.arch }}-0.74.0-") {
+			problem("check job must restore the daily Trivy database and checks cache")
+		}
+		if !trivySaved || !strings.Contains(trivySave.If, "always()") || !strings.Contains(trivySave.If, "cache-hit != 'true'") || value(trivySave.With["key"]) != "${{ steps.trivy-runtime-cache.outputs.cache-primary-key }}" {
+			problem("check job must save the Trivy cache even when repository checks fail")
+		}
 		ansibleRestore, restored := findUsesWithPath(check.Steps, "actions/cache/restore@", "ansible/.venv")
 		ansibleSave, saved := findUsesWithPath(check.Steps, "actions/cache/save@", "ansible/.venv")
 		ansibleCachePaths := value(ansibleRestore.With["path"])
