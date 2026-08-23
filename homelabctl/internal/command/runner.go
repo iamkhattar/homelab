@@ -36,6 +36,8 @@ func (r *Runner) RunEnv(ctx context.Context, dir string, environment map[string]
 		return nil
 	}
 
+	// #nosec G204 -- callers select executables from typed CLI workflows and
+	// arguments are passed directly without shell interpretation.
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
 	if len(environment) > 0 {
@@ -73,6 +75,8 @@ func (r *Runner) OutputEnv(ctx context.Context, dir string, environment map[stri
 		return "", nil
 	}
 
+	// #nosec G204 -- callers select executables from typed CLI workflows and
+	// arguments are passed directly without shell interpretation.
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
 	if len(environment) > 0 {

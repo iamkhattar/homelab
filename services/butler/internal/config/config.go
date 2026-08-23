@@ -161,6 +161,8 @@ func Load() (*Config, error) {
 
 func readConfigBytes() ([]byte, string, error) {
 	if envPath := os.Getenv("BUTLER_CONFIG_PATH"); envPath != "" {
+		// #nosec G304,G703 -- the deployment operator explicitly controls this
+		// configuration mount path; Butler never derives it from a network request.
 		data, err := os.ReadFile(envPath)
 		if err == nil {
 			return data, envPath, nil

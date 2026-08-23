@@ -183,8 +183,8 @@ func TestCICheckReportingModeGeneratesEveryReportThroughPinnedTools(t *testing.T
 	for _, fragment := range []string{
 		"gotestsum --format standard-quiet --junitfile " + filepath.Join(repo, "test-results", "homelabctl.xml"),
 		"gosec -track-suppressions -fmt sarif -out " + filepath.Join(repo, "sarif", "gosec-services-butler.sarif"),
-		"docker run --rm --volume " + repo + ":/workspace --workdir /workspace " + trivyImage + " fs --cache-dir /workspace/trivy-cache --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --format sarif --output /workspace/sarif/trivy.sarif",
-		"docker run --rm --volume " + repo + ":/workspace --workdir /workspace " + trivyImage + " fs --cache-dir /workspace/trivy-cache --format spdx-json --output /workspace/sbom/homelab.spdx.json",
+		"docker run --rm --volume " + repo + ":/workspace:ro --volume " + filepath.Join(repo, "sarif") + ":/reports --volume " + filepath.Join(repo, "trivy-cache") + ":/cache --workdir /workspace " + trivyImage + " fs --cache-dir /cache --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --format sarif --output /reports/trivy.sarif",
+		"docker run --rm --volume " + repo + ":/workspace:ro --volume " + filepath.Join(repo, "sbom") + ":/reports --volume " + filepath.Join(repo, "trivy-cache") + ":/cache --workdir /workspace " + trivyImage + " fs --cache-dir /cache --format spdx-json --output /reports/homelab.spdx.json",
 	} {
 		if !strings.Contains(stderr.String(), fragment) {
 			t.Errorf("reporting dry-run %q does not contain %q", stderr.String(), fragment)

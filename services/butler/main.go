@@ -93,8 +93,9 @@ func main() {
 
 	// Start HTTP server.
 	httpSrv := &http.Server{
-		Addr:    ":" + cfg.Server.Port,
-		Handler: srv,
+		Addr:              ":" + cfg.Server.Port,
+		Handler:           srv,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {

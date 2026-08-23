@@ -135,6 +135,8 @@ func validatePublicKeyFile(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolving public key path: %w", err)
 	}
+	// #nosec G304 -- this is an explicit operator-supplied public-key path; its
+	// contents and supported key type are validated before any SSH invocation.
 	content, err := os.ReadFile(resolved)
 	if err != nil {
 		return "", fmt.Errorf("reading public key: %w", err)

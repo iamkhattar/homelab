@@ -55,6 +55,8 @@ func ValidateDirectory(root string) error {
 
 	var problems []error
 	for _, path := range paths {
+		// #nosec G304 -- every path comes from the fixed .github/workflows glob
+		// under the already validated repository root.
 		contents, err := os.ReadFile(path)
 		if err != nil {
 			problems = append(problems, fmt.Errorf("reading %s: %w", path, err))

@@ -49,7 +49,7 @@ func generateGoSecurityReports(cmd *cobra.Command, s *state) error {
 	if err != nil {
 		return err
 	}
-	_, err := ensureReportDirectory(s, sarifDirectory)
+	directory, err := ensureReportDirectory(s, sarifDirectory)
 	if err != nil {
 		return err
 	}
@@ -69,19 +69,22 @@ func generateGoSecurityReports(cmd *cobra.Command, s *state) error {
 }
 
 func generateTrivySecurityReport(cmd *cobra.Command, s *state) error {
-	directory, err := ensureReportDirectory(s, sarifDirectory)
+	_, err := ensureReportDirectory(s, sarifDirectory)
 	if err != nil {
 		return err
 	}
-	args := trivyContainerArguments(s)
+	if _, err := ensureReportDirectory(s, trivyCacheDirectory); err != nil {
+		return err
+	}
+	args := trivyContainerArguments(s, sarifDirectory)
 	args = append(args,
 		"fs",
-		"--cache-dir", "/workspace/"+trivyCacheDirectory,
+		"--cache-dir", "/cache",
 		"--scanners", "vuln,misconfig,secret",
 		"--severity", "HIGH,CRITICAL",
 		"--exit-code", "1",
 		"--format", "sarif",
-		"--output", "/workspace/"+sarifDirectory+"/trivy.sarif",
+		"--output", "/reports/trivy.sarif",
 	)
 	args = append(args, trivySkipArguments()...)
 	args = append(args, "/workspace")
@@ -93,22 +96,27 @@ func generateSBOM(cmd *cobra.Command, s *state) error {
 	if err != nil {
 		return err
 	}
-	args := trivyContainerArguments(s)
+	if _, err := ensureReportDirectory(s, trivyCacheDirectory); err != nil {
+		return err
+	}
+	args := trivyContainerArguments(s, sbomDirectory)
 	args = append(args,
 		"fs",
-		"--cache-dir", "/workspace/"+trivyCacheDirectory,
+		"--cache-dir", "/cache",
 		"--format", "spdx-json",
-		"--output", "/workspace/"+sbomDirectory+"/homelab.spdx.json",
+		"--output", "/reports/homelab.spdx.json",
 	)
 	args = append(args, trivySkipArguments()...)
 	args = append(args, "/workspace")
 	return s.run(cmd.Context(), s.root, "docker", args...)
 }
 
-func trivyContainerArguments(s *state) []string {
+func trivyContainerArguments(s *state, reportDirectory string) []string {
 	return []string{
 		"run", "--rm",
-		"--volume", s.root+":/workspace",
+		"--volume", s.root + ":/workspace:ro",
+		"--volume", s.dir(reportDirectory) + ":/reports",
+		"--volume", s.dir(trivyCacheDirectory) + ":/cache",
 		"--workdir", "/workspace",
 		trivyImage,
 	}
@@ -131,7 +139,7 @@ func ensureReportDirectory(s *state, name string) (string, error) {
 	if s.dryRun {
 		return path, nil
 	}
-	if err := os.MkdirAll(path, 0o755); err != nil {
+	if err := os.MkdirAll(path, 0o750); err != nil {
 		return "", fmt.Errorf("creating report directory %s: %w", path, err)
 	}
 	return path, nil

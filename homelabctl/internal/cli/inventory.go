@@ -67,14 +67,18 @@ func newInventoryCommand(s *state) *cobra.Command {
 }
 
 func copyExclusive(source, destination string) error {
+	// #nosec G304 -- both paths are fixed inventory files resolved beneath the
+	// validated repository root by inventory init.
 	in, err := os.Open(source)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
-	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(destination), 0o750); err != nil {
 		return err
 	}
+	// #nosec G304 -- destination is the fixed private inventory path and O_EXCL
+	// prevents following an existing file into an overwrite.
 	out, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return err
