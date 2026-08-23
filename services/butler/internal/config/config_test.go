@@ -17,7 +17,7 @@ k8sIssuance:
 	if err := yaml.Unmarshal(input, &cfg); err != nil {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
-	if got, want := cfg.K8sIssuance.TokenReviewerSecret, "vault-k8s-token-reviewer-token"; got != want {
-		t.Fatalf("TokenReviewerSecret = %q, want %q", got, want)
+	if got, want := cfg.K8sIssuance.TokenReviewerRef, "vault-k8s-token-reviewer-token"; got != want {
+		t.Fatalf("TokenReviewerRef = %q, want %q", got, want)
 	}
 }

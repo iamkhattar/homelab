@@ -113,7 +113,7 @@ func buildK8sEngineConfig(cfg *config.Config) vault.K8sEngineConfig {
 		HostNamespace:          cfg.K8sIssuance.HostNamespace,
 		TokenReviewerNamespace: cfg.K8sIssuance.TokenReviewerNamespace,
 		TokenReviewerSA:        cfg.K8sIssuance.TokenReviewerSA,
-		TokenReviewerSecret:    cfg.K8sIssuance.TokenReviewerSecret,
+		TokenReviewerSecret:    cfg.K8sIssuance.TokenReviewerRef,
 		Roles:                  roles,
 	}
 }
