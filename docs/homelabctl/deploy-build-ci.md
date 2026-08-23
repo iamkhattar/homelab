@@ -234,11 +234,12 @@ database indefinitely.
 
 The filesystem scan excludes generated controller dependencies and build
 output: the Ansible virtual environment and downloaded collections, Terraform
-provider cache, npm modules, VitePress cache/output, compiled `bin/` artifacts
-and report directories. Their committed manifests and lockfiles remain in
-scope, as do homelab code, Dockerfiles, Terraform source, Helm charts and the
-VitePress configuration and custom components. This prevents upstream Ansible
-integration-test fixtures from being reported as if they were homelab source.
+provider cache, downloaded Helm dependency `charts/` directories, npm modules,
+VitePress cache/output, compiled `bin/` artifacts and report directories. Their
+committed manifests and lockfiles remain in scope, as do homelab code,
+Dockerfiles, Terraform source, first-party Helm templates and the VitePress
+configuration and custom components. This prevents vendored upstream fixtures
+or charts from being reported as if they were homelab source.
 
 The Trivy stage first writes unfiltered SARIF without allowing a finding to
 interrupt report generation. It then repeats the same scan with the warm cache,
@@ -249,11 +250,12 @@ the complete SARIF remains available for code scanning.
 
 The gating pass reads the root `.trivyignore.yaml`. It is a reviewed baseline,
 not a global rule disable: each exception specifies an exact finding ID, exact
-repository paths, a rationale and an expiry date. The table requests suppressed
-results so accepted debt remains visible in CI, while new findings and expired
-exceptions fail the job. The initial baseline expires on 30 November 2026 and
-covers only workload security contexts that need runtime validation on Titan,
-the Zigbee USB privilege transition, the database operator's intentional
+repository paths, a rationale and an expiry date. The table omits accepted
+findings from this baseline, while new findings and expired exceptions fail the
+job. Accepted debt remains visible in the unfiltered SARIF and in the baseline
+file's required statements. The initial baseline expires on 30 November 2026
+and covers only workload security contexts that need runtime validation on
+Titan, the Zigbee USB privilege transition, the database operator's intentional
 Service lifecycle permission and a Butler false positive where a ConfigMap
 stores a Kubernetes Secret object name rather than secret material.
 

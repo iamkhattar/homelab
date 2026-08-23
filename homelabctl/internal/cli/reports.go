@@ -104,7 +104,6 @@ func generateTrivySecurityReport(cmd *cobra.Command, s *state) error {
 		"--exit-code", "1",
 		"--format", "table",
 		"--ignorefile", "/workspace/.trivyignore.yaml",
-		"--show-suppressed",
 	)
 	tableArgs = append(tableArgs, trivySkipArguments()...)
 	tableArgs = append(tableArgs, "/workspace")
@@ -149,6 +148,7 @@ func trivySkipArguments() []string {
 		"--skip-dirs", "ansible/.venv",
 		"--skip-dirs", "ansible/collections",
 		"--skip-dirs", "bin",
+		"--skip-dirs", "cluster/**/charts",
 		"--skip-dirs", "docs/node_modules",
 		"--skip-dirs", "docs/.vitepress/cache",
 		"--skip-dirs", "docs/.vitepress/dist",

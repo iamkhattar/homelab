@@ -86,7 +86,8 @@ checkout mount plus narrowly writable report and cache mounts. Its SARIF pass
 is followed by a cached table-format pass: the table makes findings actionable
 in the job log and its exit status enforces the HIGH/CRITICAL gate. SARIF stays
 unfiltered. Only the table/gating pass applies the path-scoped, documented and
-expiring entries in `.trivyignore.yaml`, with suppressed findings still shown.
+expiring entries in `.trivyignore.yaml`; accepted findings remain present in
+SARIF and are explained in the baseline file.
 
 Gosec suppressions must be local, rule-specific and include a justification.
 Suppression tracking remains enabled in SARIF. The current exceptions cover the

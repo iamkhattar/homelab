@@ -184,9 +184,9 @@ func TestCICheckReportingModeGeneratesEveryReportThroughPinnedTools(t *testing.T
 		"gotestsum --format standard-quiet --junitfile " + filepath.Join(repo, "test-results", "homelabctl.xml"),
 		"gosec -track-suppressions -fmt sarif -out " + filepath.Join(repo, "sarif", "gosec-services-butler.sarif"),
 		"docker run --rm --volume " + repo + ":/workspace:ro --volume " + filepath.Join(repo, "sarif") + ":/reports --volume " + filepath.Join(repo, "trivy-cache") + ":/cache --workdir /workspace " + trivyImage + " fs --cache-dir /cache --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 0 --format sarif --output /reports/trivy.sarif",
-		"docker run --rm --volume " + repo + ":/workspace:ro --volume " + filepath.Join(repo, "sarif") + ":/reports --volume " + filepath.Join(repo, "trivy-cache") + ":/cache --workdir /workspace " + trivyImage + " fs --cache-dir /cache --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --format table --ignorefile /workspace/.trivyignore.yaml --show-suppressed",
+		"docker run --rm --volume " + repo + ":/workspace:ro --volume " + filepath.Join(repo, "sarif") + ":/reports --volume " + filepath.Join(repo, "trivy-cache") + ":/cache --workdir /workspace " + trivyImage + " fs --cache-dir /cache --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --format table --ignorefile /workspace/.trivyignore.yaml",
 		"docker run --rm --volume " + repo + ":/workspace:ro --volume " + filepath.Join(repo, "sbom") + ":/reports --volume " + filepath.Join(repo, "trivy-cache") + ":/cache --workdir /workspace " + trivyImage + " fs --cache-dir /cache --format spdx-json --output /reports/homelab.spdx.json",
-		"--skip-dirs ansible/.ansible --skip-dirs ansible/.venv --skip-dirs ansible/collections --skip-dirs bin",
+		"--skip-dirs ansible/.ansible --skip-dirs ansible/.venv --skip-dirs ansible/collections --skip-dirs bin --skip-dirs \"cluster/**/charts\"",
 		"--skip-dirs docs/node_modules --skip-dirs docs/.vitepress/cache --skip-dirs docs/.vitepress/dist --skip-dirs infra/.terraform --skip-dirs node_modules",
 	} {
 		if !strings.Contains(stderr.String(), fragment) {
