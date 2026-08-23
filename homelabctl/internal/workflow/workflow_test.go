@@ -80,6 +80,34 @@ func TestValidateDirectoryRejectsBrokenCIContracts(t *testing.T) {
 			wantInError: "must generate reports",
 		},
 		{
+			name: "workflow disables Go cache",
+			transform: func(input string) string {
+				return strings.Replace(input, "          cache: true", "          cache: false", 1)
+			},
+			wantInError: "must explicitly cache Go modules and build output",
+		},
+		{
+			name: "workflow omits Butler from Go cache key",
+			transform: func(input string) string {
+				return strings.Replace(input, "            services/butler/go.sum\n", "", 1)
+			},
+			wantInError: "must explicitly cache Go modules and build output",
+		},
+		{
+			name: "workflow omits Ansible runtime restore",
+			transform: func(input string) string {
+				return strings.Replace(input, "actions/cache/restore@v6", "example.invalid/no-cache-restore@v6", 1)
+			},
+			wantInError: "must restore the pinned Ansible runtime",
+		},
+		{
+			name: "workflow omits Ansible runtime save",
+			transform: func(input string) string {
+				return strings.Replace(input, "actions/cache/save@v6", "example.invalid/no-cache-save@v6", 1)
+			},
+			wantInError: "must save a missing Ansible runtime",
+		},
+		{
 			name: "workflow omits report artifacts",
 			transform: func(input string) string {
 				return strings.Replace(input, "actions/upload-artifact@v7", "example.invalid/no-upload@v7", 1)
@@ -263,6 +291,32 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: |
+            homelabctl/go.sum
+            services/butler/go.sum
+      - id: ansible-runtime-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ansible/.venv
+            ansible/collections
+          key: ansible-${{ runner.os }}-${{ runner.arch }}-py3.13-${{ hashFiles('ansible/requirements.txt', 'ansible/requirements.yml') }}
+      - if: steps.ansible-runtime-cache.outputs.cache-hit != 'true'
+        run: bin/homelabctl setup ansible
+      - if: steps.ansible-runtime-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ansible/.venv
+            ansible/collections
+          key: ${{ steps.ansible-runtime-cache.outputs.cache-primary-key }}
+      - run: |
+          bin/homelabctl setup docs
+          bin/homelabctl setup reports
       - run: |
           bin/homelabctl ci check --reports
       - if: always()

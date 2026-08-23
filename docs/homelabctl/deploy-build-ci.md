@@ -321,6 +321,19 @@ pushes them after authentication. In parallel after checks, a main-only release
 job uses that same version with the pinned GoReleaser action to publish static
 `homelabctl` archives and `checksums.txt`.
 
+Every `actions/setup-go` step enables its module and build-output cache
+explicitly. The check job keys that cache from both `homelabctl/go.sum` and
+`services/butler/go.sum`; image-publication and release jobs key their local CLI
+build from `homelabctl/go.sum`. Cache misses affect duration, never correctness.
+
+The check job also restores `ansible/.venv` and `ansible/collections` from an
+exact operating-system, architecture, Python-version and requirements hash. On
+a cache hit, CI skips `homelabctl setup ansible`; on a miss, it installs through
+homelabctl and saves the completed runtime immediately, before any test or scan
+can fail the job. Documentation and reporting setup still run every time: npm
+and setup-go provide their package/build caches, while the commands continue to
+verify their locked dependency contracts.
+
 `homelabctl ci check --only workflows` parses every workflow and enforces the
 local contract: read-only default permissions, concurrency cancellation,
 bounded job timeouts, full Git history for merge-base selection, check-before-

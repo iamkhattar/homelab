@@ -83,6 +83,8 @@ var majorVersionPattern = regexp.MustCompile(`@v([0-9]+)(?:\.|$)`)
 const pinnedGoReleaserAction = "goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94"
 
 var minimumActionMajors = map[string]int{
+	"actions/cache/restore":             6,
+	"actions/cache/save":                6,
 	"actions/checkout":                  7,
 	"actions/upload-artifact":           7,
 	"actions/setup-go":                  7,
@@ -166,6 +168,24 @@ func validateCI(path string, workflow definition) []error {
 		validateJob(path, "check", check, &problems)
 		if value(check.Permissions["security-events"]) != "write" {
 			problem("check job must grant security-events: write for SARIF upload")
+		}
+		setupGo, found := findUses(check.Steps, "actions/setup-go@")
+		goCacheDependencies := value(setupGo.With["cache-dependency-path"])
+		if !found || value(setupGo.With["cache"]) != "true" || !strings.Contains(goCacheDependencies, "homelabctl/go.sum") || !strings.Contains(goCacheDependencies, "services/butler/go.sum") {
+			problem("check job must explicitly cache Go modules and build output for every Go module")
+		}
+		ansibleRestore, restored := findUses(check.Steps, "actions/cache/restore@")
+		ansibleSave, saved := findUses(check.Steps, "actions/cache/save@")
+		ansibleCachePaths := value(ansibleRestore.With["path"])
+		ansibleCacheKey := value(ansibleRestore.With["key"])
+		if !restored || !strings.Contains(ansibleCachePaths, "ansible/.venv") || !strings.Contains(ansibleCachePaths, "ansible/collections") || !strings.Contains(ansibleCacheKey, "ansible/requirements.txt") || !strings.Contains(ansibleCacheKey, "ansible/requirements.yml") {
+			problem("check job must restore the pinned Ansible runtime using both requirements files")
+		}
+		if !saved || !strings.Contains(ansibleSave.If, "cache-hit != 'true'") || value(ansibleSave.With["key"]) != "${{ steps.ansible-runtime-cache.outputs.cache-primary-key }}" {
+			problem("check job must save a missing Ansible runtime before repository checks")
+		}
+		if !hasRun(check.Steps, "bin/homelabctl setup ansible") || !hasRun(check.Steps, "bin/homelabctl setup docs") || !hasRun(check.Steps, "bin/homelabctl setup reports") {
+			problem("check job must install Ansible, docs and reporting dependencies through homelabctl")
 		}
 		if !hasRun(check.Steps, "bin/homelabctl ci check", "--reports") {
 			problem("check job must generate reports through bin/homelabctl ci check --reports")

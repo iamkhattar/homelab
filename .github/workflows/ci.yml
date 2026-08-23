@@ -35,6 +35,7 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
           cache-dependency-path: |
             homelabctl/go.sum
             services/butler/go.sum
@@ -62,8 +63,32 @@ jobs:
         run: go build -trimpath -o "$GITHUB_WORKSPACE/bin/homelabctl" ./cmd/homelabctl
         working-directory: homelabctl
 
-      - name: Install repository dependencies
-        run: bin/homelabctl setup
+      - name: Restore pinned Ansible runtime
+        id: ansible-runtime-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ansible/.venv
+            ansible/collections
+          key: ansible-${{ runner.os }}-${{ runner.arch }}-py3.13-${{ hashFiles('ansible/requirements.txt', 'ansible/requirements.yml') }}
+
+      - name: Install Ansible dependencies
+        if: steps.ansible-runtime-cache.outputs.cache-hit != 'true'
+        run: bin/homelabctl setup ansible
+
+      - name: Save pinned Ansible runtime
+        if: steps.ansible-runtime-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ansible/.venv
+            ansible/collections
+          key: ${{ steps.ansible-runtime-cache.outputs.cache-primary-key }}
+
+      - name: Install documentation and reporting dependencies
+        run: |
+          bin/homelabctl setup docs
+          bin/homelabctl setup reports
 
       - name: Run repository checks
         run: bin/homelabctl ci check --reports
@@ -117,6 +142,7 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
           cache-dependency-path: homelabctl/go.sum
 
       - name: Build homelabctl
@@ -167,6 +193,7 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
           cache-dependency-path: homelabctl/go.sum
 
       - name: Create immutable GitHub release
