@@ -91,7 +91,14 @@ func TestValidateDirectoryRejectsBrokenCIContracts(t *testing.T) {
 			transform: func(input string) string {
 				return strings.Replace(input, "github/codeql-action/upload-sarif@v4", "example.invalid/no-sarif@v4", 1)
 			},
-			wantInError: "must upload homelabctl-generated SARIF",
+			wantInError: "must upload each homelabctl-generated SARIF file separately",
+		},
+		{
+			name: "workflow reuses SARIF category",
+			transform: func(input string) string {
+				return strings.Replace(input, "category: gosec-services-butler", "category: gosec-homelabctl", 1)
+			},
+			wantInError: "unique category gosec-services-butler",
 		},
 		{
 			name: "publishes without CI guard",
@@ -268,7 +275,18 @@ jobs:
       - if: always()
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: sarif
+          sarif_file: sarif/gosec-homelabctl.sarif
+          category: gosec-homelabctl
+      - if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif/gosec-services-butler.sarif
+          category: gosec-services-butler
+      - if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif/trivy.sarif
+          category: trivy-repository
   publish:
     needs: check
     runs-on: ubuntu-latest

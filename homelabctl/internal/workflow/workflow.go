@@ -177,9 +177,35 @@ func validateCI(path string, workflow definition) []error {
 		if !found || !strings.Contains(artifactStep.If, "always()") || !strings.Contains(value(artifactStep.With["path"]), "test-results/") || !strings.Contains(value(artifactStep.With["path"]), "sarif/") || !strings.Contains(value(artifactStep.With["path"]), "sbom/") {
 			problem("check job must upload test, SARIF and SBOM report directories")
 		}
-		sarifStep, found := findUses(check.Steps, "github/codeql-action/upload-sarif@")
-		if !found || !strings.Contains(sarifStep.If, "always()") || value(sarifStep.With["sarif_file"]) != "sarif" {
-			problem("check job must upload homelabctl-generated SARIF to code scanning")
+		type sarifUpload struct {
+			path     string
+			category string
+		}
+		requiredUploads := []sarifUpload{
+			{path: "sarif/gosec-homelabctl.sarif", category: "gosec-homelabctl"},
+			{path: "sarif/gosec-services-butler.sarif", category: "gosec-services-butler"},
+			{path: "sarif/trivy.sarif", category: "trivy-repository"},
+		}
+		var sarifSteps []step
+		for _, candidate := range check.Steps {
+			if strings.HasPrefix(candidate.Uses, "github/codeql-action/upload-sarif@") {
+				sarifSteps = append(sarifSteps, candidate)
+			}
+		}
+		if len(sarifSteps) != len(requiredUploads) {
+			problem("check job must upload each homelabctl-generated SARIF file separately")
+		}
+		for _, required := range requiredUploads {
+			found := false
+			for _, candidate := range sarifSteps {
+				if value(candidate.With["sarif_file"]) == required.path && value(candidate.With["category"]) == required.category && strings.Contains(candidate.If, "always()") {
+					found = true
+					break
+				}
+			}
+			if !found {
+				problem("check job must upload %s with unique category %s", required.path, required.category)
+			}
 		}
 	}
 

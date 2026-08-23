@@ -16,7 +16,7 @@ const (
 	sarifDirectory       = "sarif"
 	sbomDirectory        = "sbom"
 	trivyCacheDirectory  = "trivy-cache"
-	trivyImage           = "ghcr.io/aquasecurity/trivy:0.73.0@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c"
+	trivyImage           = "ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969"
 )
 
 func generateGoTestReports(cmd *cobra.Command, s *state, modules []string) error {
@@ -119,6 +119,7 @@ func trivyContainerArguments(s *state, reportDirectory string) []string {
 		"--volume", s.dir(trivyCacheDirectory) + ":/cache",
 		"--workdir", "/workspace",
 		trivyImage,
+		"--skip-version-check",
 	}
 }
 

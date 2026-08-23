@@ -219,7 +219,9 @@ paths are stable and Git-ignored:
 | `sbom/homelab.spdx.json` | Repository-wide SPDX JSON software bill of materials | Report artifact and downstream tooling |
 
 `gotestsum` and `gosec` are installed from exact Go module versions. Trivy
-runs from `ghcr.io/aquasecurity/trivy:0.73.0` pinned to an immutable digest.
+runs from `ghcr.io/aquasecurity/trivy:0.74.0` pinned to an immutable digest;
+its version-notice check is disabled because upgrades are reviewed and pinned
+in this repository rather than selected dynamically during CI.
 The checkout is mounted read-only at `/workspace`; only `sarif/`, `sbom/` and
 the ignored `trivy-cache/` receive writable mounts. The cache avoids downloading
 the vulnerability databases twice during the security and SBOM stages.
@@ -227,7 +229,10 @@ the vulnerability databases twice during the security and SBOM stages.
 Security findings are gating failures. The aggregate runner continues after a
 failed stage, however, so all possible reports are produced. GitHub Actions
 uses `if: always()` to retain `test-results/`, `sarif/` and `sbom/` for 14 days
-even when checks fail, and uploads SARIF to code scanning when the event has
+even when checks fail. Each SARIF file is uploaded separately with a stable,
+unique category (`gosec-homelabctl`, `gosec-services-butler` or
+`trivy-repository`) because GitHub treats each as an independent analysis. The
+workflow uploads SARIF to code scanning when the event has
 permission. Fork pull requests still receive the downloadable artifact but do
 not receive elevated `security-events` access.
 

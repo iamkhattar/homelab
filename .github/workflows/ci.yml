@@ -82,12 +82,26 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Upload security findings to code scanning
-        if: ${{ always() && hashFiles('sarif/*.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+      - name: Upload homelabctl gosec findings
+        if: ${{ always() && hashFiles('sarif/gosec-homelabctl.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: sarif
-          category: homelabctl
+          sarif_file: sarif/gosec-homelabctl.sarif
+          category: gosec-homelabctl
+
+      - name: Upload Butler gosec findings
+        if: ${{ always() && hashFiles('sarif/gosec-services-butler.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif/gosec-services-butler.sarif
+          category: gosec-services-butler
+
+      - name: Upload Trivy findings
+        if: ${{ always() && hashFiles('sarif/trivy.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif/trivy.sarif
+          category: trivy-repository
 
   publish:
     name: Build container images
