@@ -196,7 +196,7 @@ func doctorRepository(t *testing.T) string {
 func fakeDoctorTools(t *testing.T, goVersion, nodeVersion string) string {
 	t.Helper()
 	directory := t.TempDir()
-	for _, name := range []string{"npm", "ssh", "ssh-copy-id", "ansible-playbook", "ansible-lint", "kubectl", "helm", "helmfile", "terraform", "docker"} {
+	for _, name := range []string{"npm", "ssh", "ssh-copy-id", "ansible-playbook", "ansible-lint", "kubectl", "helm", "helmfile", "terraform", "docker", "gotestsum", "gosec"} {
 		writeExecutable(t, filepath.Join(directory, name), "#!/bin/sh\nexit 0\n")
 	}
 	writeExecutable(t, filepath.Join(directory, "go"), "#!/bin/sh\nprintf '%s\\n' '"+goVersion+"'\n")

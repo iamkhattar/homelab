@@ -299,8 +299,10 @@ publication therefore remains visible in workflow source.
 ## GitHub Actions flow
 
 The workflow bootstraps the CLI, then uses it to install repository dependencies
-and run checks. Pull requests invoke `homelabctl ci build` without pushing. The
-main branch invokes `homelabctl ci publish` with the shared semantic version,
+and run `homelabctl ci check --reports`. It uploads portable reports before any
+later build or release activity. Pull requests invoke `homelabctl ci build`
+without pushing. The main branch invokes `homelabctl ci publish` with the
+shared semantic version,
 immutable revision and `latest` tags for services, homelabctl and docs, then
 pushes them after authentication. In parallel after checks, a main-only release
 job uses that same version with the pinned GoReleaser action to publish static
@@ -311,9 +313,10 @@ local contract: read-only default permissions, concurrency cancellation,
 bounded job timeouts, full Git history for merge-base selection, check-before-
 publish/release ordering, SHA-tagged PR builds, CI-gated main publication,
 main-only release execution, least-privilege release permissions, one shared
-immutable semantic release version, and the absence of deploy, Terraform apply/destroy,
-Helmfile apply/sync and kubectl apply commands. GitHub remains responsible for
-validating its complete Actions schema.
+immutable semantic release version, required report/SARIF uploads, and the
+absence of deploy, Terraform apply/destroy, Helmfile apply/sync and kubectl
+apply commands. GitHub remains responsible for validating its complete Actions
+schema.
 
 Image publication is not deployment. Titan is not automatically mutated by the
 current workflow. Deployment remains an explicit top-level operation:

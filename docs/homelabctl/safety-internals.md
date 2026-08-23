@@ -84,6 +84,11 @@ inside workflow YAML. `homelabctl ci check --reports` constructs JUnit, raw test
 JSON, gosec SARIF, Trivy SARIF and SPDX output. Trivy receives a read-only
 checkout mount plus narrowly writable report and cache mounts.
 
+Gosec suppressions must be local, rule-specific and include a justification.
+Suppression tracking remains enabled in SARIF. The current exceptions cover the
+audited subprocess runner, fixed repository paths and explicit operator-selected
+configuration/public-key files; they do not globally disable a rule.
+
 Dry-run tests prove validation and command construction. They deliberately do
 not claim that a remote Debian node, registry, cloud account or Kubernetes API
 is available; Ansible syntax checks, Terraform tests and explicit operator

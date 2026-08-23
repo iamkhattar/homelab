@@ -20,7 +20,7 @@ func newDoctorCommand(s *state) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			s.heading("Operator environment")
-			tools := []string{"go", "node", "npm", "ssh", "ssh-copy-id", "ansible-playbook", "ansible-lint", "kubectl", "helm", "helmfile", "terraform", "docker"}
+			tools := []string{"go", "node", "npm", "ssh", "ssh-copy-id", "ansible-playbook", "ansible-lint", "kubectl", "helm", "helmfile", "terraform", "docker", "gotestsum", "gosec"}
 			missing := 0
 			for _, tool := range tools {
 				path, err := s.runner.LookPath(tool)

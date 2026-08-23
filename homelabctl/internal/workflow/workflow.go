@@ -174,11 +174,11 @@ func validateCI(path string, workflow definition) []error {
 			problem("check job must not skip Go tests")
 		}
 		artifactStep, found := findUses(check.Steps, "actions/upload-artifact@")
-		if !found || !strings.Contains(value(artifactStep.With["path"]), "test-results/") || !strings.Contains(value(artifactStep.With["path"]), "sarif/") || !strings.Contains(value(artifactStep.With["path"]), "sbom/") {
+		if !found || !strings.Contains(artifactStep.If, "always()") || !strings.Contains(value(artifactStep.With["path"]), "test-results/") || !strings.Contains(value(artifactStep.With["path"]), "sarif/") || !strings.Contains(value(artifactStep.With["path"]), "sbom/") {
 			problem("check job must upload test, SARIF and SBOM report directories")
 		}
 		sarifStep, found := findUses(check.Steps, "github/codeql-action/upload-sarif@")
-		if !found || value(sarifStep.With["sarif_file"]) != "sarif" {
+		if !found || !strings.Contains(sarifStep.If, "always()") || value(sarifStep.With["sarif_file"]) != "sarif" {
 			problem("check job must upload homelabctl-generated SARIF to code scanning")
 		}
 	}
