@@ -1,0 +1,16 @@
+# Managed by Ansible. Change homelab_base variables instead of editing this file.
+# This file is sourced by interactive login shells through /etc/profile.
+case $- in
+  *i*) ;;
+  *) return ;;
+esac
+
+if [ -n "${BASH_VERSION:-}" ]; then
+  if [ "${TERM:-dumb}" = "dumb" ]; then
+    PS1='[{{ homelab_base_shell_prompt_environment }} | \h] \u:\w \\$ '
+  elif [ "$(id -u)" -eq 0 ]; then
+    PS1='\[\033[1;31m\][{{ homelab_base_shell_prompt_environment }} | \h]\[\033[0m\] \u:\w \\$ '
+  else
+    PS1='\[\033[1;32m\][{{ homelab_base_shell_prompt_environment }} | \h]\[\033[0m\] \u:\w \\$ '
+  fi
+fi

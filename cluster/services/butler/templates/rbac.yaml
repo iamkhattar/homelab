@@ -7,6 +7,9 @@ metadata:
     app.kubernetes.io/name: {{ .Release.Name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 ---
+# Secrets in the release namespace: butler manages butler-vault-init and
+# (Phase 5+) the cleanup of stale per-app credential staging Secrets, so
+# it needs full CRUD plus list/watch.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -18,7 +21,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["get", "create", "update"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -32,6 +35,48 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: {{ .Release.Name }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.serviceAccount.name }}
+    namespace: {{ .Release.Namespace }}
+---
+# Butler publishes the homelab CA bundle as a ConfigMap in kube-system so any
+# pod cluster-wide can mount it. A scoped Role+RoleBinding in kube-system is
+# enough — no ClusterRole needed.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-ca-publisher
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+    resourceNames:
+      - homelab-ca-bundle
+  # Allow create of configmaps cluster-wide for the first publish; the
+  # resourceNames filter above only applies to verbs targeting an existing
+  # named resource. Create is namespace-scoped via this Role being in
+  # kube-system, so this is still least-privilege.
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-ca-publisher
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-ca-publisher
 subjects:
   - kind: ServiceAccount
     name: {{ .Values.serviceAccount.name }}

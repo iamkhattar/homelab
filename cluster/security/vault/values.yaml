@@ -6,6 +6,13 @@ vault:
     dataStorage:
       enabled: true
       size: 5Gi
+    # Mounts an emptyDir/PVC at /vault/audit so butler can enable the file
+    # audit device. Butler writes audit logs here; promtail (later) ships them
+    # to Loki.
+    auditStorage:
+      enabled: true
+      size: 2Gi
+      mountPath: /vault/audit
     standalone:
       enabled: true
       config: |

@@ -1,15 +1,13 @@
 ---
-# Servers should be restarted sequientally to avoid etcd learner issues
-# Agents have no such limitation
-- name: Upgrade K3s Servers
-  hosts: server
-  become: true
-  serial: 1
-  roles:
-    - role: k3s_upgrade
+- name: Upgrade K3s servers and agents
+  ansible.builtin.import_playbook: k3s.orchestration.upgrade
 
-- name: Upgrade K3s Agents
-  hosts: agent
+- name: Verify the upgraded cluster
+  hosts: "server[0]"
+  gather_facts: false
   become: true
-  roles:
-    - role: k3s_upgrade
+  tasks:
+    - name: Wait for all Kubernetes nodes to become ready
+      ansible.builtin.command:
+        cmd: k3s kubectl wait --for=condition=Ready node --all --timeout=180s
+      changed_when: false

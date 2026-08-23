@@ -1,0 +1,204 @@
+---
+- name: Validate the managed operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_version.full is version('2.15', '>=')
+      - ansible_distribution == 'Debian'
+      - ansible_distribution_major_version in ['12', '13']
+    fail_msg: >-
+      The homelab base role supports Debian 12 and 13 and requires
+      ansible-core 2.15 or newer.
+
+- name: Update the apt package cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+    lock_timeout: 120
+
+- name: Apply available package upgrades
+  when: homelab_base_apply_package_upgrades | bool
+  ansible.builtin.apt:
+    upgrade: dist
+    lock_timeout: 120
+
+- name: Install base administration and security packages
+  ansible.builtin.apt:
+    name: "{{ homelab_base_packages }}"
+    state: present
+    lock_timeout: 120
+
+- name: Gather service state for network safety checks
+  ansible.builtin.service_facts:
+
+- name: Refuse an unmanaged active host firewall
+  when: not (manage_firewall | default(false) | bool)
+  ansible.builtin.assert:
+    that:
+      - >-
+        ansible_facts.services['ufw.service'] is not defined or
+        ansible_facts.services['ufw.service'].state != 'running'
+      - >-
+        ansible_facts.services['ufw'] is not defined or
+        ansible_facts.services['ufw'].state != 'running'
+      - >-
+        ansible_facts.services['firewalld.service'] is not defined or
+        ansible_facts.services['firewalld.service'].state != 'running'
+      - >-
+        ansible_facts.services['nftables.service'] is not defined or
+        ansible_facts.services['nftables.service'].state != 'running'
+    fail_msg: >-
+      An active host firewall was detected, but this inventory does not manage
+      one yet. Disable it before installing K3s; a CIDR-aware firewall policy
+      will be introduced with Tailscale before remote agents are joined.
+
+- name: Configure the system hostname
+  when: homelab_base_manage_hostname | bool
+  ansible.builtin.hostname:
+    name: "{{ homelab_base_hostname }}"
+    use: systemd
+
+- name: Keep the local hostname resolvable
+  when: homelab_base_manage_hostname | bool
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\s+'
+    line: "127.0.1.1 {{ homelab_base_hostname }}"
+    state: present
+
+- name: Configure the system timezone
+  community.general.timezone:
+    name: "{{ homelab_base_timezone }}"
+
+- name: Install the homelab shell prompt
+  when: homelab_base_shell_prompt_enabled | bool
+  ansible.builtin.template:
+    src: homelab-prompt.sh.j2
+    dest: /etc/profile.d/20-homelab-prompt.sh
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Remove the homelab shell prompt when disabled
+  when: not (homelab_base_shell_prompt_enabled | bool)
+  ansible.builtin.file:
+    path: /etc/profile.d/20-homelab-prompt.sh
+    state: absent
+
+- name: Ensure the administrator account has sudo access
+  ansible.builtin.user:
+    name: "{{ homelab_admin_user }}"
+    groups:
+      - sudo
+    append: true
+
+- name: Require an SSH public key before enabling hardening
+  when: homelab_ssh_hardening_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - homelab_admin_authorized_keys | length > 0
+      - homelab_ssh_allowed_users | length > 0
+    fail_msg: >-
+      Add at least one tested public key to homelab_admin_authorized_keys
+      before enabling SSH hardening.
+
+- name: Manage administrator SSH public keys
+  when: homelab_admin_authorized_keys | length > 0
+  ansible.posix.authorized_key:
+    user: "{{ homelab_admin_user }}"
+    key: "{{ homelab_admin_authorized_keys | join('\n') }}"
+    state: present
+    exclusive: true
+
+- name: Install hardened SSH server configuration
+  when: homelab_ssh_hardening_enabled | bool
+  ansible.builtin.template:
+    src: sshd-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/10-homelab-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Reload SSH
+
+- name: Disable active swap
+  when:
+    - homelab_base_disable_swap | bool
+    - ansible_swaptotal_mb > 0
+  ansible.builtin.command:
+    cmd: swapoff --all
+  changed_when: true
+
+- name: Disable persistent swap entries
+  when: homelab_base_disable_swap | bool
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^(\s*[^#\n]+\s+\S+\s+swap\s+.*)$'
+    replace: '# \1'
+
+- name: Prevent sleep and hibernation
+  when: homelab_base_disable_sleep | bool
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    masked: true
+  loop:
+    - sleep.target
+    - suspend.target
+    - hibernate.target
+    - hybrid-sleep.target
+
+- name: Create journald configuration directory
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Bound persistent journal usage
+  ansible.builtin.template:
+    src: journald.conf.j2
+    dest: /etc/systemd/journald.conf.d/10-homelab.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart journald
+
+- name: Configure automatic package checks and security upgrades
+  ansible.builtin.copy:
+    src: 20auto-upgrades
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Disable unattended automatic reboots
+  ansible.builtin.copy:
+    src: 52homelab-unattended-upgrades
+    dest: /etc/apt/apt.conf.d/52homelab-unattended-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable time synchronization
+  ansible.builtin.systemd_service:
+    name: chrony
+    state: started
+    enabled: true
+
+- name: Enable periodic SSD trimming
+  ansible.builtin.systemd_service:
+    name: fstrim.timer
+    state: started
+    enabled: true
+
+- name: Check whether a reboot is required
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: homelab_base_reboot_required
+
+- name: Report a required reboot
+  when: homelab_base_reboot_required.stat.exists
+  ansible.builtin.debug:
+    msg: >-
+      Package upgrades require a reboot. Run homelabctl cluster reboot after
+      K3s is installed, or homelabctl node reboot before installing K3s.

@@ -7,209 +7,137 @@ on:
 
 permissions:
   contents: read
-  checks: write
-  security-events: write
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.25"
+  GO_VERSION: "1.27.0"
+  NODE_VERSION: "24"
+  TERRAFORM_VERSION: "1.14.6"
 
 jobs:
-  setup:
-    name: Setup
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: hl/go.sum
-
-      - name: Build hl
-        run: go build -o "$GITHUB_WORKSPACE/bin/hl" .
-        working-directory: hl
-
-      - name: Upload hl
-        uses: actions/upload-artifact@v4
-        with:
-          name: hl
-          path: bin/hl
-          retention-days: 1
-
   check:
     name: Check
-    needs: setup
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: hl/go.sum
+          cache-dependency-path: |
+            homelabctl/go.sum
+            services/butler/go.sum
 
-      - name: Download hl
-        uses: actions/download-artifact@v4
+      - name: Set up Node
+        uses: actions/setup-node@v7
         with:
-          name: hl
-          path: bin/
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
 
-      - name: Prepare hl
-        run: |
-          chmod +x bin/hl
-          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: ansible/requirements.txt
 
-      - name: Setup tools
-        run: hl ci setup helm helmfile terraform gotestsum golangci-lint ansible-lint
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
 
-      - name: Check
-        run: hl ci check
+      - name: Build homelabctl
+        run: go build -trimpath -o "$GITHUB_WORKSPACE/bin/homelabctl" ./cmd/homelabctl
+        working-directory: homelabctl
+
+      - name: Install repository dependencies
+        run: bin/homelabctl setup
+
+      - name: Run repository checks
+        run: bin/homelabctl ci check
         env:
           CI: "true"
 
-      - name: Lint SARIF (golangci-lint, ansible-lint)
-        if: always()
-        run: hl ci lint-sarif --output-dir "$GITHUB_WORKSPACE/sarif"
-
-      - name: Upload SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: sarif/
-          category: lint
-
-      - name: Upload test reports
-        if: always()
-        uses: dorny/test-reporter@v1
-        with:
-          name: Tests
-          path: test-results/*.xml
-          reporter: java-junit
-          fail-on-error: false
-
   publish:
-    name: Publish
-    needs: [check, gitleaks, sbom]
+    name: Build service images
+    needs: check
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: Download hl
-        uses: actions/download-artifact@v4
+      - name: Set up Go
+        uses: actions/setup-go@v7
         with:
-          name: hl
-          path: bin/
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: homelabctl/go.sum
 
-      - name: Prepare hl
-        run: |
-          chmod +x bin/hl
-          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
+      - name: Build homelabctl
+        run: go build -trimpath -o "$GITHUB_WORKSPACE/bin/homelabctl" ./cmd/homelabctl
+        working-directory: homelabctl
 
       - name: Log in to Docker Hub
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build images (PR)
+      - name: Build changed images
         if: github.event_name == 'pull_request'
         run: |
-          hl ci docker \
+          bin/homelabctl ci build \
             --changed \
             --base "origin/${{ github.base_ref }}" \
             --tag "${{ github.sha }}"
-        env:
-          CI: "true"
 
-      - name: Build and push images (main)
+      - name: Build and push changed images
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          hl ci docker \
+          bin/homelabctl ci publish \
             --changed \
             --base "${{ github.event.before }}" \
-            --push \
             --tag latest \
             --tag "${{ github.sha }}"
         env:
           CI: "true"
 
-  gitleaks:
-    name: Gitleaks
-    needs: setup
+  release:
+    name: Release homelabctl
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: check
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: Download hl
-        uses: actions/download-artifact@v4
+      - name: Set up Go
+        uses: actions/setup-go@v7
         with:
-          name: hl
-          path: bin/
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: homelabctl/go.sum
 
-      - name: Prepare hl
-        run: |
-          chmod +x bin/hl
-          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
-
-      - name: Setup tools
-        run: hl ci setup gitleaks
-
-      - name: Run gitleaks (SARIF)
-        run: hl ci gitleaks --output-dir "$GITHUB_WORKSPACE/sarif"
-
-      - name: Upload SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
+      - name: Create immutable GitHub release
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
-          sarif_file: sarif/
-          category: gitleaks
-
-  sbom:
-    name: SBOM & Vulnerability Scan
-    needs: setup
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download hl
-        uses: actions/download-artifact@v4
-        with:
-          name: hl
-          path: bin/
-
-      - name: Prepare hl
-        run: |
-          chmod +x bin/hl
-          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
-
-      - name: Setup tools
-        run: hl ci setup syft grype
-
-      - name: Generate SBOMs
-        run: hl ci sbom --output-dir "$GITHUB_WORKSPACE/sbom"
-
-      - name: Run vulnerability scan
-        run: hl ci vulnscan --sbom-dir "$GITHUB_WORKSPACE/sbom" --output-dir "$GITHUB_WORKSPACE/sarif"
-
-      - name: Upload SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: sarif/
-          category: grype
-
-      - name: Upload SBOMs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom
-          path: sbom/
+          distribution: goreleaser
+          version: v2.17.1
+          args: release --clean
+          workdir: homelabctl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: v0.1.${{ github.run_number }}

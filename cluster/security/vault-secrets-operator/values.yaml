@@ -20,8 +20,9 @@ vaultAuth:
   method: kubernetes
   mount: kubernetes
   role: vso
-  serviceAccount: default
+  serviceAccount: vault-secrets-operator
   allowedNamespaces:
+    - security
     - databases
     - storage
     - monitoring

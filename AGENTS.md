@@ -8,46 +8,86 @@ Homelab infrastructure supporting both local (home) nodes and external (Hetzner)
 
 ## Architecture
 
-The repo has four top-level layers:
+The repo has five top-level layers:
 
 1. **`infra/`** — Terraform (Hetzner Cloud provider, Terraform Cloud backend `iamkhattar/homelab`). Provisions external nodes with a private network (`10.0.0.0/16`, subnet `10.0.1.0/24` in `eu-central`), firewalls, and cloud-init templates (`infra/config/cloud-init-*.yml`).
 
-2. **`ansible/`** — Ansible roles for bootstrapping all nodes (local and external) into a K3s cluster. The `site.yml` playbook runs three roles in order: `prerequisites` (OS prep, networking, IP detection), `k3s_server` (downloads and starts K3s server with `--secrets-encryption`), `k3s_agent` (joins agent nodes to the server). Inventory files are per node type. The K3s version is pinned in inventory vars.
+2. **`ansible/`** — A thin wrapper around the pinned upstream `k3s.orchestration` collection. The local `homelab_base` role prepares and hardens Debian nodes before the upstream collection installs or upgrades K3s. One private `inventory/hosts.yml`, copied from `hosts.example.yml`, describes home servers and optional remote agents; node labels and taints keep location-specific workloads controlled.
 
-3. **`cluster/`** — Helmfile at `cluster/` root orchestrates Helm releases with dependency ordering via `needs`. Charts are organized into `core/` (namespaces, RBAC, cert-manager), `storage/` (Longhorn), and `apps/` (user-facing applications like Home Assistant, Vault, MQTT).
+3. **`docs/`** — VitePress operations guide. Covers Debian installation, the Ansible design, K3s installation and maintenance, backup/recovery, troubleshooting, and the future Hetzner/Tailscale boundary.
 
-4. **`services/` and `cli/`** — Custom services and CLIs that get containerized and deployed to the cluster.
+4. **`cluster/`** — Helmfile at `cluster/` root orchestrates Helm releases with dependency ordering via `needs`. Charts are organized into `core/` (namespaces, RBAC, cert-manager), `storage/` (Longhorn), and `apps/` (user-facing applications like Home Assistant, Vault, MQTT).
+
+5. **`homelabctl/` and `services/`** — The Go operator/CI CLI and custom services that are built and deployed from this repository.
 
 ## Key Commands
 
-### Terraform (run from `infra/`)
-```
-terraform init              # Initialize providers and Terraform Cloud backend
-terraform fmt -check        # Check formatting (CI runs this)
-terraform validate          # Validate configuration
-terraform plan              # Preview changes (requires TF_VAR_* env vars)
-terraform apply             # Apply changes
-```
-Required environment variables: `TF_VAR_hetzner_cloud_api_token`, `TF_VAR_ssh_public_key`.
+After the one-time `homelabctl` self-build, all normal repository procedures use
+the CLI from the repository root. Native tools are implementation details or
+explicit break-glass diagnostics.
 
-### Ansible (run from `ansible/`)
+### Workstation and inventory
+
 ```
-ansible-playbook playbooks/site.yml -i inventory/inventory-server.yml -e 'token=<k3s_token>'   # Bootstrap server
-ansible-playbook playbooks/site.yml -i inventory/inventory-agent.yml -e 'token=<k3s_token>'    # Bootstrap agent
-ansible-playbook playbooks/upgrade.yml -i inventory/inventory-server.yml                        # Upgrade K3s
-ansible-playbook playbooks/reboot.yml -i inventory/inventory-server.yml                         # Rolling reboot
+homelabctl setup
+homelabctl doctor
+homelabctl inventory init
+homelabctl inventory check
 ```
 
-### Helmfile (run from `cluster/`)
+### Nodes and K3s
+
 ```
-helmfile sync     # Deploy/update all releases
-helmfile diff     # Preview changes
-helmfile apply    # Apply only changed releases
+homelabctl node prepare --check
+homelabctl node prepare
+homelabctl cluster bootstrap
+homelabctl cluster status
+homelabctl cluster snapshot save --name before-change
+homelabctl cluster recovery export --destination /path/to/encrypted-staging
+homelabctl cluster upgrade
+homelabctl cluster reboot
 ```
+
+### Deployments and optional infrastructure
+
+```
+homelabctl deploy diff
+homelabctl deploy apply
+homelabctl infra fmt
+homelabctl infra validate
+homelabctl infra plan
+```
+
+Do not add Terraform apply/destroy to the CLI until the legacy Hetzner
+cloud-init and token flow has been redesigned.
+
+### Documentation
+
+```
+homelabctl docs setup
+homelabctl docs dev
+homelabctl docs build
+homelabctl docs preview
+homelabctl build docs --tag dev
+homelabctl docs serve --image iamkhattar/homelab-docs:dev
+```
+
+### Repository checks and images
+
+```
+homelabctl ci check
+homelabctl ci check --only ansible
+homelabctl build services
+```
+
+The only bootstrap exception is building `homelabctl` itself before a published
+binary exists: from `homelabctl/`, build `./cmd/homelabctl` into `../bin/`.
 
 ## CI/CD
 
-- **Infrastructure workflow** (`.github/workflows/infrastructure.yml`): Triggers on changes to `infra/` or the workflow file. Runs `fmt -check`, `init`, `validate`, `plan` (on PRs with comment output), and `apply` (on push to main only).
+- **CI workflow** (`.github/workflows/ci.yml`): driven by `homelabctl`. It checks Go, docs, Ansible and Terraform, then builds changed service images plus the documentation image and pushes them from `main`.
+- **Auto-assign workflow** (`.github/workflows/auto-assign.yml`): assigns the PR author as a reviewer.
+- Push-model only: there is no in-cluster GitOps controller (no Argo CD / Flux). All deploys are initiated with `homelabctl deploy`.
 
 ## Conventions
 
@@ -56,4 +96,4 @@ helmfile apply    # Apply only changed releases
 - Helm chart dependencies (e.g., cert-manager, longhorn) are declared in each chart's `Chart.yaml` and locked in `Chart.lock`.
 - Terraform state is remote (Terraform Cloud); never commit `.tfstate` files.
 - Sensitive variables (`*.tfvars`, SSH keys, kubeconfig) are gitignored.
-- Ansible `no_log: true` is used for tasks handling tokens.
+- Do not pass secrets in command-line extra vars or render K3s tokens into new cloud-init templates. Keep `no_log: true` scoped to the individual tasks that handle secrets.

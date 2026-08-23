@@ -1,6 +1,13 @@
 ingress:
   enabled: true
   host: "auth.{{ .Environment.Values.domain }}"
+  tls:
+    enabled: true
+    clusterIssuer: vault
+    tlsSecretName: pocket-id-tls
 
 env:
-  PUBLIC_APP_URL: "http://auth.{{ .Environment.Values.domain }}"
+  # https is now correct because cert-manager (via the Vault ClusterIssuer)
+  # issues a real cert for auth.<domain>. Operators need to trust the
+  # homelab root CA once via the future `homelabctl trust` flow.
+  PUBLIC_APP_URL: "https://auth.{{ .Environment.Values.domain }}"

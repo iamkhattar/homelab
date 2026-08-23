@@ -1,0 +1,79 @@
+---
+- name: Export K3s recovery material
+  hosts: "server[0]"
+  gather_facts: false
+  become: true
+  vars:
+    homelab_snapshot_name: recovery
+  tasks:
+    - name: Validate recovery export inputs
+      ansible.builtin.assert:
+        that:
+          - homelab_recovery_export_dir is defined
+          - homelab_recovery_export_dir | length > 0
+          - homelab_snapshot_name is match('^[A-Za-z0-9][A-Za-z0-9._-]*$')
+        fail_msg: A local export directory and safe snapshot name are required
+
+    - name: Create a fresh recovery snapshot
+      ansible.builtin.command:
+        argv:
+          - k3s
+          - etcd-snapshot
+          - save
+          - --name
+          - "{{ homelab_snapshot_name }}"
+      changed_when: true
+
+    - name: Find the fresh recovery snapshot
+      ansible.builtin.find:
+        paths: /var/lib/rancher/k3s/server/db/snapshots
+        patterns: "{{ homelab_snapshot_name }}-*"
+        file_type: file
+      register: homelab_recovery_snapshots
+
+    - name: Require a recovery snapshot to export
+      ansible.builtin.assert:
+        that:
+          - homelab_recovery_snapshots.matched | int > 0
+        fail_msg: K3s reported success but no matching snapshot was found
+
+    - name: Select the newest recovery snapshot
+      ansible.builtin.set_fact:
+        homelab_recovery_snapshot_path: "{{ (homelab_recovery_snapshots.files | sort(attribute='mtime') | last).path }}"
+
+    - name: Create the private local recovery directory
+      ansible.builtin.file:
+        path: "{{ homelab_recovery_export_dir }}/{{ inventory_hostname }}"
+        state: directory
+        mode: "0700"
+      become: false
+      delegate_to: localhost
+
+    - name: Fetch the embedded-etcd snapshot
+      ansible.builtin.fetch:
+        src: "{{ homelab_recovery_snapshot_path }}"
+        dest: "{{ homelab_recovery_export_dir }}/{{ inventory_hostname }}/etcd-snapshot"
+        flat: true
+        validate_checksum: true
+
+    - name: Fetch the K3s server token
+      ansible.builtin.fetch:
+        src: /var/lib/rancher/k3s/server/token
+        dest: "{{ homelab_recovery_export_dir }}/{{ inventory_hostname }}/server-token"
+        flat: true
+        validate_checksum: true
+      no_log: true
+
+    - name: Restrict exported recovery file permissions
+      ansible.builtin.file:
+        path: "{{ homelab_recovery_export_dir }}/{{ inventory_hostname }}/{{ item }}"
+        mode: "0600"
+      loop:
+        - etcd-snapshot
+        - server-token
+      become: false
+      delegate_to: localhost
+
+    - name: Report the recovery export location
+      ansible.builtin.debug:
+        msg: "Recovery material was exported to {{ homelab_recovery_export_dir }}/{{ inventory_hostname }}; encrypt and move it off this workstation."

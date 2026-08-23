@@ -19,10 +19,24 @@ const (
 )
 
 // EnsureReady makes sure Vault is initialized, unsealed, and the client is
-// authenticated. It stores init credentials in a K8s Secret so subsequent
-// restarts can unseal without manual intervention.
+// authenticated.
+//
+// Critical invariant: every Vault API call in this function is on an endpoint
+// that does NOT require a token (sys/init, sys/seal-status, sys/unseal). The
+// caller is expected to construct *Client with NewClient (no token) and only
+// have a token after EnsureReady returns successfully. This means butler can
+// bootstrap a brand-new Vault from a cold start with nothing but its own pod
+// identity — there is no chicken-and-egg "where does the first token come
+// from" problem.
+//
+// On success the client's token is set to the root token (either freshly
+// minted during sys/init or loaded from the butler-vault-init Secret).
+//
+// Init credentials are stored as a K8s Secret in the butler namespace so
+// subsequent pod restarts can read them and re-unseal without operator
+// intervention.
 func (c *Client) EnsureReady(ctx context.Context, k8s kubernetes.Interface, namespace string) error {
-	// 1. Check init status (no auth required).
+	// 1. Check init status. sys/init is unauthenticated.
 	initStatus, err := c.raw.Sys().InitStatusWithContext(ctx)
 	if err != nil {
 		return fmt.Errorf("checking vault init status: %w", err)
@@ -40,7 +54,7 @@ func (c *Client) EnsureReady(ctx context.Context, k8s kubernetes.Interface, name
 		}
 	}
 
-	// 2. Check seal status and unseal if needed.
+	// 2. Check seal status and unseal if needed. Both are unauthenticated.
 	sealStatus, err := c.raw.Sys().SealStatusWithContext(ctx)
 	if err != nil {
 		return fmt.Errorf("checking vault seal status: %w", err)
@@ -60,6 +74,11 @@ func (c *Client) EnsureReady(ctx context.Context, k8s kubernetes.Interface, name
 
 // initialize calls sys/init with 1 key share / 1 threshold (suitable for a
 // homelab single-node Vault) and persists the credentials as a K8s Secret.
+//
+// Idempotency: if a butler-vault-init Secret already exists in the namespace
+// (e.g., from a previous partial run where init succeeded but Secret-create
+// failed) we overwrite it with the freshly-minted credentials — the old
+// keys are useless against the just-reinitialized Vault anyway.
 func (c *Client) initialize(ctx context.Context, k8s kubernetes.Interface, namespace string) error {
 	resp, err := c.raw.Sys().InitWithContext(ctx, &vaultapi.InitRequest{
 		SecretShares:    1,
@@ -76,7 +95,6 @@ func (c *Client) initialize(ctx context.Context, k8s kubernetes.Interface, names
 	unsealKey := resp.KeysB64[0]
 	rootToken := resp.RootToken
 
-	// Persist to K8s Secret.
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      initSecretName,
@@ -88,7 +106,13 @@ func (c *Client) initialize(ctx context.Context, k8s kubernetes.Interface, names
 		},
 	}
 
-	if _, err := k8s.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
+	_, err = k8s.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
+	if k8serrors.IsAlreadyExists(err) {
+		slog.Warn("butler-vault-init Secret already existed before init; overwriting with new credentials")
+		if _, err := k8s.CoreV1().Secrets(namespace).Update(ctx, secret, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("updating existing vault init secret: %w", err)
+		}
+	} else if err != nil {
 		return fmt.Errorf("storing vault init secret: %w", err)
 	}
 
@@ -140,4 +164,3 @@ func (c *Client) unseal(ctx context.Context, k8s kubernetes.Interface, namespace
 	slog.Info("vault unsealed successfully")
 	return nil
 }
-

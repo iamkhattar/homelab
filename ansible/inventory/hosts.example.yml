@@ -1,0 +1,65 @@
+---
+# Copy this file to hosts.yml and replace the example address and user.
+# hosts.yml is intentionally ignored because it describes the private network.
+k3s_cluster:
+  children:
+    server:
+      hosts:
+        titan:
+          ansible_host: 192.168.1.50
+          ansible_user: change-me
+          # Optional when using a dedicated non-default operator key:
+          # ansible_ssh_private_key_file: /absolute/path/to/homelab_titan_ed25519
+          homelab_base_manage_hostname: true
+          homelab_base_hostname: titan
+          homelab_base_shell_prompt_enabled: true
+          homelab_base_shell_prompt_environment: HOME
+
+          # Leave hardening disabled for the first connection. After adding at
+          # least one public key below and confirming key login, set it to true.
+          homelab_ssh_hardening_enabled: false
+          homelab_admin_authorized_keys: []
+          # Example:
+          # homelab_admin_authorized_keys:
+          #   - "ssh-ed25519 AAAA... your-name@your-mac"
+
+          # Labels make placement explicit when remote agents are added later.
+          server_config_yaml: |
+            # Use embedded etcd even on the single server so K3s can create
+            # scheduled snapshots and a later move to three servers is clean.
+            cluster-init: true
+            secrets-encryption: true
+            etcd-snapshot-compress: true
+            etcd-snapshot-retention: 14
+            disable:
+              - traefik
+            node-label:
+              - homelab.io/location=home
+              - homelab.io/hardware=mini-pc
+
+    # Keep the group present even when it has no hosts. Hetzner machines will be
+    # added here as agents after private networking through Tailscale is ready.
+    agent:
+      hosts: {}
+      # Future shape after Tailscale is configured:
+      # hosts:
+      #   hetzner-agent-01:
+      #     ansible_host: 100.x.y.z
+      #     ansible_user: ansible
+      #     agent_config_yaml: |
+      #       node-label:
+      #         - homelab.io/location=hetzner
+      #       node-taint:
+      #         - homelab.io/location=hetzner:NoSchedule
+
+  vars:
+    ansible_port: 22
+    k3s_version: v1.36.3+k3s1
+    api_endpoint: "{{ hostvars[groups['server'][0]]['ansible_host'] }}"
+    cluster_context: homelab
+    user_kubectl: true
+    manage_firewall: false
+
+    # Let the first server generate the cluster token. Do not put a plaintext
+    # token in inventory, Terraform variables, or cloud-init.
+    # token: "use-an-encrypted-variable-or-runtime-secret-if-set-explicitly"

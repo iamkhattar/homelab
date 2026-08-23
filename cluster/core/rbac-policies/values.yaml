@@ -1,4 +1,6 @@
 serviceAccounts:
+  - name: vault-secrets-operator
+    namespace: security
   - name: prometheus
     namespace: monitoring
   - name: fluent-bit
@@ -7,6 +9,30 @@ serviceAccounts:
     namespace: databases
   - name: storage-admin
     namespace: storage
+
+  # --- Vault Kubernetes secrets engine (Phase 1B) ---
+  # Token reviewer: Vault calls this SA's identity at TokenReview to validate
+  # tokens it issues, and uses its long-lived JWT (see serviceAccountTokens)
+  # to call the TokenRequest API.
+  - name: vault-k8s-token-reviewer
+    namespace: security
+  # Managed SAs that Vault mints short-lived tokens for. ClusterRoleBindings
+  # below tie these to cluster-admin / edit / view.
+  - name: vault-managed-admin
+    namespace: kube-system
+  - name: vault-managed-operator
+    namespace: kube-system
+  - name: vault-managed-viewer
+    namespace: kube-system
+
+# Long-lived ServiceAccount token Secrets. Modern K8s does not auto-create
+# Secrets for SAs (TokenRequest is preferred), but the Vault Kubernetes
+# engine needs a long-lived JWT to bootstrap its config. This list creates
+# one such Secret per entry.
+serviceAccountTokens:
+  - name: vault-k8s-token-reviewer-token
+    namespace: security
+    serviceAccount: vault-k8s-token-reviewer
 
 clusterRoles:
   - name: prometheus
@@ -32,6 +58,20 @@ clusterRoles:
         resources: ["persistentvolumes", "persistentvolumeclaims"]
         verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
+  # Vault calls TokenRequest as the token-reviewer SA to mint short-lived
+  # tokens for the vault-managed-* SAs. This ClusterRole grants exactly that
+  # capability, scoped to those three target SAs.
+  - name: vault-token-issuer
+    rules:
+      - apiGroups: [""]
+        resources: ["serviceaccounts/token"]
+        resourceNames: ["vault-managed-admin", "vault-managed-operator", "vault-managed-viewer"]
+        verbs: ["create"]
+      - apiGroups: [""]
+        resources: ["serviceaccounts"]
+        resourceNames: ["vault-managed-admin", "vault-managed-operator", "vault-managed-viewer"]
+        verbs: ["get"]
+
 roles:
   - name: database-operator
     namespace: databases
@@ -56,6 +96,35 @@ clusterRoleBindings:
     serviceAccount: storage-admin
     namespace: storage
     clusterRole: storage-admin
+
+  # --- Vault Kubernetes secrets engine (Phase 1B) ---
+  # Token reviewer needs system:auth-delegator to call TokenReview during
+  # token validation, plus vault-token-issuer to call TokenRequest to mint
+  # SA JWTs for the managed SAs.
+  - name: vault-k8s-token-reviewer-auth-delegator
+    serviceAccount: vault-k8s-token-reviewer
+    namespace: security
+    clusterRole: system:auth-delegator
+  - name: vault-k8s-token-reviewer-token-issuer
+    serviceAccount: vault-k8s-token-reviewer
+    namespace: security
+    clusterRole: vault-token-issuer
+
+  # Managed SAs bound to built-in K8s roles. The Vault Kubernetes secrets
+  # engine mints tokens for these SAs; whoever holds the token thus has
+  # the corresponding cluster privileges.
+  - name: vault-managed-admin
+    serviceAccount: vault-managed-admin
+    namespace: kube-system
+    clusterRole: cluster-admin
+  - name: vault-managed-operator
+    serviceAccount: vault-managed-operator
+    namespace: kube-system
+    clusterRole: edit
+  - name: vault-managed-viewer
+    serviceAccount: vault-managed-viewer
+    namespace: kube-system
+    clusterRole: view
 
 roleBindings:
   - name: database-operator

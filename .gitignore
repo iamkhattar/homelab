@@ -5,6 +5,9 @@
 *.tfstate
 *.tfstate.*
 
+# GoReleaser output
+homelabctl/dist/
+
 # Crash log files
 crash.log
 crash.*.log
@@ -41,6 +44,12 @@ terraform.rc
 
 **/node_modules/**
 **/public/**
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+/bin/
+/test-results/
+/sarif/
+/sbom/
 
 infra/config/.ssh/id_rsa
 infra/config/.ssh/id_rsa.pub
@@ -48,3 +57,11 @@ cluster/kubeconfig.yml
 
 *.tgz
 .terraform.lock.hcl
+.kube
+
+# Local Ansible runtime and machine-specific inventory
+ansible/.venv/
+ansible/.ansible/
+ansible/collections/
+ansible/inventory/hosts.yml
+*.retry

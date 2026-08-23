@@ -1,15 +1,58 @@
 # Homelab
 
-![Linting](https://github.com/iamkhattar/homelab/actions/workflows/linting.yml/badge.svg)
-![Infrastructure](https://github.com/iamkhattar/homelab/actions/workflows/infrastructure.yml/badge.svg)
+Home-first infrastructure for a single-node K3s cluster running on `titan`, an
+AMD mini PC with Debian. Ansible prepares the operating system and manages the
+K3s lifecycle. Helmfile deploys cluster services. Terraform remains available
+for future, tainted Hetzner worker nodes after private Tailscale networking is
+introduced.
 
-Welcome to my Homelab project, a dynamic and scalable infrastructure built on Hetzner Cloud using Terraform, Ansible,
-and K3s. This setup is designed to host a variety of personal services and experimental projects, providing a flexible
-and cost-effective platform for learning and development.
+[`homelabctl`](docs/homelabctl/index.md) is the Go operator and CI entry point. It
+wraps the repository's native tools without replacing their configuration.
 
-The infrastructure is provisioned using Terraform, which allows for easy scaling and management of Hetzner Cloud resources.
-Ansible is employed for configuration management, ensuring consistent setup across all nodes and simplifying the installation
-of K3s, a lightweight Kubernetes distribution. This combination of tools enables rapid deployment and modification of the
-homelab environment, making it ideal for hosting both established services and new applications developed in my free time.
-The use of K3s provides a robust container orchestration platform, allowing for efficient resource utilization and simplified
-application deployment.
+## Bootstrap the operator CLI
+
+Building `homelabctl` itself is the one repository bootstrap command that cannot
+go through `homelabctl`. Install Go 1.27 or newer; until versioned binaries are
+published, run once:
+
+```bash
+cd homelabctl
+go build -o ../bin/homelabctl ./cmd/homelabctl
+cd ..
+export PATH="$PWD/bin:$PATH"
+```
+
+All normal repository and homelab procedures use the CLI after that point:
+
+```bash
+homelabctl setup
+homelabctl doctor
+```
+
+## Documentation
+
+The operational guide lives in [`docs/`](docs/index.md) and covers Debian
+installation, Ansible, K3s installation, upgrades, reboots, backup and recovery.
+Start a new physical machine with the [complete Titan setup
+runbook](docs/getting-started/titan-setup.md).
+
+The documentation site is isolated under `docs/` and requires Node.js 24 or
+newer. Use the operator interface from the repository root:
+
+```bash
+homelabctl docs setup
+homelabctl docs dev
+```
+
+Build and preview the production site with:
+
+```bash
+homelabctl docs build
+homelabctl docs preview
+```
+
+Build the internal Nginx image from the repository root with:
+
+```bash
+homelabctl build docs --tag dev
+```

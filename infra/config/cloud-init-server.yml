@@ -30,4 +30,4 @@ runcmd:
   - systemctl restart networking
   - git clone https://github.com/iamkhattar/homelab.git /opt/homelab
   - chown -R ansible:ansible /opt/homelab
-  # - su - ansible -s /bin/bash -c "cd /opt/homelab/ansible && ansible-playbook playbooks/site.yml -i inventory/inventory-server.yml -e 'token=${k3s_api_token}'"
+  - su - ansible -s /bin/bash -c "cd /opt/homelab/ansible && ansible-playbook playbooks/site.yml -i inventory/inventory-server.yml -e 'token=${k3s_api_token}'"

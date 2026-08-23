@@ -1,0 +1,316 @@
+package workflow
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+
+	"go.yaml.in/yaml/v3"
+)
+
+type definition struct {
+	Name        string         `yaml:"name"`
+	On          yaml.Node      `yaml:"on"`
+	Permissions map[string]any `yaml:"permissions"`
+	Concurrency yaml.Node      `yaml:"concurrency"`
+	Env         map[string]any `yaml:"env"`
+	Jobs        map[string]job `yaml:"jobs"`
+}
+
+type job struct {
+	Needs          any            `yaml:"needs"`
+	If             string         `yaml:"if"`
+	TimeoutMinutes int            `yaml:"timeout-minutes"`
+	Steps          []step         `yaml:"steps"`
+	Permissions    map[string]any `yaml:"permissions"`
+}
+
+type step struct {
+	Name string         `yaml:"name"`
+	Uses string         `yaml:"uses"`
+	Run  string         `yaml:"run"`
+	If   string         `yaml:"if"`
+	With map[string]any `yaml:"with"`
+	Env  map[string]any `yaml:"env"`
+}
+
+// ValidateDirectory parses every workflow and enforces the repository's CI
+// contract. GitHub remains the source of truth for the complete Actions schema;
+// these checks protect the invariants homelabctl relies on.
+func ValidateDirectory(root string) error {
+	directory := filepath.Join(root, ".github", "workflows")
+	paths, err := filepath.Glob(filepath.Join(directory, "*.y*ml"))
+	if err != nil {
+		return fmt.Errorf("finding GitHub workflows: %w", err)
+	}
+	if len(paths) == 0 {
+		return fmt.Errorf("no GitHub workflows found in %s", directory)
+	}
+	sort.Strings(paths)
+
+	var problems []error
+	for _, path := range paths {
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			problems = append(problems, fmt.Errorf("reading %s: %w", path, err))
+			continue
+		}
+		var workflow definition
+		if err := yaml.Unmarshal(contents, &workflow); err != nil {
+			problems = append(problems, fmt.Errorf("parsing %s: %w", path, err))
+			continue
+		}
+		if workflow.Name == "" || len(workflow.Jobs) == 0 {
+			problems = append(problems, fmt.Errorf("%s must define a name and at least one job", path))
+		}
+		problems = append(problems, validateGeneral(path, workflow)...)
+		if filepath.Base(path) == "ci.yml" || filepath.Base(path) == "ci.yaml" {
+			problems = append(problems, validateCI(path, workflow)...)
+		}
+	}
+	return errors.Join(problems...)
+}
+
+var majorVersionPattern = regexp.MustCompile(`@v([0-9]+)(?:\.|$)`)
+
+var minimumActionMajors = map[string]int{
+	"actions/checkout":             7,
+	"actions/setup-go":             7,
+	"actions/setup-node":           7,
+	"actions/setup-python":         7,
+	"docker/login-action":          4,
+	"goreleaser/goreleaser-action": 7,
+	"hashicorp/setup-terraform":    4,
+}
+
+func validateGeneral(path string, workflow definition) []error {
+	var problems []error
+	if emptyNode(workflow.On) {
+		problems = append(problems, fmt.Errorf("%s must define at least one trigger", path))
+	}
+	for jobName, candidate := range workflow.Jobs {
+		if candidate.TimeoutMinutes <= 0 {
+			problems = append(problems, fmt.Errorf("%s: job %s must define timeout-minutes", path, jobName))
+		}
+		if len(workflow.Permissions) == 0 && len(candidate.Permissions) == 0 {
+			problems = append(problems, fmt.Errorf("%s: job %s must use explicit permissions", path, jobName))
+		}
+		for _, candidateStep := range candidate.Steps {
+			parts := strings.SplitN(candidateStep.Uses, "@", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			minimum, guarded := minimumActionMajors[parts[0]]
+			if !guarded {
+				continue
+			}
+			matches := majorVersionPattern.FindStringSubmatch(candidateStep.Uses)
+			if len(matches) != 2 {
+				// Full commit hashes are intentionally allowed for immutable pinning.
+				if len(parts[1]) == 40 {
+					continue
+				}
+				problems = append(problems, fmt.Errorf("%s: job %s action %s must use v%d or newer, or a full commit hash", path, jobName, candidateStep.Uses, minimum))
+				continue
+			}
+			major, _ := strconv.Atoi(matches[1])
+			if major < minimum {
+				problems = append(problems, fmt.Errorf("%s: job %s action %s is stale; use v%d or newer", path, jobName, candidateStep.Uses, minimum))
+			}
+		}
+	}
+	return append(problems, forbiddenCommands(path, workflow)...)
+}
+
+func validateCI(path string, workflow definition) []error {
+	var problems []error
+	problem := func(format string, args ...any) {
+		problems = append(problems, fmt.Errorf("%s: %s", path, fmt.Sprintf(format, args...)))
+	}
+
+	events := mappingKeys(workflow.On)
+	if !events["push"] || !events["pull_request"] {
+		problem("must run for pushes and pull requests")
+	}
+	if value(workflow.Permissions["contents"]) != "read" {
+		problem("must default to contents: read permissions")
+	}
+	if value(workflow.Env["GO_VERSION"]) != "1.27.0" {
+		problem("must use Go 1.27.0")
+	}
+	if value(workflow.Env["NODE_VERSION"]) != "24" {
+		problem("must use Node 24")
+	}
+	if emptyNode(workflow.Concurrency) {
+		problem("must define concurrency so stale runs are cancelled")
+	}
+
+	check, ok := workflow.Jobs["check"]
+	if !ok {
+		problem("must define the check job")
+	} else {
+		validateJob(path, "check", check, &problems)
+		if !hasRun(check.Steps, "bin/homelabctl ci check") {
+			problem("check job must run bin/homelabctl ci check")
+		}
+		if hasRun(check.Steps, "bin/homelabctl ci check", "--skip", "go-test") {
+			problem("check job must not skip Go tests")
+		}
+	}
+
+	publish, ok := workflow.Jobs["publish"]
+	if !ok {
+		problem("must define the publish job")
+	} else {
+		validateJob(path, "publish", publish, &problems)
+		if !containsString(publish.Needs, "check") {
+			problem("publish job must depend on check")
+		}
+		if !hasRun(publish.Steps, "ci build", "--changed", `origin/${{ github.base_ref }}`, `--tag "${{ github.sha }}"`) {
+			problem("publish job must build PR changes from the base branch with the commit SHA tag")
+		}
+		if !hasRun(publish.Steps, "ci publish", "--changed", `${{ github.event.before }}`, "--tag latest", `--tag "${{ github.sha }}"`) {
+			problem("publish job must publish main changes with latest and commit SHA tags")
+		}
+		if !hasRunWithEnv(publish.Steps, "ci publish", "CI", "true") {
+			problem("image publication must set CI=true")
+		}
+	}
+
+	release, ok := workflow.Jobs["release"]
+	if !ok {
+		problem("must define the homelabctl release job")
+	} else {
+		validateJob(path, "release", release, &problems)
+		if !containsString(release.Needs, "check") {
+			problem("release job must depend on check")
+		}
+		if value(release.Permissions["contents"]) != "write" {
+			problem("release job must grant contents: write")
+		}
+		if !strings.Contains(release.If, "github.event_name == 'push'") || !strings.Contains(release.If, "github.ref == 'refs/heads/main'") {
+			problem("release job must run only for pushes to main")
+		}
+		releaseStep, found := findUses(release.Steps, "goreleaser/goreleaser-action@")
+		if !found {
+			problem("release job must use goreleaser/goreleaser-action")
+		} else {
+			if value(releaseStep.With["version"]) != "v2.17.1" {
+				problem("release job must pin GoReleaser v2.17.1")
+			}
+			if value(releaseStep.With["args"]) != "release --clean" || value(releaseStep.With["workdir"]) != "homelabctl" {
+				problem("release job must run release --clean from homelabctl")
+			}
+			if value(releaseStep.Env["GITHUB_TOKEN"]) != "${{ secrets.GITHUB_TOKEN }}" {
+				problem("release job must authenticate with GITHUB_TOKEN")
+			}
+			if value(releaseStep.Env["GORELEASER_CURRENT_TAG"]) != "v0.1.${{ github.run_number }}" {
+				problem("release job must derive an immutable semantic tag from github.run_number")
+			}
+		}
+	}
+	return problems
+}
+
+func validateJob(path, name string, candidate job, problems *[]error) {
+	if candidate.TimeoutMinutes <= 0 {
+		*problems = append(*problems, fmt.Errorf("%s: %s job must define timeout-minutes", path, name))
+	}
+	foundCheckout := false
+	for _, candidateStep := range candidate.Steps {
+		if strings.HasPrefix(candidateStep.Uses, "actions/checkout@") && value(candidateStep.With["fetch-depth"]) != "0" {
+			foundCheckout = true
+			*problems = append(*problems, fmt.Errorf("%s: %s job checkout must use fetch-depth: 0 for merge-base calculation", path, name))
+			return
+		}
+		if strings.HasPrefix(candidateStep.Uses, "actions/checkout@") {
+			foundCheckout = true
+		}
+	}
+	if !foundCheckout {
+		*problems = append(*problems, fmt.Errorf("%s: %s job must check out the repository", path, name))
+	}
+}
+
+func forbiddenCommands(path string, workflow definition) []error {
+	forbidden := []string{"homelabctl deploy", "terraform apply", "terraform destroy", "helmfile apply", "helmfile sync", "kubectl apply"}
+	var problems []error
+	for jobName, candidate := range workflow.Jobs {
+		for _, candidateStep := range candidate.Steps {
+			normalized := strings.ToLower(strings.Join(strings.Fields(candidateStep.Run), " "))
+			for _, command := range forbidden {
+				if strings.Contains(normalized, command) {
+					problems = append(problems, fmt.Errorf("%s: job %s contains forbidden mutating command %q", path, jobName, command))
+				}
+			}
+		}
+	}
+	return problems
+}
+
+func mappingKeys(node yaml.Node) map[string]bool {
+	result := map[string]bool{}
+	if node.Kind == yaml.MappingNode {
+		for index := 0; index < len(node.Content); index += 2 {
+			result[node.Content[index].Value] = true
+		}
+	}
+	return result
+}
+
+func emptyNode(node yaml.Node) bool { return node.Kind == 0 || len(node.Content) == 0 }
+
+func hasRun(steps []step, fragments ...string) bool {
+	for _, candidate := range steps {
+		matches := true
+		for _, fragment := range fragments {
+			if !strings.Contains(candidate.Run, fragment) {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return true
+		}
+	}
+	return false
+}
+
+func hasRunWithEnv(steps []step, runFragment, key, expected string) bool {
+	for _, candidate := range steps {
+		if strings.Contains(candidate.Run, runFragment) && value(candidate.Env[key]) == expected {
+			return true
+		}
+	}
+	return false
+}
+
+func findUses(steps []step, prefix string) (step, bool) {
+	for _, candidate := range steps {
+		if strings.HasPrefix(candidate.Uses, prefix) {
+			return candidate, true
+		}
+	}
+	return step{}, false
+}
+
+func containsString(candidate any, expected string) bool {
+	switch typed := candidate.(type) {
+	case string:
+		return typed == expected
+	case []any:
+		for _, item := range typed {
+			if value(item) == expected {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func value(candidate any) string { return fmt.Sprint(candidate) }
