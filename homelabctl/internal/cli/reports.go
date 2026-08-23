@@ -152,6 +152,7 @@ func trivySkipArguments() []string {
 		"--skip-dirs", "docs/node_modules",
 		"--skip-dirs", "docs/.vitepress/cache",
 		"--skip-dirs", "docs/.vitepress/dist",
+		"--skip-dirs", "docs/.vitepress/.temp",
 		"--skip-dirs", "infra/.terraform",
 		"--skip-dirs", "node_modules",
 		"--skip-dirs", testResultsDirectory,
