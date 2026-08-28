@@ -89,7 +89,7 @@ func TestValidateDirectoryRejectsBrokenCIContracts(t *testing.T) {
 		{
 			name: "workflow omits Butler from Go cache key",
 			transform: func(input string) string {
-				return strings.Replace(input, ", 'services/butler/go.sum'", "", 1)
+				return strings.Replace(input, ", 'butler/go.sum'", "", 1)
 			},
 			wantInError: "must restore Go modules and build output",
 		},
@@ -145,9 +145,9 @@ func TestValidateDirectoryRejectsBrokenCIContracts(t *testing.T) {
 		{
 			name: "workflow reuses SARIF category",
 			transform: func(input string) string {
-				return strings.Replace(input, "category: gosec-services-butler", "category: gosec-homelabctl", 1)
+				return strings.Replace(input, "category: gosec-butler", "category: gosec-homelabctl", 1)
 			},
-			wantInError: "unique category gosec-services-butler",
+			wantInError: "unique category gosec-butler",
 		},
 		{
 			name: "publishes without CI guard",
@@ -197,6 +197,13 @@ func TestValidateDirectoryRejectsBrokenCIContracts(t *testing.T) {
 				return strings.Replace(input, ` --tag "${{ env.RELEASE_VERSION }}"`, "", 1)
 			},
 			wantInError: "shared release version",
+		},
+		{
+			name: "main publication only publishes changed services",
+			transform: func(input string) string {
+				return strings.Replace(input, "ci publish --tag", "ci publish --changed --base HEAD~1 --tag", 1)
+			},
+			wantInError: "must not use --changed",
 		},
 		{
 			name: "goreleaser does not use shared release version",
@@ -322,7 +329,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-${{ runner.os }}-${{ runner.arch }}-${{ env.GO_VERSION }}-${{ hashFiles('homelabctl/go.sum', 'services/butler/go.sum') }}
+          key: go-${{ runner.os }}-${{ runner.arch }}-${{ env.GO_VERSION }}-${{ hashFiles('homelabctl/go.sum', 'butler/go.sum') }}
       - id: ansible-runtime-cache
         uses: actions/cache/restore@v6
         with:
@@ -380,8 +387,8 @@ jobs:
       - if: always()
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: sarif/gosec-services-butler.sarif
-          category: gosec-services-butler
+          sarif_file: sarif/gosec-butler.sarif
+          category: gosec-butler
       - if: always()
         uses: github/codeql-action/upload-sarif@v4
         with:
@@ -400,7 +407,7 @@ jobs:
           bin/homelabctl ci build --changed --base "origin/${{ github.base_ref }}" --tag "${{ github.sha }}"
       - name: Publish changed images
         run: |
-          bin/homelabctl ci publish --changed --base "${{ github.event.before }}" --tag "${{ env.RELEASE_VERSION }}" --tag latest --tag "${{ github.sha }}"
+          bin/homelabctl ci publish --tag "${{ env.RELEASE_VERSION }}" --tag latest --tag "${{ github.sha }}"
         env:
           CI: "true"
   release:

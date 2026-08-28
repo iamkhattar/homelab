@@ -177,7 +177,7 @@ func validateCI(path string, workflow definition) []error {
 		goSave, goSaved := findUsesWithPath(check.Steps, "actions/cache/save@", "~/go/pkg/mod")
 		goCachePaths := value(goRestore.With["path"])
 		goCacheKey := value(goRestore.With["key"])
-		if !goRestored || !strings.Contains(goCachePaths, "~/.cache/go-build") || !strings.Contains(goCacheKey, "homelabctl/go.sum") || !strings.Contains(goCacheKey, "services/butler/go.sum") {
+		if !goRestored || !strings.Contains(goCachePaths, "~/.cache/go-build") || !strings.Contains(goCacheKey, "homelabctl/go.sum") || !strings.Contains(goCacheKey, "butler/go.sum") {
 			problem("check job must restore Go modules and build output using every Go module checksum")
 		}
 		if !goSaved || !strings.Contains(goSave.If, "cache-hit != 'true'") || value(goSave.With["key"]) != "${{ steps.go-runtime-cache.outputs.cache-primary-key }}" {
@@ -221,7 +221,7 @@ func validateCI(path string, workflow definition) []error {
 		}
 		requiredUploads := []sarifUpload{
 			{path: "sarif/gosec-homelabctl.sarif", category: "gosec-homelabctl"},
-			{path: "sarif/gosec-services-butler.sarif", category: "gosec-services-butler"},
+			{path: "sarif/gosec-butler.sarif", category: "gosec-butler"},
 			{path: "sarif/trivy.sarif", category: "trivy-repository"},
 		}
 		var sarifSteps []step
@@ -258,8 +258,13 @@ func validateCI(path string, workflow definition) []error {
 		if !hasRun(publish.Steps, "ci build", "--changed", `origin/${{ github.base_ref }}`, `--tag "${{ github.sha }}"`) {
 			problem("publish job must build PR changes from the base branch with the commit SHA tag")
 		}
-		if !hasRun(publish.Steps, "ci publish", "--changed", `${{ github.event.before }}`, `--tag "${{ env.RELEASE_VERSION }}"`, "--tag latest", `--tag "${{ github.sha }}"`) {
-			problem("publish job must publish main changes with the shared release version, latest, and commit SHA tags")
+		if !hasRun(publish.Steps, "ci publish", `--tag "${{ env.RELEASE_VERSION }}"`, "--tag latest", `--tag "${{ github.sha }}"`) {
+			problem("publish job must publish all release images with the shared release version, latest, and commit SHA tags")
+		}
+		for _, candidate := range publish.Steps {
+			if strings.Contains(candidate.Run, "ci publish") && strings.Contains(candidate.Run, "--changed") {
+				problem("main publication must not use --changed because Butler and homelabctl share every release version")
+			}
 		}
 		if !hasRunWithEnv(publish.Steps, "ci publish", "CI", "true") {
 			problem("image publication must set CI=true")

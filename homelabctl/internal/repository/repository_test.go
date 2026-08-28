@@ -118,6 +118,26 @@ func TestChangedServiceNamesRejectsUnknownBase(t *testing.T) {
 	}
 }
 
+func TestChangedServiceNamesIncludesTopLevelButler(t *testing.T) {
+	root, baseHash := initGitRepository(t)
+	repository, err := git.PlainOpen(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.Storer.SetReference(plumbing.NewHashReference("refs/remotes/origin/main", baseHash)); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(root, "butler", "cmd", "butler", "main.go"))
+	commitPaths(t, repository, "change butler", "butler/cmd/butler/main.go")
+	got, err := ChangedServiceNames(root, "origin/main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, []string{"butler"}) {
+		t.Fatalf("ChangedServiceNames() = %v, want butler", got)
+	}
+}
+
 func TestChangedServiceNamesIncludesDeletedAndRenamedServices(t *testing.T) {
 	root, _ := initGitRepository(t)
 	repository, err := git.PlainOpen(root)
@@ -199,7 +219,7 @@ func TestGoFilesFindsSourceAndSkipsGeneratedDirectories(t *testing.T) {
 
 func TestServicesFindsDockerfiles(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "services", "butler", "Dockerfile"))
+	writeFile(t, filepath.Join(root, "butler", "Dockerfile"))
 	writeFile(t, filepath.Join(root, "services", "notes", "README.md"))
 
 	services, err := Services(root)
@@ -215,6 +235,15 @@ func TestServicesReturnsEmptyWhenDirectoryDoesNotExist(t *testing.T) {
 	services, err := Services(t.TempDir())
 	if err != nil || len(services) != 0 {
 		t.Fatalf("Services() = %v, %v; want empty result", services, err)
+	}
+}
+
+func TestServicesFindsTopLevelButlerWithoutServicesDirectory(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "butler", "Dockerfile"))
+	services, err := Services(root)
+	if err != nil || len(services) != 1 || services[0].Name != "butler" {
+		t.Fatalf("Services() = %v, %v; want top-level Butler", services, err)
 	}
 }
 

@@ -93,14 +93,78 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 		long:    "Create a new snapshot and fetch it with the K3s server token into a unique private directory outside the repository. The destination is staging space and must be encrypted and moved off-device.",
 		example: "  homelabctl cluster recovery export \\\n    --destination /secure/homelab-recovery \\\n    --name first-install \\\n    --ask-become-pass",
 	},
-	"homelabctl deploy": {long: "Preview or reconcile Helmfile desired state. Deployment remains separate from image publication and CI."},
+	"homelabctl control": {long: "Use Butler's versioned API through a private Kubernetes port-forward. Normal commands require a Pocket ID token; bootstrap and recovery use a short-lived, audience-bound Kubernetes service-account token."},
+	"homelabctl control bootstrap": {
+		long:    "Advance Butler's idempotent Vault bootstrap state machine through the isolated recovery service. The operation requires explicit confirmation and can optionally import a Pocket ID management API key from a local file directly into Vault.",
+		example: "  homelabctl control bootstrap --confirm\n  homelabctl control bootstrap --confirm --pocket-id-api-key-file /secure/pocket-id-api-key",
+	},
+	"homelabctl control recovery": {
+		long:    "Inspect the no-ingress recovery service using a freshly issued, ten-minute Kubernetes token. This path remains available when Pocket ID, VSO, normal Butler, or Vault authentication is unavailable.",
+		example: "  homelabctl control recovery",
+	},
+	"homelabctl control recovery export": {
+		long:    "Read the named Vault initialization Secret into memory and write only an age-encrypted, mode-0600 bundle outside the repository. Existing output files are never overwritten.",
+		example: "  homelabctl control recovery export --output /secure/titan-vault.age --age-recipient age1example",
+	},
+	"homelabctl control status": {
+		long:    "List Butler domain reconcilers and their most recent outcome through the Pocket ID-protected normal API.",
+		example: "  BUTLER_TOKEN=... homelabctl control status",
+	},
+	"homelabctl control operations": {
+		long:    "List bounded asynchronous operation metadata. Butler never stores request bodies, provider credentials, or issued tokens in operation records.",
+		example: "  BUTLER_TOKEN=... homelabctl control operations",
+	},
+	"homelabctl control events": {
+		long:    "List bounded audit-safe control-plane events with actor, type, message, operation and timestamp fields.",
+		example: "  BUTLER_TOKEN=... homelabctl control events",
+	},
+	"homelabctl control users": {long: "Manage non-administrator Pocket ID user lifecycle and group membership through Butler's identity domain."},
+	"homelabctl control groups": {
+		long:    "List Pocket ID authorization groups and their stable IDs before assigning user membership through Butler.",
+		example: "  BUTLER_TOKEN=... homelabctl control groups",
+	},
+	"homelabctl control users list": {
+		long:    "List Pocket ID users through Butler without exposing passkeys or management credentials.",
+		example: "  BUTLER_TOKEN=... homelabctl control users list",
+	},
+	"homelabctl control users create": {
+		long:    "Create a non-administrator Pocket ID user. Butler deliberately rejects administrator creation and promotion to reduce owner-lockout and privilege-escalation risk.",
+		example: "  BUTLER_TOKEN=... homelabctl control users create --username sam --display-name 'Sam' --email sam@example.com",
+	},
+	"homelabctl control users update": {
+		long:    "Update the complete Pocket ID user record or disable the account. Pocket ID requires the username on updates, so pass the current value explicitly.",
+		example: "  BUTLER_TOKEN=... homelabctl control users update USER_ID --username sam --display-name 'Sam' --disabled",
+	},
+	"homelabctl control users set-groups": {
+		long:    "Replace one Pocket ID user's complete group membership set using provider group IDs. An empty list removes all managed memberships.",
+		example: "  BUTLER_TOKEN=... homelabctl control users set-groups USER_ID --group GROUP_ID",
+	},
+	"homelabctl control clients": {long: "Inspect reconciled Pocket ID OIDC clients and explicitly rotate confidential client credentials without returning secret values."},
+	"homelabctl control clients list": {
+		long:    "List Pocket ID OIDC client metadata through Butler. Generated client-secret values are never returned.",
+		example: "  BUTLER_TOKEN=... homelabctl control clients list",
+	},
+	"homelabctl control clients rotate": {
+		long:    "Rotate one confidential Pocket ID OIDC client secret and write the one-time value directly to its Vault oauth path. The CLI receives only a success status.",
+		example: "  BUTLER_TOKEN=... homelabctl control clients rotate grafana",
+	},
+	"homelabctl control applications": {long: "Manage non-secret ApplicationIntegration ownership, namespace, authentication, ingress and Vault-path contracts."},
+	"homelabctl control applications list": {
+		long:    "List ApplicationIntegration records stored by Butler in a dedicated non-secret Kubernetes ConfigMap.",
+		example: "  BUTLER_TOKEN=... homelabctl control applications list",
+	},
+	"homelabctl control applications put": {
+		long:    "Create or replace an ApplicationIntegration contract. Butler validates its namespace during reconciliation and never stores credential values in this resource.",
+		example: "  BUTLER_TOKEN=... homelabctl control applications put paperless --app-namespace paperless-ngx --authentication forward-auth --owner homelab-admin --host paperless.home.6940469.xyz --vault-path applications/paperless-ngx",
+	},
+	"homelabctl deploy": {long: "Preview or reconcile Helmfile desired state. Deployment remains separate from image publication and CI. The shared image tag defaults to the full committed Git SHA and must already exist in the registry."},
 	"homelabctl deploy diff": {
 		long:    "Run Helmfile diff from cluster/ without applying releases.",
 		example: "  homelabctl deploy diff",
 	},
 	"homelabctl deploy apply": {
-		long:    "Apply changed Helmfile releases, optionally selecting one validated release name.",
-		example: "  homelabctl deploy apply\n  homelabctl deploy apply cert-manager",
+		long:    "Apply changed Helmfile releases, optionally selecting one validated release name or one dependency stage. A release and --stage are mutually exclusive.",
+		example: "  homelabctl deploy apply\n  homelabctl deploy apply cert-manager\n  homelabctl deploy apply --stage data",
 	},
 	"homelabctl deploy sync": {
 		long:    "Force every declared Helmfile release to desired state without diff gating. Prefer diff followed by apply for routine changes.",
@@ -112,7 +176,7 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 	"homelabctl infra plan":     {long: "Create a Terraform plan using the configured backend and provider credentials without applying it.", example: "  homelabctl infra plan"},
 	"homelabctl build":          {long: "Build service, homelabctl, and documentation container artifacts using repository conventions."},
 	"homelabctl build services": {
-		long:    "Discover Dockerfiles under services/ and build all or explicitly named images. Changed mode selects services from a Git comparison; pushing requires CI.",
+		long:    "Discover the top-level Butler image and Dockerfiles under services/, then build all or explicitly named images. Changed mode selects images from a Git comparison; pushing requires CI.",
 		example: "  homelabctl build services --tag dev\n  homelabctl build services api --registry example\n  homelabctl build services --changed --base origin/main --tag revision",
 	},
 	"homelabctl build docs": {

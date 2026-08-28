@@ -85,6 +85,7 @@ func generateTrivySecurityReport(cmd *cobra.Command, s *state) error {
 		"--exit-code", "0",
 		"--format", "sarif",
 		"--output", "/reports/trivy.sarif",
+		"--ignorefile", "/workspace/.trivyignore.yaml",
 	)
 	sarifArgs = append(sarifArgs, trivySkipArguments()...)
 	sarifArgs = append(sarifArgs, "/workspace")
@@ -153,6 +154,7 @@ func trivySkipArguments() []string {
 		"--skip-dirs", "docs/.vitepress/cache",
 		"--skip-dirs", "docs/.vitepress/dist",
 		"--skip-dirs", "docs/.vitepress/.temp",
+		"--skip-files", "infra/config/.ssh/id_rsa",
 		"--skip-dirs", "infra/.terraform",
 		"--skip-dirs", "node_modules",
 		"--skip-dirs", testResultsDirectory,

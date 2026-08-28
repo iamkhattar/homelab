@@ -12,7 +12,15 @@ var (
 	releaseNamePattern    = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]*$`)
 	imageTagPattern       = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$`)
 	gitSHAImageTagPattern = regexp.MustCompile(`^[0-9a-f]{40,64}$`)
+	apiIdentifierPattern  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
 )
+
+func validateAPIIdentifier(value, label string) error {
+	if !apiIdentifierPattern.MatchString(value) {
+		return fmt.Errorf("%s must be 1-128 characters using letters, numbers, dots, underscores, colons, or hyphens", label)
+	}
+	return nil
+}
 
 func validateInventoryHost(value string) error {
 	if !inventoryHostPattern.MatchString(value) {
