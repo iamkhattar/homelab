@@ -1,0 +1,3 @@
+image:
+  # homelabctl injects the committed SHA by default. CI publishes the same tag.
+  tag: {{ requiredEnv "HOMELAB_IMAGE_TAG" | quote }}

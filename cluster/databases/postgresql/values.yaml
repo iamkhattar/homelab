@@ -5,6 +5,8 @@ postgresql:
       adminPasswordKey: postgres-password
     database: homelab
   primary:
+    initdb:
+      scriptsSecret: postgresql-initdb
     persistence:
       enabled: true
       size: 10Gi
@@ -15,7 +17,30 @@ postgresql:
       limits:
         cpu: 500m
         memory: 512Mi
+    networkPolicy:
+      enabled: true
+      allowExternal: false
+      allowExternalEgress: false
+      extraIngress:
+        - from:
+            - namespaceSelector:
+                matchExpressions:
+                  - key: kubernetes.io/metadata.name
+                    operator: In
+                    values: [kitchenowl, paperless-ngx, vaultwarden]
+          ports:
+            - protocol: TCP
+              port: 5432
+      extraEgress:
+        - to:
+            - namespaceSelector: {}
+              podSelector:
+                matchLabels:
+                  k8s-app: kube-dns
+          ports:
+            - {protocol: UDP, port: 53}
+            - {protocol: TCP, port: 53}
   metrics:
     enabled: true
     serviceMonitor:
-      enabled: true
+      enabled: false

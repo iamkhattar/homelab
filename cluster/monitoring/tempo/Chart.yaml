@@ -1,0 +1,10 @@
+apiVersion: v2
+name: tempo
+description: Bounded single-binary trace storage for Titan
+type: application
+version: 0.1.0
+appVersion: "2.9.0"
+dependencies:
+  - name: tempo
+    version: "1.24.4"
+    repository: https://grafana.github.io/helm-charts

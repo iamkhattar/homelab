@@ -3,35 +3,99 @@ namespaces:
     labels:
       app.kubernetes.io/component: cert-manager
       6940469.xyz/category: core
+      pod-security.kubernetes.io/enforce: baseline
+      pod-security.kubernetes.io/enforce-version: v1.36
+      pod-security.kubernetes.io/audit: restricted
+      pod-security.kubernetes.io/audit-version: v1.36
+      pod-security.kubernetes.io/warn: restricted
+      pod-security.kubernetes.io/warn-version: v1.36
   - name: databases
     labels:
       app.kubernetes.io/component: database
       6940469.xyz/category: infrastructure
+      pod-security.kubernetes.io/enforce: baseline
+      pod-security.kubernetes.io/enforce-version: v1.36
+      pod-security.kubernetes.io/audit: restricted
+      pod-security.kubernetes.io/audit-version: v1.36
+      pod-security.kubernetes.io/warn: restricted
+      pod-security.kubernetes.io/warn-version: v1.36
   - name: storage
     labels:
       app.kubernetes.io/component: storage
       6940469.xyz/category: infrastructure
+      pod-security.kubernetes.io/enforce: baseline
+      pod-security.kubernetes.io/enforce-version: v1.36
+      pod-security.kubernetes.io/audit: restricted
+      pod-security.kubernetes.io/audit-version: v1.36
+      pod-security.kubernetes.io/warn: restricted
+      pod-security.kubernetes.io/warn-version: v1.36
   - name: monitoring
     labels:
       app.kubernetes.io/component: monitoring
       6940469.xyz/category: observability
+      pod-security.kubernetes.io/enforce: baseline
+      pod-security.kubernetes.io/enforce-version: v1.36
+      pod-security.kubernetes.io/audit: restricted
+      pod-security.kubernetes.io/audit-version: v1.36
+      pod-security.kubernetes.io/warn: restricted
+      pod-security.kubernetes.io/warn-version: v1.36
   - name: security
     labels:
       app.kubernetes.io/component: security
       6940469.xyz/category: security
-  - name: applications
-    labels:
+      pod-security.kubernetes.io/enforce: baseline
+      pod-security.kubernetes.io/enforce-version: v1.36
+      pod-security.kubernetes.io/audit: restricted
+      pod-security.kubernetes.io/audit-version: v1.36
+      pod-security.kubernetes.io/warn: restricted
+      pod-security.kubernetes.io/warn-version: v1.36
+  # Applications are separate security boundaries. Keep labels aligned so
+  # shared infrastructure can opt into category-wide access explicitly.
+  - name: homepage
+    labels: &applicationLabels
       app.kubernetes.io/component: application
-      6940469.xyz/category: applications
+      6940469.xyz/category: application
+      pod-security.kubernetes.io/enforce: baseline
+      pod-security.kubernetes.io/enforce-version: v1.36
+      pod-security.kubernetes.io/audit: restricted
+      pod-security.kubernetes.io/audit-version: v1.36
+      pod-security.kubernetes.io/warn: restricted
+      pod-security.kubernetes.io/warn-version: v1.36
+  - name: kitchenowl
+    labels: *applicationLabels
+  - name: ntfy
+    labels: *applicationLabels
+  - name: paperless-ngx
+    labels: *applicationLabels
+  - name: vaultwarden
+    labels: *applicationLabels
   - name: smart-home
     labels:
       app.kubernetes.io/component: smart-home
       6940469.xyz/category: applications
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/enforce-version: v1.36
+      pod-security.kubernetes.io/audit: restricted
+      pod-security.kubernetes.io/audit-version: v1.36
+      pod-security.kubernetes.io/warn: restricted
+      pod-security.kubernetes.io/warn-version: v1.36
   - name: networking
     labels:
       app.kubernetes.io/component: networking
       6940469.xyz/category: infrastructure
+      pod-security.kubernetes.io/enforce: baseline
+      pod-security.kubernetes.io/enforce-version: v1.36
+      pod-security.kubernetes.io/audit: restricted
+      pod-security.kubernetes.io/audit-version: v1.36
+      pod-security.kubernetes.io/warn: restricted
+      pod-security.kubernetes.io/warn-version: v1.36
   - name: cicd
     labels:
       app.kubernetes.io/component: cicd
       6940469.xyz/category: infrastructure
+      pod-security.kubernetes.io/enforce: baseline
+      pod-security.kubernetes.io/enforce-version: v1.36
+      pod-security.kubernetes.io/audit: restricted
+      pod-security.kubernetes.io/audit-version: v1.36
+      pod-security.kubernetes.io/warn: restricted
+      pod-security.kubernetes.io/warn-version: v1.36

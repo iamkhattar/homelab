@@ -1,0 +1,10 @@
+apiVersion: v2
+name: actions-runner-scale-set
+description: Scale-to-zero GitHub Actions runners for homelab deployment jobs
+type: application
+version: 0.1.0
+appVersion: "0.14.2"
+dependencies:
+  - name: gha-runner-scale-set
+    version: "0.14.2"
+    repository: oci://ghcr.io/actions/actions-runner-controller-charts

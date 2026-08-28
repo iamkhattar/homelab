@@ -1,0 +1,9 @@
+apiVersion: v2
+name: homelab-metrics-server
+description: Metrics Server for Kubernetes resource metrics and autoscaling
+type: application
+version: 0.1.0
+dependencies:
+  - name: metrics-server
+    version: 3.13.1
+    repository: https://kubernetes-sigs.github.io/metrics-server/

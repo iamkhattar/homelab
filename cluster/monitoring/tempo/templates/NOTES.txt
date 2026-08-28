@@ -1,0 +1,1 @@
+Tempo receives OTLP traces from Alloy and retains seven days on Titan.

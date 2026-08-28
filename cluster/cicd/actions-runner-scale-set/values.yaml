@@ -1,0 +1,36 @@
+gha-runner-scale-set:
+  githubConfigUrl: https://github.com/iamkhattar/homelab
+  githubConfigSecret: github-actions-credentials
+  runnerScaleSetName: titan
+  minRunners: 0
+  maxRunners: 1
+  controllerServiceAccount:
+    namespace: cicd
+    name: arc-controller
+  containerMode:
+    type: kubernetes
+    kubernetesModeWorkVolumeClaim:
+      accessModes:
+        - ReadWriteOnce
+      storageClassName: local-path
+      resources:
+        requests:
+          storage: 5Gi
+  template:
+    spec:
+      containers:
+        - name: runner
+          image: ghcr.io/actions/actions-runner:2.334.0
+          command:
+            - /home/runner/run.sh
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+      securityContext:
+        fsGroup: 123
+        seccompProfile:
+          type: RuntimeDefault

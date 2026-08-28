@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: binwiederhier/ntfy
-  tag: v2.11.0
+  tag: v2.26.3
   pullPolicy: IfNotPresent
 
 command: ["ntfy", "serve"]
@@ -13,9 +13,10 @@ service:
   containerPort: 80
 
 env:
-  NTFY_BASE_URL: "https://ntfy.example.com"  # Update with your domain
+  NTFY_BASE_URL: "https://ntfy.home.6940469.xyz"
   NTFY_UPSTREAM_BASE_URL: "https://ntfy.sh"
   NTFY_BEHIND_PROXY: "true"
+  NTFY_REQUIRE_LOGIN: "true"
 
 persistence:
   enabled: true

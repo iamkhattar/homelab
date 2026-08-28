@@ -45,18 +45,6 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-            {{- if .Values.vaultInitSecret.enabled }}
-            # VAULT_TOKEN comes from the Secret butler creates itself during
-            # first init. optional: true so the pod doesn't crashloop before
-            # init has happened; lifecycle.go also reads this Secret directly
-            # via the kube client so this env is mostly a convenience.
-            - name: VAULT_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.vaultInitSecret.name }}
-                  key: {{ .Values.vaultInitSecret.rootTokenKey }}
-                  optional: true
-            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -80,6 +68,13 @@ spec:
             - name: config
               mountPath: /etc/butler
               readOnly: true
+            - name: vault-token
+              mountPath: /var/run/secrets/butler-vault
+              readOnly: true
+            {{- if .Values.persistence.enabled }}
+            - name: operations
+              mountPath: /var/lib/butler
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
@@ -89,3 +84,16 @@ spec:
             items:
               - key: config.yaml
                 path: config.yaml
+        - name: vault-token
+          projected:
+            defaultMode: 0440
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  audience: vault
+                  expirationSeconds: 3600
+        {{- if .Values.persistence.enabled }}
+        - name: operations
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-operations
+        {{- end }}

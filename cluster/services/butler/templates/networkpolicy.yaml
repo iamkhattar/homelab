@@ -63,6 +63,17 @@ spec:
           port: 443
         - protocol: TCP
           port: 1411
+    # Garage admin API in storage/ for layout, bucket and key reconciliation.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: storage
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: garage
+      ports:
+        - protocol: TCP
+          port: 3903
     # DNS
     - to:
         - namespaceSelector: {}
@@ -74,4 +85,15 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    # OTLP telemetry to Alloy.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alloy
+      ports:
+        - protocol: TCP
+          port: 4318
 {{- end }}

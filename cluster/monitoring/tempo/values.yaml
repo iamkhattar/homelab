@@ -1,0 +1,19 @@
+tempo:
+  tempo:
+    reportingEnabled: false
+    retention: 168h
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+  persistence:
+    enabled: true
+    size: 5Gi
+  resources:
+    requests: {cpu: 100m, memory: 192Mi}
+    limits: {cpu: 500m, memory: 512Mi}
+  serviceMonitor:
+    enabled: false

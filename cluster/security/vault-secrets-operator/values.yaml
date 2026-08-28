@@ -26,4 +26,22 @@ vaultAuth:
     - databases
     - storage
     - monitoring
-    - applications
+    - homepage
+    - kitchenowl
+    - ntfy
+    - paperless-ngx
+    - vaultwarden
+    - cicd
+
+# Application VaultAuth objects are local to their namespace and map to a
+# distinct Vault Kubernetes role. A compromised application cannot use VSO to
+# read another application's paths.
+applicationVaultAuths:
+  - namespace: kitchenowl
+    role: vso-kitchenowl
+  - namespace: paperless-ngx
+    role: vso-paperless-ngx
+  - namespace: vaultwarden
+    role: vso-vaultwarden
+  - namespace: monitoring
+    role: vso-grafana
