@@ -24,7 +24,7 @@ known.
 | SSH hardening | Ready in repo | Key-only policy is opt-in so password access is not disabled before the key is proven. |
 | K3s server | Not deployed | Installation and verification runbooks exist; run them only after the host baseline succeeds. |
 | Cluster recovery | Not deployed | Embedded-etcd snapshots are configured, but an off-node export and restore test are still required. |
-| `homelabctl` | Ready in repo | The Go CLI is the documented operator interface for setup, inventory, SSH access, Debian/K3s lifecycle, diagnostics, snapshots, recovery export, docs, deployments, builds and checks. Reporting mode generates JUnit/JSON tests, gosec and Trivy SARIF, and an SPDX SBOM for retained CI artifacts and GitHub code scanning. Successful main builds publish checksum-protected Linux/macOS releases with built-in update support. Control-plane API commands remain future work. |
+| `homelabctl` | Ready in repo | The Go CLI is the documented operator interface for setup, inventory, SSH access, Debian/K3s lifecycle, diagnostics, snapshots, recovery export, Butler bootstrap/control, docs, deployments, builds and checks. Reporting mode generates JUnit/JSON tests, gosec and Trivy SARIF, and an SPDX SBOM for retained CI artifacts and GitHub code scanning. Successful main builds publish checksum-protected Linux/macOS releases with built-in update support. |
 | Documentation site | Ready in repo | Isolated VitePress project, intent-based handbook navigation, ordered section flows, unprivileged Nginx image and component engineering manuals are implemented. Internal cluster hosting waits on ingress and authentication. |
 
 ## Workload snapshot
@@ -33,14 +33,32 @@ known.
 | --- | --- | --- |
 | Ingress and internal DNS | Not deployed | Stable K3s, a LAN naming strategy and certificate approach |
 | Persistent storage | Blocked | Choose and test a single-node storage and backup model |
-| Prometheus, Grafana and Loki | Not deployed | Storage, retention and resource budgets |
-| Pocket ID | Not deployed | HTTPS ingress, internal DNS, persistent storage and backup |
-| Vault | Not deployed | Stable storage, unseal/recovery design and off-cluster bootstrap credentials |
+| Prometheus, Grafana, Loki, Tempo and Alloy | Ready in repo | Pinned bounded charts, seven-day retention, kube-state-metrics, node-exporter, OTLP receivers, log collection, Butler metrics/logs/traces, Grafana correlation and initial platform alerts render. Choose and test the final off-cluster Alertmanager receiver before relying on alerts. |
+| Pocket ID | Ready in repo | Pinned v2 deployment, Vault-provided encryption key, native OTLP, Butler-managed groups, users and OIDC clients, secret rotation into Vault, and Butler PKCE login exist; first owner/API key remain an interactive Titan checkpoint. |
+| Vault and Butler | Ready in repo | Top-level Butler has separate normal and private recovery runtimes. Recovery performs confirmed, resumable initialization; normal reconciliation uses projected Kubernetes auth. VSO remains the application secret-delivery path. Export the recovery Secret to an age-encrypted off-cluster bundle and restore-test on Titan. |
+| Shared PostgreSQL, Redis and Garage | Ready in repo | Helmfile order, least-privilege consumer projections, per-application PostgreSQL identities, persistence, NetworkPolicies and Garage v2 API reconciliation render successfully; deploy and restore-test on Titan |
+| Actions Runner Controller | Ready in repo | Controller and one scale-to-zero runner set render successfully; create/import a least-privilege GitHub App and prove a read-only job before deployment authority |
+| Homepage, KitchenOwl, ntfy, Vaultwarden and Paperless-ngx | Ready in repo | Each app has its own namespace; selected charts, pinned images, resources, persistence, scoped Vault credentials and initial NetworkPolicies exist; keep internal until per-app TLS/auth/backup checks pass |
 | Home Assistant | Not deployed | Storage, backup and a tested USB device strategy |
 | Zigbee and MQTT | Not deployed | Stable `/dev/serial/by-id` mapping and a decision on Zigbee2MQTT/Mosquitto |
 | Internal docs hosting | Not deployed | Container registry, ingress and access policy |
 | Tailscale | Not deployed | Tailnet identity, ACL and key-expiry decisions |
 | Hetzner agents | Legacy review | Tailscale transport and replacement of token-bearing cloud-init |
+
+## Newly implemented repository contracts
+
+- `homelabctl control login` uses Pocket ID Authorization Code with PKCE and a
+  loopback callback; logout removes the private cached session.
+- Butler issues only configured short-lived Kubernetes roles from Vault and
+  never records the returned bearer token.
+- Butler operations and audit-safe events survive pod restarts on a dedicated
+  PVC.
+- Bootstrap pauses for the Pocket ID management credential, reconciles groups
+  and OIDC clients, completes Vault OIDC, and only then becomes operational.
+- Metrics Server, broader platform alerts, and Kubernetes/Vault/cert-manager
+  dashboards are represented in Helmfile.
+- Real Vault, Pocket ID and Kubernetes integration tests exist behind the
+  explicit `integration` build tag and `BUTLER_INTEGRATION=1` guard.
 
 ## Immediate next checkpoint
 

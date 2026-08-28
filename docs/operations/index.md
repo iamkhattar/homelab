@@ -9,6 +9,7 @@ boundary and ends with verification.
 | Situation | Runbook |
 | --- | --- |
 | K3s has not been installed yet | [Install the K3s cluster](/operations/install) |
+| K3s is healthy and the platform is not installed | [Bootstrap the cluster platform](/operations/platform-bootstrap) |
 | Apply Debian updates, reboot or upgrade K3s | [Maintenance and upgrades](/operations/maintenance) |
 | Create, export or reason about recovery material | [Backup and recovery](/operations/backup-recovery) |
 | Titan, SSH, K3s or workloads are unhealthy | [Troubleshooting](/operations/troubleshooting) |

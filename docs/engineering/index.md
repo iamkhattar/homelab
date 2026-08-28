@@ -9,7 +9,8 @@ before changing automation, CLI behavior, CI or documentation structure.
 | --- | --- | --- |
 | `homelabctl/` | Typed operator workflows, validation and CI orchestration | [homelabctl introduction](/homelabctl/) |
 | `ansible/` | Debian baseline and K3s host lifecycle | [Ansible introduction](/ansible/) |
-| `cluster/` | Workload desired state composed with Helmfile | [Deployment workflow](/homelabctl/deploy-build-ci) |
+| `cluster/` | Workload desired state composed with Helmfile | [Cluster platform](/engineering/cluster-platform) |
+| `butler/` | Vault, identity and provider-API control plane | [Butler control plane](/engineering/butler-control-plane) |
 | `infra/` | Optional future Hetzner infrastructure planning | [Hetzner and Tailscale](/future/hetzner-tailscale) |
 | `docs/` | This isolated VitePress handbook and Nginx image | [Documentation system](/documentation/hosting) |
 | `.github/workflows/` | Checks and image publication through `homelabctl` | [CI workflow](/homelabctl/deploy-build-ci) |
@@ -31,6 +32,19 @@ homelabctl ci check --only workflows
 homelabctl ci check
 ```
 
+Real platform integration tests are opt-in. The Vault case creates and removes
+a unique probe secret; Pocket ID and Kubernetes checks are read-only:
+
+```bash
+cd butler
+BUTLER_INTEGRATION=1 VAULT_ADDR="$VAULT_ADDR" VAULT_TOKEN="$VAULT_TOKEN" \
+POCKET_ID_URL="$POCKET_ID_URL" POCKET_ID_API_KEY="$POCKET_ID_API_KEY" \
+KUBECONFIG="$KUBECONFIG" go test -tags=integration ./integration -count=1
+```
+
+Run these from the trusted LAN or a private runner after bootstrap and before
+accepting an upgrade. Normal CI intentionally excludes them.
+
 ## Design rule
 
 `homelabctl` owns workflow and validation, while Ansible, kubectl, Helmfile,
@@ -39,4 +53,5 @@ library for local repository plumbing or structured parsing. Do not recreate an
 infrastructure engine merely to avoid invoking its supported CLI.
 
 Continue with the component you intend to change: [homelabctl](/homelabctl/),
-[Ansible](/ansible/) or the [documentation system](/documentation/hosting).
+[Ansible](/ansible/), [Butler](/engineering/butler-control-plane) or the
+[documentation system](/documentation/hosting).

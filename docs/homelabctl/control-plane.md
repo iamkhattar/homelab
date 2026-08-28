@@ -1,14 +1,31 @@
-# Future control-plane integration
+# Butler control-plane integration
 
-This page describes intended behaviour, not commands available today.
+The connected control commands are implemented against Butler's versioned API.
+They remain separate from local recovery commands, which must work when Butler
+or the cluster is unavailable.
 
-::: warning Greenfield design
-The current `services/butler` implementation is experimental legacy work. It is
-not the specification for the new control plane, and its endpoints, reconcilers,
-Vault lifecycle, authentication model and storage choices carry no compatibility
-requirement. The service may be replaced, renamed or removed as this design is
-implemented.
-:::
+## Interactive sign-in
+
+```sh
+homelabctl control login
+homelabctl control status
+homelabctl control logout
+```
+
+Login opens Pocket ID, uses Authorization Code with PKCE on a fixed loopback
+callback, validates issuer, audience, state and nonce, then saves the short-lived
+ID token in the private user config directory. `--token` and `BUTLER_TOKEN` are
+explicit overrides and take precedence over the cached session.
+
+## Short-lived Kubernetes access
+
+```sh
+homelabctl control credentials issue --role homelab-viewer --ttl 15m
+homelabctl control credentials issue --role homelab-operator --ttl 30m --format json
+```
+
+The default response is a Kubernetes `ExecCredential`. Butler enforces the
+role, namespace and maximum TTL server-side and never persists the token.
 
 ## Two operating planes
 
@@ -22,18 +39,18 @@ implemented.
 The connected service must never become necessary to reinstall K3s, restore its
 datastore or redeploy the service itself.
 
-## Intended command families
+## Command families
 
 ```text
-homelabctl
-├── context list|show|use
-├── auth login|logout|status
-├── control status|reconcile|events
-└── trust show|install
+homelabctl control
+├── login|logout
+├── bootstrap|recovery
+├── status|operations|events
+├── users|groups|clients|applications
+└── credentials issue
 ```
 
-These names are reserved design direction. They must not appear in runnable
-runbooks until implemented and tested.
+Use `homelabctl control --help` for the executable reference.
 
 ## Context model
 

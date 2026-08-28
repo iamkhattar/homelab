@@ -124,13 +124,56 @@ homelabctl cluster recovery export \
   --ask-become-pass
 ```
 
+## Butler control plane
+
+All control-plane commands use Butler's versioned JSON API. By default the CLI
+opens a loopback-only `kubectl port-forward`; `--address` is available for an
+already-private endpoint. `control login` obtains a short-lived Pocket ID ID
+token with Authorization Code and PKCE and stores it in the private user config
+directory. `--token` or `BUTLER_TOKEN` are non-persistent overrides.
+
+| Command | Purpose | Safety boundary |
+| --- | --- | --- |
+| `control login`, `logout` | Create or remove the local Pocket ID session | Fixed loopback callback, PKCE, issuer/audience/state/nonce validation and private file permissions |
+| `control recovery` | Read bootstrap and Vault lifecycle status | Uses a 10-minute, audience-bound Kubernetes TokenRequest and the non-ingressed recovery service |
+| `control bootstrap --confirm` | Advance the resumable Vault bootstrap | Explicit confirmation is mandatory; secrets are never returned |
+| `control recovery export` | Write the recovery Secret directly to an age-encrypted off-repository file | Refuses repository and filesystem-root destinations and existing output files |
+| `control status`, `operations`, `events` | Inspect reconciliation and audit-safe activity | Viewer access; no request bodies or secret values are recorded |
+| `control users ...`, `groups`, `clients ...` | Manage Pocket ID identities and rotate client secrets | Mutations require Butler admin; rotated secrets go directly to Vault |
+| `control applications ...` | Manage non-secret application integration metadata | Names and identifiers are validated before API calls |
+| `control credentials issue` | Issue an approved short-lived Kubernetes token | Admin-only; role, namespace and maximum TTL are server-side; default output is an `ExecCredential` |
+
+```bash
+# One-time private bootstrap. The API key file is read locally and its value is
+# written directly to Vault; it is not stored in Git or a ConfigMap.
+homelabctl control recovery
+homelabctl control bootstrap --confirm \
+  --pocket-id-api-key-file /secure/pocket-id-api-key
+homelabctl control recovery export \
+  --output /secure/butler-vault-init.age \
+  --age-recipient age1example...
+
+# Normal Pocket ID-authenticated administration.
+homelabctl control login
+homelabctl control status
+homelabctl control users list
+homelabctl control users set-groups USER_ID --group GROUP_ID
+homelabctl control clients rotate CLIENT_ID
+homelabctl control credentials issue --role homelab-viewer --ttl 15m
+homelabctl control applications put kitchenowl \
+  --app-namespace kitchenowl \
+  --authentication native-oidc \
+  --host kitchenowl.home.6940469.xyz
+homelabctl control logout
+```
+
 ## Deployment and infrastructure
 
 | Command | Purpose | Validation and mutation |
 | --- | --- | --- |
-| `deploy diff` | Preview Helmfile changes | Read-only preview |
-| `deploy apply [release]` | Apply changed releases | Optional release uses lowercase letters, numbers, dots and hyphens |
-| `deploy sync` | Reconcile every release without diff gating | Mutating; intentionally explicit |
+| `deploy diff [--image-tag tag]` | Preview Helmfile changes | Read-only; image tag defaults to the committed Git SHA |
+| `deploy apply [release] [--stage stage] [--image-tag tag]` | Apply all changes, one release or one stage | Release/stage are exclusive; selected releases include declared Helmfile dependencies |
+| `deploy sync [--image-tag tag]` | Reconcile every release without diff gating | Mutating; intentionally explicit; image tag must already be published |
 | `infra fmt` | Check Terraform formatting | Does not rewrite files |
 | `infra validate` | Backend-free init and validation | May download providers |
 | `infra plan` | Query and plan configured infrastructure | Does not apply; may access backend/provider APIs |

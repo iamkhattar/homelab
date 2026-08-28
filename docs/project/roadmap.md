@@ -96,15 +96,19 @@ Acceptance criteria:
 
 ## Phase 3 — Observability
 
+**State:** ready in the repository; Titan deployment and signal verification remain outstanding.
+
 **Goal:** detect host and workload problems before adding household-critical apps.
 
-Planned stack:
+Implemented stack:
 
-- Prometheus for Kubernetes, node and application metrics;
+- Prometheus for Kubernetes, node and application metrics, with
+  kube-state-metrics and node-exporter;
 - Grafana for dashboards and alert investigation;
 - Loki for bounded log retention;
-- node exporter and Kubernetes state metrics;
-- alert delivery to an off-cluster channel.
+- monolithic Tempo for traces and Grafana Alloy for Kubernetes logs and OTLP;
+- Alertmanager with initial Butler, Vault and storage rules; the final
+  off-cluster receiver is an explicit deployment-time decision still to make.
 
 Before deployment, set disk, memory and retention budgets appropriate for a
 single mini PC. Avoid collecting high-cardinality data without a use case.
@@ -118,6 +122,9 @@ Acceptance criteria:
 - observability storage cannot consume the disk without a bound.
 
 ## Phase 4 — Identity and secrets
+
+**State:** first deployable repository increment complete; first-owner bootstrap,
+recovery export and Titan verification remain outstanding.
 
 **Goal:** centralise application sign-in and runtime secrets without creating a
 bootstrap loop.
@@ -140,7 +147,53 @@ Acceptance criteria:
 - applications receive secrets without plaintext values being committed to Git;
 - access policy is deny-by-default and understandable from the repository.
 
-## Phase 5 — Home automation
+## Phase 5 — Shared data and cluster delivery
+
+**Goal:** provide the selected applications with bounded shared state and a
+scale-to-zero deployment path.
+
+Work:
+
+- deploy one PostgreSQL instance with a separate database, role and
+  Vault-generated password per application;
+- deploy authenticated standalone Redis for real cache/queue consumers;
+- deploy Garage as internal S3-compatible storage without calling its local
+  copy a backup;
+- deploy Actions Runner Controller and a one-runner `titan` scale set whose
+  idle capacity is zero;
+- deliver GitHub App credentials through VSO and deployment credentials as
+  short-lived, bounded leases;
+- prove initial bootstrap from the control machine and routine deployment from
+  an ephemeral runner.
+
+Acceptance criteria:
+
+- each client can reach only its declared data services;
+- database credentials are distinct and never committed to Git;
+- state can be restored from a copy outside Titan;
+- the runner returns to zero pods after a job and cannot read unrelated Secrets
+  or use cluster-admin.
+
+## Phase 6 — Selected applications
+
+**Goal:** deploy the deliberately small initial application set.
+
+Deploy Homepage, KitchenOwl, ntfy, Vaultwarden and Paperless-ngx one at a time.
+An application remains internal until its Pocket ID pattern, HTTPS name,
+NetworkPolicy, telemetry, backup and restore have been verified. Vaultwarden
+uses native Pocket ID OIDC; applications without suitable native OIDC use the
+reviewed shared ingress authentication pattern.
+
+Acceptance criteria:
+
+- every app has a separate Vault path and only its required database/cache
+  identity;
+- every stateful app has a successful restore rehearsal;
+- no selected service is reachable from the public internet;
+- Homepage shows only reviewed internal links and has read-only Kubernetes API
+  access.
+
+## Phase 7 — Home automation
 
 **Goal:** run Home Assistant and Zigbee reliably enough for household use.
 
@@ -160,7 +213,7 @@ Acceptance criteria:
 - Home Assistant state can be restored on a clean deployment;
 - essential lights or devices retain a manual path during cluster downtime.
 
-## Phase 6 — Self-hosted operator services
+## Phase 8 — Self-hosted operator services
 
 **Goal:** host this handbook and selected operator tooling internally.
 
@@ -170,7 +223,7 @@ health and rollout checks to `homelabctl`.
 
 This phase follows identity so operational details are not accidentally exposed.
 
-## Phase 7 — Tailscale and Hetzner capacity
+## Phase 9 — Tailscale and Hetzner capacity
 
 **Goal:** add optional remote workers without making them part of the trusted
 default scheduling pool.
