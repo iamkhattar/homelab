@@ -55,6 +55,7 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 		example: "  homelabctl node diagnose --limit titan --ask-become-pass",
 	},
 	"homelabctl cluster": {long: "Install, inspect, back up, upgrade, and safely reboot the K3s cluster described by inventory."},
+	"homelabctl trust":   {long: "Export public platform trust material through the authenticated Kubernetes connection."},
 	"homelabctl cluster bootstrap": {
 		long:    "Apply the Debian baseline, install or reconcile the inventory-pinned K3s version through the official collection, configure kubeconfig, and wait for node readiness.",
 		example: "  homelabctl cluster bootstrap --ask-become-pass",

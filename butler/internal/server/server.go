@@ -69,8 +69,8 @@ func (s *Server) routes() {
 		s.mux.HandleFunc("GET /auth/callback", s.auth.Callback)
 		s.mux.HandleFunc("POST /auth/logout", s.auth.Logout)
 	}
-	// PKI CA chain is non-secret public PEM; safe to expose unauthenticated
-	// so a future homelabctl trust command can fetch it before authentication.
+	// PKI CA chain is non-secret public PEM and remains a diagnostic fallback;
+	// homelabctl trust export uses authenticated Kubernetes for initial trust.
 	s.mux.HandleFunc("GET /api/v1/pki/ca-chain", s.handleCAChain)
 
 	// Authenticated.

@@ -22,12 +22,15 @@ func TestOperationalCommandsConstructExpectedDryRuns(t *testing.T) {
 		{name: "deploy selected release", args: []string{"deploy", "apply", "cert-manager"}, want: []string{"helmfile apply --selector name=cert-manager --include-needs"}},
 		{name: "deploy selected stage", args: []string{"deploy", "apply", "--stage", "data"}, want: []string{"helmfile apply --selector stage=data --include-needs"}},
 		{name: "deploy sync", args: []string{"deploy", "sync"}, want: []string{"helmfile sync"}},
+		{name: "deploy ordered identity platform", args: []string{"deploy", "platform", "--through", "identity", "--confirm"}, want: []string{"stage=foundation", "stage=networking", "stage=secrets", "stage=identity"}},
+		{name: "deploy gated observability platform", args: []string{"deploy", "platform", "--through", "observability", "--confirm"}, want: []string{"stage=data", "butler-bootstrap-state", "stage=observability"}},
 		{name: "terraform format", args: []string{"infra", "fmt"}, want: []string{"terraform fmt -check -recursive", "/infra"}},
 		{name: "terraform validate", args: []string{"infra", "validate"}, want: []string{"terraform init -backend=false -input=false", "terraform validate"}},
 		{name: "terraform plan", args: []string{"infra", "plan"}, want: []string{"terraform plan"}},
 		{name: "cluster nodes", args: []string{"--context", "titan-admin", "cluster", "nodes"}, want: []string{"kubectl --context titan-admin get nodes -o wide --show-labels"}},
 		{name: "cluster unhealthy status", args: []string{"cluster", "status"}, want: []string{"get nodes -o wide", "--field-selector=status.phase!=Running,status.phase!=Succeeded"}},
 		{name: "cluster all pods", args: []string{"cluster", "status", "--all-pods"}, want: []string{"get pods --all-namespaces"}},
+		{name: "export authenticated CA trust", args: []string{"trust", "export", "--output", "/tmp/homelab-test-ca.pem"}, want: []string{"get configmap homelab-ca-bundle", "--output=jsonpath"}},
 		{name: "inventory verbose check", args: []string{"inventory", "check", "--verbose"}, want: []string{"ansible-inventory --graph", "ansible k3s_cluster --module-name ansible.builtin.ping -vv"}},
 		{name: "cluster upgrade", args: []string{"cluster", "upgrade", "--limit", "titan", "--ask-become-pass"}, want: []string{"playbooks/upgrade.yml --limit titan --ask-become-pass"}},
 	}
@@ -46,6 +49,22 @@ func TestOperationalCommandsConstructExpectedDryRuns(t *testing.T) {
 				if !strings.Contains(stderr.String(), fragment) {
 					t.Errorf("dry-run output %q does not contain %q", stderr.String(), fragment)
 				}
+			}
+			if strings.Contains(test.name, "platform") {
+				previous := -1
+				for _, stage := range platformStages {
+					position := strings.Index(stderr.String(), "stage="+stage)
+					if position < 0 {
+						continue
+					}
+					if position <= previous {
+						t.Errorf("platform stages are not ordered in output %q", stderr.String())
+					}
+					previous = position
+				}
+			}
+			if test.name == "deploy gated observability platform" && strings.Count(stderr.String(), "butler-bootstrap-state") != 1 {
+				t.Errorf("bootstrap acceptance gate should run exactly once: %q", stderr.String())
 			}
 			if test.name == "cluster all pods" && strings.Contains(stderr.String(), "--field-selector") {
 				t.Errorf("--all-pods output unexpectedly contains a field selector: %q", stderr.String())
@@ -110,6 +129,9 @@ func TestControlFlagsRejectInvalidCombinationsBeforeCommands(t *testing.T) {
 		{args: []string{"build", "services", "api", "--changed", "--base", "main"}, want: "cannot be combined"},
 		{args: []string{"build", "services", "--changed"}, want: "--base is required"},
 		{args: []string{"deploy", "apply", "postgresql", "--stage", "data"}, want: "cannot be used together"},
+		{args: []string{"deploy", "platform", "--through", "unknown", "--confirm"}, want: "--through must be one of"},
+		{args: []string{"deploy", "platform"}, want: "--confirm is required"},
+		{args: []string{"control", "verify-identity"}, want: "--confirm is required"},
 	}
 
 	for _, test := range tests {

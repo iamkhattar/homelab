@@ -41,6 +41,8 @@ type Status struct {
 	VaultInitialized    bool      `json:"vaultInitialized"`
 	VaultSealed         bool      `json:"vaultSealed"`
 	RecoverySecretFound bool      `json:"recoverySecretFound"`
+	ButlerLoginVerified bool      `json:"butlerLoginVerified"`
+	VaultLoginVerified  bool      `json:"vaultLoginVerified"`
 	CheckedAt           time.Time `json:"checkedAt"`
 	Error               string    `json:"error,omitempty"`
 }
@@ -83,6 +85,8 @@ func (s *Service) Status(ctx context.Context) Status {
 	}
 	if state, err := s.k8s.CoreV1().ConfigMaps(s.namespace).Get(ctx, stateConfigMapName, metav1.GetOptions{}); err == nil && state.Data["phase"] != "" {
 		status.Phase = state.Data["phase"]
+		status.ButlerLoginVerified = state.Data["butlerLoginVerified"] == "true"
+		status.VaultLoginVerified = state.Data["vaultLoginVerified"] == "true"
 	}
 	return status
 }
@@ -122,7 +126,57 @@ func (s *Service) Advance(ctx context.Context, confirmed bool) error {
 	if err := s.bootstrapper.Reconcile(ctx); err != nil {
 		return fmt.Errorf("completing Vault OIDC handoff: %w", err)
 	}
-	return s.setPhase(ctx, "operational")
+	return s.setPhase(ctx, "awaiting-identity-verification")
+}
+
+type IdentityEvidence struct {
+	PocketIDSubject string   `json:"pocketIdSubject"`
+	ButlerRole      string   `json:"butlerRole"`
+	VaultPolicies   []string `json:"vaultPolicies"`
+}
+
+// ConfirmIdentity records only non-secret evidence after homelabctl has
+// completed a real Pocket ID login to Butler and a separate Vault OIDC login.
+// The Vault token is verified and revoked on the workstation and never crosses
+// this API boundary.
+func (s *Service) ConfirmIdentity(ctx context.Context, evidence IdentityEvidence) error {
+	if strings.TrimSpace(evidence.PocketIDSubject) == "" || evidence.ButlerRole != "admin" {
+		return fmt.Errorf("a Pocket ID-authenticated Butler administrator is required")
+	}
+	if !contains(evidence.VaultPolicies, "vault-admin") || !contains(evidence.VaultPolicies, "k8s-admin") {
+		return fmt.Errorf("Vault OIDC login did not receive the required administrator policies")
+	}
+	state, err := s.k8s.CoreV1().ConfigMaps(s.namespace).Get(ctx, stateConfigMapName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("reading bootstrap identity phase: %w", err)
+	}
+	if state.Data["phase"] != "awaiting-identity-verification" && state.Data["phase"] != "operational" {
+		return fmt.Errorf("identity verification is not available during phase %q", state.Data["phase"])
+	}
+	if state.Data == nil {
+		state.Data = map[string]string{}
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	state.Data["butlerLoginVerified"] = "true"
+	state.Data["vaultLoginVerified"] = "true"
+	state.Data["identitySubject"] = evidence.PocketIDSubject
+	state.Data["identityVerifiedAt"] = now
+	state.Data["phase"] = "operational"
+	state.Data["updatedAt"] = now
+	state.Data["completedAt"] = now
+	if _, err := s.k8s.CoreV1().ConfigMaps(s.namespace).Update(ctx, state, metav1.UpdateOptions{}); err != nil {
+		return fmt.Errorf("recording identity verification: %w", err)
+	}
+	return nil
+}
+
+func contains(values []string, wanted string) bool {
+	for _, value := range values {
+		if value == wanted {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) setPhase(ctx context.Context, phase string) error {
@@ -138,7 +192,11 @@ func (s *Service) setPhase(ctx context.Context, phase string) error {
 	if err != nil {
 		return fmt.Errorf("reading bootstrap completion: %w", err)
 	}
-	state.Data = map[string]string{"phase": phase, "updatedAt": time.Now().UTC().Format(time.RFC3339)}
+	if state.Data == nil {
+		state.Data = map[string]string{}
+	}
+	state.Data["phase"] = phase
+	state.Data["updatedAt"] = time.Now().UTC().Format(time.RFC3339)
 	if phase == "operational" {
 		state.Data["completedAt"] = time.Now().UTC().Format(time.RFC3339)
 	}

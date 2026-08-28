@@ -73,22 +73,26 @@ func validateSnapshotName(value string) error {
 }
 
 func validateRecoveryDestination(root, destination string) (string, error) {
-	if err := validateNonBlank(destination, "recovery destination"); err != nil {
+	return validateExternalDestination(root, destination, "recovery destination")
+}
+
+func validateExternalDestination(root, destination, label string) (string, error) {
+	if err := validateNonBlank(destination, label); err != nil {
 		return "", err
 	}
 	absolute, err := filepath.Abs(destination)
 	if err != nil {
-		return "", fmt.Errorf("resolving recovery destination: %w", err)
+		return "", fmt.Errorf("resolving %s: %w", label, err)
 	}
 	if filepath.Dir(absolute) == absolute {
-		return "", fmt.Errorf("recovery destination must not be a filesystem root")
+		return "", fmt.Errorf("%s must not be a filesystem root", label)
 	}
 	relative, err := filepath.Rel(root, absolute)
 	if err != nil {
-		return "", fmt.Errorf("comparing recovery destination with repository: %w", err)
+		return "", fmt.Errorf("comparing %s with repository: %w", label, err)
 	}
 	if relative == "." || relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("recovery destination must be outside the repository")
+		return "", fmt.Errorf("%s must be outside the repository", label)
 	}
 	return absolute, nil
 }

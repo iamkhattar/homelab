@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestPersistentStoreSurvivesRestart(t *testing.T) {
@@ -14,7 +15,12 @@ func TestPersistentStoreSurvivesRestart(t *testing.T) {
 	}
 	first.Record("identity.user.created", "admin@example.test", "user created")
 	operation := first.Start(context.Background(), "reconcile", "admin@example.test", func(context.Context) error { return nil })
-	for i := 0; i < 100 && first.Operations()[0].State != Succeeded; i++ {
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) && first.Operations()[0].State != Succeeded {
+		time.Sleep(time.Millisecond)
+	}
+	if first.Operations()[0].State != Succeeded {
+		t.Fatal("operation did not finish before persistence reload")
 	}
 	second, err := NewPersistentStore(path, 10)
 	if err != nil {

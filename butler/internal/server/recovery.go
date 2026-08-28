@@ -30,7 +30,21 @@ func NewRecovery(auth RecoveryAuthorizer, service *recovery.Service) *RecoverySe
 	s.mux.Handle("GET /api/v1/recovery/status", s.protected(http.HandlerFunc(s.handleStatus)))
 	s.mux.Handle("POST /api/v1/bootstrap/advance", s.protected(http.HandlerFunc(s.handleAdvance)))
 	s.mux.Handle("PUT /api/v1/bootstrap/pocket-id-api-key", s.protected(http.HandlerFunc(s.handlePocketIDAPIKey)))
+	s.mux.Handle("POST /api/v1/bootstrap/identity-verification", s.protected(http.HandlerFunc(s.handleIdentityVerification)))
 	return s
+}
+
+func (s *RecoveryServer) handleIdentityVerification(w http.ResponseWriter, r *http.Request) {
+	var evidence recovery.IdentityEvidence
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8<<10)).Decode(&evidence); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	if err := s.service.ConfirmIdentity(r.Context(), evidence); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	writeJSON(w, http.StatusOK, s.service.Status(r.Context()))
 }
 
 func (s *RecoveryServer) handlePocketIDAPIKey(w http.ResponseWriter, r *http.Request) {

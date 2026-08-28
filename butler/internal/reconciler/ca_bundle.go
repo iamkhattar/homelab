@@ -13,8 +13,8 @@ import (
 
 // CABundleConfigMapName is the well-known ConfigMap name where butler
 // publishes the homelab PKI CA chain. Consumers (cert-manager, pods that
-// need to TLS-verify against in-cluster services, and a future homelabctl trust command
-// fallback) all read from this name.
+// need to TLS-verify against in-cluster services, and homelabctl trust export)
+// all read from this name.
 const (
 	CABundleConfigMapName = "homelab-ca-bundle"
 	CABundleNamespace     = "kube-system"

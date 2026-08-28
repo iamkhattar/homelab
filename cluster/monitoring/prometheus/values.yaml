@@ -95,6 +95,33 @@ prometheus:
               annotations:
                 summary: Pod has remained pending
                 description: Pod {{ $labels.namespace }}/{{ $labels.pod }} has been Pending for fifteen minutes.
+            - alert: KubernetesDaemonSetUnavailable
+              expr: kube_daemonset_status_number_available < kube_daemonset_status_desired_number_scheduled
+              for: 10m
+              labels: {severity: warning, service: kubernetes}
+              annotations:
+                summary: DaemonSet has unavailable pods
+                description: DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset }} is below its desired availability.
+            - alert: KubernetesJobFailed
+              expr: kube_job_status_failed > 0
+              for: 5m
+              labels: {severity: warning, service: kubernetes}
+              annotations:
+                summary: Kubernetes job failed
+                description: Job {{ $labels.namespace }}/{{ $labels.job_name }} has failed.
+            - alert: KubernetesContainerOOMKilled
+              expr: increase(kube_pod_container_status_restarts_total[15m]) > 0 and on(namespace,pod,container) kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+              labels: {severity: warning, service: kubernetes}
+              annotations:
+                summary: Container was OOM-killed
+                description: Container {{ $labels.container }} in {{ $labels.namespace }}/{{ $labels.pod }} exhausted its memory limit.
+            - alert: KubernetesPersistentVolumeClaimPending
+              expr: kube_persistentvolumeclaim_status_phase{phase="Pending"} == 1
+              for: 15m
+              labels: {severity: warning, service: kubernetes}
+              annotations:
+                summary: PersistentVolumeClaim remains pending
+                description: Claim {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} has not bound to storage.
             - alert: NodeFilesystemFilling
               expr: node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"} < 0.15
               for: 15m

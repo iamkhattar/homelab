@@ -471,7 +471,7 @@ func (c *Client) ensureJWTRoles(ctx context.Context, in BootstrapInput) error {
 			"allowed_redirect_uris": []string{
 				// Loopback for vault CLI; UI callback path for the Vault UI.
 				"http://localhost:8250/oidc/callback",
-				"https://vault." + firstDomain(in) + "/ui/vault/auth/oidc/oidc/callback",
+				"https://vault." + firstDomain(in) + "/ui/vault/auth/jwt/oidc/callback",
 			},
 		})
 		if err != nil {
@@ -816,8 +816,8 @@ func (c *Client) ensureAuditDevice(ctx context.Context) error {
 
 // CAChain returns the PEM-encoded CA chain (root + intermediate) from the
 // Vault PKI mounts. Used by the HTTP /api/v1/pki/ca-chain endpoint and by
-// the CA-bundle ConfigMap reconciler so a future homelabctl trust command has a stable
-// public source.
+// the CA-bundle ConfigMap reconciler so homelabctl trust export has a stable
+// authenticated source.
 func (c *Client) CAChain(ctx context.Context) (string, error) {
 	resp, err := c.raw.Logical().ReadWithContext(ctx, pkiIntMount+"/cert/ca_chain")
 	if err != nil {

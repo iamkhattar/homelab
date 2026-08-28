@@ -149,7 +149,7 @@ config:
       kind: confidential
       redirectURIs:
         - http://localhost:8250/oidc/callback
-        - https://vault.home.6940469.xyz/ui/vault/auth/oidc/oidc/callback
+        - https://vault.home.6940469.xyz/ui/vault/auth/jwt/oidc/callback
     - name: grafana
       kind: confidential
       redirectURIs:

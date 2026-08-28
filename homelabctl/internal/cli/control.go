@@ -17,18 +17,20 @@ import (
 )
 
 type controlOptions struct {
-	address   string
-	namespace string
-	token     string
-	issuer    string
-	clientID  string
-	session   string
+	address         string
+	recoveryAddress string
+	namespace       string
+	token           string
+	issuer          string
+	clientID        string
+	session         string
 }
 
 func newControlCommand(s *state) *cobra.Command {
 	options := &controlOptions{}
 	cmd := &cobra.Command{Use: "control", Short: "Operate Butler through its versioned API"}
 	cmd.PersistentFlags().StringVar(&options.address, "address", "", "existing Butler base URL; otherwise create a private kubectl port-forward")
+	cmd.PersistentFlags().StringVar(&options.recoveryAddress, "recovery-address", "", "existing Butler recovery URL; otherwise create a private kubectl port-forward")
 	cmd.PersistentFlags().StringVar(&options.namespace, "namespace", "security", "namespace containing Butler")
 	cmd.PersistentFlags().StringVar(&options.token, "token", "", "Pocket ID ID token override (or BUTLER_TOKEN)")
 	cmd.PersistentFlags().StringVar(&options.issuer, "issuer", "https://auth.home.6940469.xyz", "Pocket ID OIDC issuer")
@@ -38,6 +40,7 @@ func newControlCommand(s *state) *cobra.Command {
 	cmd.AddCommand(newControlLoginCommand(s, options))
 	cmd.AddCommand(newControlLogoutCommand(s, options))
 	cmd.AddCommand(newControlBootstrapCommand(s, options))
+	cmd.AddCommand(newControlVerifyIdentityCommand(s, options))
 	cmd.AddCommand(newControlRecoveryCommand(s, options))
 	cmd.AddCommand(newControlGetCommand(s, options, "status", "Show reconciler status", "/api/v1/status"))
 	cmd.AddCommand(newControlGetCommand(s, options, "operations", "List recent control-plane operations", "/api/v1/operations"))
@@ -48,6 +51,71 @@ func newControlCommand(s *state) *cobra.Command {
 	cmd.AddCommand(newControlApplicationsCommand(s, options))
 	cmd.AddCommand(newControlCredentialsCommand(s, options))
 	return cmd
+}
+
+func newControlVerifyIdentityCommand(s *state, options *controlOptions) *cobra.Command {
+	var vaultAddress, vaultRole string
+	var confirm bool
+	command := &cobra.Command{
+		Use:     "verify-identity",
+		Short:   "Prove Pocket ID login works for both Butler and Vault",
+		Long:    "Authenticate to Butler with the cached Pocket ID session, complete a separate browser OIDC login to Vault, verify its administrator policies, revoke that temporary Vault token, and submit only non-secret acceptance evidence to Butler recovery.",
+		Example: "  homelabctl control login\n  homelabctl control verify-identity --confirm",
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if !confirm {
+				return fmt.Errorf("--confirm is required to finalize identity bootstrap")
+			}
+			if s.dryRun {
+				s.info("would verify the cached Pocket ID session against Butler")
+				s.info("would complete Vault OIDC role " + vaultRole + " at " + vaultAddress + " and revoke the resulting token")
+				return withRecoveryClient(cmd.Context(), s, options, func(*controlapi.Client) error { return nil })
+			}
+			var principal struct {
+				Subject string `json:"subject"`
+				Role    string `json:"role"`
+			}
+			if err := withNormalClient(cmd.Context(), s, options, func(client *controlapi.Client) error {
+				return client.Do(cmd.Context(), http.MethodGet, "/api/v1/me", nil, &principal)
+			}); err != nil {
+				return fmt.Errorf("verifying Pocket ID login to Butler: %w", err)
+			}
+			if principal.Subject == "" || principal.Role != "admin" {
+				return fmt.Errorf("Pocket ID identity must map to Butler admin before bootstrap can complete")
+			}
+			evidence, err := controlapi.VerifyVaultOIDCLogin(cmd.Context(), controlapi.VaultOIDCOptions{
+				Address: vaultAddress,
+				Role:    vaultRole,
+				OpenURL: func(address string) error {
+					s.info("If the browser does not open, visit: " + address)
+					return browser.OpenURL(address)
+				},
+			})
+			if err != nil {
+				return err
+			}
+			return withRecoveryClient(cmd.Context(), s, options, func(client *controlapi.Client) error {
+				var status interface{}
+				if err := client.Do(cmd.Context(), http.MethodPost, "/api/v1/bootstrap/identity-verification", map[string]interface{}{
+					"pocketIdSubject": principal.Subject,
+					"butlerRole":      principal.Role,
+					"vaultPolicies":   evidence.Policies,
+				}, &status); err != nil {
+					return err
+				}
+				s.success("Pocket ID login to Butler and Vault verified; bootstrap is operational")
+				return printJSON(s, status)
+			})
+		},
+	}
+	defaultVaultAddress := os.Getenv("VAULT_ADDR")
+	if defaultVaultAddress == "" {
+		defaultVaultAddress = "https://vault.home.6940469.xyz"
+	}
+	command.Flags().StringVar(&vaultAddress, "vault-address", defaultVaultAddress, "Vault HTTPS address")
+	command.Flags().StringVar(&vaultRole, "vault-role", "homelab-admin", "Vault OIDC role expected to grant administrator policies")
+	command.Flags().BoolVar(&confirm, "confirm", false, "confirm final identity acceptance and bootstrap completion")
+	return command
 }
 
 func newControlCredentialsCommand(s *state, options *controlOptions) *cobra.Command {
@@ -409,6 +477,9 @@ func withRecoveryClient(ctx context.Context, s *state, options *controlOptions, 
 	token, err := s.output(ctx, s.root, "kubectl", "--context", s.kubeContext, "--namespace", options.namespace, "create", "token", "butler-recovery-client", "--audience=butler-recovery", "--duration=10m")
 	if err != nil {
 		return err
+	}
+	if options.recoveryAddress != "" {
+		return fn(controlapi.NewClient(options.recoveryAddress, token))
 	}
 	return withControlClient(ctx, s, options, "butler-recovery", 8081, token, fn)
 }
