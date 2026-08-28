@@ -50,6 +50,9 @@ A roadmap phase or increment is not complete until all of these are true:
 
 ## Phase 1 — Recoverable Titan foundation
 
+**State:** repository automation is ready; execution and recovery evidence on
+Titan remain outstanding.
+
 **Goal:** one dependable Debian host and one healthy K3s server.
 
 Work:
@@ -268,3 +271,7 @@ Acceptance criteria:
 - SMART/NVMe health and temperature monitoring;
 - signed provenance or attestations for the checksum-protected `homelabctl` release artifacts;
 - a concise change log recording upgrades, restore tests and hardware changes.
+
+These are not prerequisites for the first installation. The immediate gate is
+a healthy, reproducible K3s node plus a verified encrypted recovery copy held
+away from both Titan and the operator workstation.

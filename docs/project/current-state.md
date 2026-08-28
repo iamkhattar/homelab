@@ -14,6 +14,25 @@ known.
 
 <StatusLegend />
 
+## Pre-Titan handoff
+
+The repository is at the pre-Titan boundary: the supported host, cluster,
+platform and recovery workflows exist in Git and pass workstation validation.
+The remaining foundation work requires facts or evidence from the physical
+machine. Do not interpret **Ready in repo** as **Deployed**.
+
+| Category | Remaining work |
+| --- | --- |
+| Required on Titan | Finish Debian, reserve the LAN address, establish verified SSH access, apply the Ansible baseline, install K3s, export recovery material and rehearse a restore. |
+| Required before important data | Choose encrypted off-node storage and prove that K3s, Vault, database and application backups can be restored from it. |
+| Required before relying on alerts | Choose an off-cluster Alertmanager receiver, deliver its credential through Vault and verify a test notification. |
+| Required during platform bootstrap | Publish the private-address DNS records, define Vault recovery-share custody, complete the Pocket ID owner ceremony, initialize Vault through Butler, export recovery material and trust the private CA. |
+| Later design decisions | DNS-01 automation, internal resolver failover, ZHA versus Zigbee2MQTT, and the future Tailscale/Hetzner design. |
+
+Repository enhancements such as controlled automatic security updates,
+SMART/NVMe telemetry and signed build provenance are useful follow-up work, but
+they do not block the first recoverable Titan installation.
+
 ## Foundation snapshot
 
 | Area | Status | Evidence and next action |
@@ -87,6 +106,11 @@ The next safe sequence is deliberately small:
 
 Do not start the application platform until step 8 is complete. The detailed
 acceptance criteria for later phases live in the [roadmap](/project/roadmap).
+After the foundation passes, continue with the
+[platform bootstrap runbook](/operations/platform-bootstrap): deploy only
+through identity first, finish Pocket ID and Vault verification, export and
+trust the CA, and then add data, observability, CI/CD and applications one stage
+at a time.
 
 ## Sources of truth
 
