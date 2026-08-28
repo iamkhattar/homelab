@@ -31,11 +31,11 @@ known.
 
 | Capability | Status | Prerequisite |
 | --- | --- | --- |
-| Ingress and internal DNS | Not deployed | Stable K3s, a LAN naming strategy and certificate approach |
-| Persistent storage | Blocked | Choose and test a single-node storage and backup model |
-| Prometheus, Grafana, Loki, Tempo and Alloy | Ready in repo | Pinned bounded charts, seven-day retention, kube-state-metrics, node-exporter, OTLP receivers, log collection, Butler metrics/logs/traces, Grafana correlation and initial platform alerts render. Choose and test the final off-cluster Alertmanager receiver before relying on alerts. |
+| Ingress and internal DNS | Ready in repo | Helmfile-managed Traefik, `home.6940469.xyz`, Vault private PKI and authenticated CA export are selected. Publishing the private-address Namecheap records and proving household DNS/trust remain deployment checkpoints; public DNS-01 automation is later work. |
+| Persistent storage | Ready for testing | K3s local-path with bounded PVCs is the accepted single-node starting point. Select the encrypted off-node backup target and rehearse restores before storing important data. |
+| Prometheus, Grafana, Loki, Tempo and Alloy | Ready in repo | Pinned bounded charts, seven-day retention, kube-state-metrics, node-exporter, OTLP receivers, log collection, Butler metrics/logs/traces, Grafana correlation, reusable all-workload dashboards and workload/Job/PVC/OOM alerts render. Choose and test the final off-cluster Alertmanager receiver before relying on alerts. |
 | Pocket ID | Ready in repo | Pinned v2 deployment, Vault-provided encryption key, native OTLP, Butler-managed groups, users and OIDC clients, secret rotation into Vault, and Butler PKCE login exist; first owner/API key remain an interactive Titan checkpoint. |
-| Vault and Butler | Ready in repo | Top-level Butler has separate normal and private recovery runtimes. Recovery performs confirmed, resumable initialization; normal reconciliation uses projected Kubernetes auth. VSO remains the application secret-delivery path. Export the recovery Secret to an age-encrypted off-cluster bundle and restore-test on Titan. |
+| Vault and Butler | Ready in repo | Top-level Butler has separate normal and private recovery runtimes. Recovery performs confirmed, resumable initialization and now remains identity-pending until real Pocket ID logins to Butler and Vault pass. Normal reconciliation uses projected Kubernetes auth. VSO remains the application secret-delivery path. Export the recovery Secret to an age-encrypted off-cluster bundle and restore-test on Titan. |
 | Shared PostgreSQL, Redis and Garage | Ready in repo | Helmfile order, least-privilege consumer projections, per-application PostgreSQL identities, persistence, NetworkPolicies and Garage v2 API reconciliation render successfully; deploy and restore-test on Titan |
 | Actions Runner Controller | Ready in repo | Controller and one scale-to-zero runner set render successfully; create/import a least-privilege GitHub App and prove a read-only job before deployment authority |
 | Homepage, KitchenOwl, ntfy, Vaultwarden and Paperless-ngx | Ready in repo | Each app has its own namespace; selected charts, pinned images, resources, persistence, scoped Vault credentials and initial NetworkPolicies exist; keep internal until per-app TLS/auth/backup checks pass |
@@ -54,7 +54,15 @@ known.
 - Butler operations and audit-safe events survive pod restarts on a dedicated
   PVC.
 - Bootstrap pauses for the Pocket ID management credential, reconciles groups
-  and OIDC clients, completes Vault OIDC, and only then becomes operational.
+  and OIDC clients, then requires real Butler and Vault Pocket ID login proofs
+  before becoming operational. The temporary Vault token remains on the
+  workstation and is revoked after policy verification.
+- `homelabctl deploy platform` applies the supported Helmfile stage order and
+  rejects data, observability, CI/CD and application deployment while Butler's
+  bootstrap phase is not `operational`.
+- `homelabctl trust export` obtains the private PKI chain through authenticated
+  Kubernetes, validates every CA certificate and writes a non-overwriting public
+  bundle with displayed SHA-256 fingerprints.
 - Metrics Server, broader platform alerts, and Kubernetes/Vault/cert-manager
   dashboards are represented in Helmfile.
 - Real Vault, Pocket ID and Kubernetes integration tests exist behind the

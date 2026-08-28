@@ -202,9 +202,11 @@ consistent.
 - `--context` represents only a kubectl context, not a complete environment;
 - output is human-oriented; stable JSON output is planned;
 - updates are operator-triggered rather than an unattended background process;
-- deployment has no confirmation or rollback command yet;
+- ordered platform deployment has confirmation, while targeted apply/sync and
+  rollback remain deliberately native Helmfile/Helm procedures;
 - restore remains intentionally manual;
-- control-plane authentication and API-backed commands are not implemented.
+- the Pocket ID session uses a private local file rather than an OS credential
+  store.
 
 These limitations should be resolved through typed commands and documented
 contracts rather than hidden shell behaviour.

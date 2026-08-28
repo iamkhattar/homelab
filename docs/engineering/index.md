@@ -33,12 +33,16 @@ homelabctl ci check
 ```
 
 Real platform integration tests are opt-in. The Vault case creates and removes
-a unique probe secret; Pocket ID and Kubernetes checks are read-only:
+a unique probe secret; Pocket ID and the base Kubernetes checks are read-only.
+The Butler case requests a five-minute viewer credential and proves it can
+authenticate to Kubernetes and read pods without reusing the kubeconfig's
+original client credential:
 
 ```bash
 cd butler
 BUTLER_INTEGRATION=1 VAULT_ADDR="$VAULT_ADDR" VAULT_TOKEN="$VAULT_TOKEN" \
 POCKET_ID_URL="$POCKET_ID_URL" POCKET_ID_API_KEY="$POCKET_ID_API_KEY" \
+BUTLER_URL="$BUTLER_URL" BUTLER_TOKEN="$BUTLER_TOKEN" \
 KUBECONFIG="$KUBECONFIG" go test -tags=integration ./integration -count=1
 ```
 

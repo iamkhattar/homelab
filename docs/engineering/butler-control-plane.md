@@ -54,13 +54,16 @@ The recovery API reports one of these phases:
 1. `initialize-vault`;
 2. `unseal-vault`;
 3. `configure-vault`;
-4. `operational`.
+4. `awaiting-pocket-id-api-key`;
+5. `configure-identity`;
+6. `awaiting-identity-verification`;
+7. `operational`.
 
 Every Vault operation is idempotent. An initialized Vault without the selected
 `butler-vault-init` recovery Secret is treated as unsafe and Butler refuses to
 continue. Successful completion is recorded in the non-secret
-`butler-bootstrap-state` ConfigMap. Repeating bootstrap after `operational` is
-a no-op.
+`butler-bootstrap-state` ConfigMap. Vault configuration never skips the human
+identity acceptance gate. Repeating bootstrap after `operational` is a no-op.
 
 The initialization root token and unseal key live in the named recovery Secret
 because that is the chosen single-node recovery model. Normal Butler cannot
@@ -109,6 +112,22 @@ homelabctl control bootstrap --confirm \
 It is never passed as a command-line value, returned by Butler, or stored in an
 operation event.
 
+After reconciliation, the operator must prove both authentication paths:
+
+```bash
+homelabctl control login
+homelabctl control verify-identity --confirm
+```
+
+The first command proves Pocket ID issuer, audience, nonce, PKCE and Butler
+role mapping. The second checks `/api/v1/me`, performs Vault's browser OIDC
+flow against the `homelab-admin` role, looks up the temporary token's policies,
+and revokes it. Only non-secret evidence reaches
+`POST /api/v1/bootstrap/identity-verification`; Butler requires an admin role
+and both `vault-admin` and `k8s-admin` policies before changing the persisted
+phase to `operational`. The Vault token is held only in workstation memory and
+is never sent to Butler.
+
 ## Versioned management API
 
 The current API is under `/api/v1`:
@@ -123,6 +142,7 @@ The current API is under `/api/v1`:
 | `GET /identity/groups`, `/identity/clients` | viewer | Inspect provider metadata |
 | `POST /identity/clients/{id}/rotate` | admin | Rotate directly into Vault |
 | `GET/PUT /applications/{name}` | viewer/admin | Manage non-secret integration contracts |
+| `POST /bootstrap/identity-verification` | recovery identity | Accept non-secret evidence for both real human login paths |
 
 Operations keep only ID, kind, actor, state, timestamps and sanitized errors.
 Events contain no request bodies, tokens, API keys or provider responses.

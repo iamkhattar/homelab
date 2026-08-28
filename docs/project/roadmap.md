@@ -71,18 +71,28 @@ Acceptance criteria:
 
 ## Phase 2 — Cluster platform
 
+**State:** initial repository design complete; DNS publication, workstation CA
+trust, off-node backup selection and Titan restore testing remain outstanding.
+
 **Goal:** give applications stable networking, certificates, storage and backup.
 
-Decisions and work:
+Accepted implementation:
 
-- choose an internal DNS suffix and how LAN clients resolve it;
-- deploy ingress separately because bundled Traefik is disabled;
-- choose certificate issuance for private names;
-- audit existing Helmfile charts before applying anything inherited from the old
-  Hetzner cluster;
-- choose a single-node persistent-storage approach based on restore simplicity;
+- use `home.6940469.xyz` with private-address public DNS records and no router
+  port-forward;
+- deploy Traefik through Helmfile because bundled K3s Traefik is disabled;
+- begin with Vault private PKI and export its CA through authenticated
+  Kubernetes;
+- use bounded K3s local-path PVCs instead of claiming single-node Longhorn is
+  highly available;
+- keep one namespace per selected application.
+
+Remaining work:
+
+- select DNS-01 automation before moving to publicly trusted certificates;
 - define off-node application backup targets, schedules and restore tests;
-- establish resource requests, limits and namespace conventions.
+- measure the committed resource and retention budgets on Titan and adjust only
+  from observed pressure.
 
 Longhorn should not be assumed to provide high availability on one machine. Any
 storage choice must be evaluated by how it restores after loss of Titan's disk,
@@ -123,8 +133,9 @@ Acceptance criteria:
 
 ## Phase 4 — Identity and secrets
 
-**State:** first deployable repository increment complete; first-owner bootstrap,
-recovery export and Titan verification remain outstanding.
+**State:** repository implementation complete, including the real Butler and
+Vault login acceptance gate; first-owner bootstrap, recovery export and Titan
+verification remain outstanding.
 
 **Goal:** centralise application sign-in and runtime secrets without creating a
 bootstrap loop.
@@ -147,10 +158,19 @@ Acceptance criteria:
 - applications receive secrets without plaintext values being committed to Git;
 - access policy is deny-by-default and understandable from the repository.
 
+The repository workflow applies through identity, pauses for the interactive
+Pocket ID owner ceremony, then runs `homelabctl control verify-identity`. Data
+and later stages remain blocked until the persisted bootstrap phase is
+`operational`.
+
 ## Phase 5 — Shared data and cluster delivery
 
 **Goal:** provide the selected applications with bounded shared state and a
 scale-to-zero deployment path.
+
+`homelabctl deploy platform --through STAGE --confirm` now encodes the stage
+order. It re-applies earlier idempotent stages and checks Butler's operational
+acceptance gate before entering this phase.
 
 Work:
 

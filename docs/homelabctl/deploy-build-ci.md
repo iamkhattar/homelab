@@ -24,6 +24,24 @@ homelabctl deploy diff --image-tag v0.1.123
 
 ## Apply desired state
 
+For a platform installation or upgrade, use the dependency-ordered workflow:
+
+```bash
+homelabctl deploy platform --through identity --confirm
+homelabctl control bootstrap --confirm
+# Complete Pocket ID owner enrollment and import its management API key.
+homelabctl control login
+homelabctl control verify-identity --confirm
+homelabctl deploy platform --through applications --confirm
+```
+
+The safe default stops at `identity`. Before `data`, `observability`, `cicd` or
+`applications`, the CLI reads `security/butler-bootstrap-state` and requires
+the phase to be `operational`. Each ordered invocation re-applies earlier
+stages because Helmfile reconciliation is idempotent.
+
+The lower-level commands remain available for a targeted repair or inspection.
+
 Apply every changed release:
 
 ```bash

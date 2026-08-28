@@ -137,6 +137,7 @@ directory. `--token` or `BUTLER_TOKEN` are non-persistent overrides.
 | `control login`, `logout` | Create or remove the local Pocket ID session | Fixed loopback callback, PKCE, issuer/audience/state/nonce validation and private file permissions |
 | `control recovery` | Read bootstrap and Vault lifecycle status | Uses a 10-minute, audience-bound Kubernetes TokenRequest and the non-ingressed recovery service |
 | `control bootstrap --confirm` | Advance the resumable Vault bootstrap | Explicit confirmation is mandatory; secrets are never returned |
+| `control verify-identity --confirm` | Prove Pocket ID access to Butler and Vault before accepting bootstrap | Requires Butler admin; the temporary Vault token is verified, revoked and never sent to Butler |
 | `control recovery export` | Write the recovery Secret directly to an age-encrypted off-repository file | Refuses repository and filesystem-root destinations and existing output files |
 | `control status`, `operations`, `events` | Inspect reconciliation and audit-safe activity | Viewer access; no request bodies or secret values are recorded |
 | `control users ...`, `groups`, `clients ...` | Manage Pocket ID identities and rotate client secrets | Mutations require Butler admin; rotated secrets go directly to Vault |
@@ -155,6 +156,7 @@ homelabctl control recovery export \
 
 # Normal Pocket ID-authenticated administration.
 homelabctl control login
+homelabctl control verify-identity --confirm
 homelabctl control status
 homelabctl control users list
 homelabctl control users set-groups USER_ID --group GROUP_ID
@@ -167,6 +169,19 @@ homelabctl control applications put kitchenowl \
 homelabctl control logout
 ```
 
+## Platform trust
+
+| Command | Purpose | Safety boundary |
+| --- | --- | --- |
+| `trust export --output PATH` | Export the Vault PKI CA chain from `kube-system/homelab-ca-bundle` | Uses authenticated Kubernetes, validates every CA certificate, refuses repository/root destinations and never overwrites |
+
+```bash
+homelabctl trust export --output /secure/homelab-ca.pem
+```
+
+This deliberately uses Kubernetes as the initial trust root instead of
+accepting a CA merely because an unauthenticated HTTP endpoint returned it.
+
 ## Deployment and infrastructure
 
 | Command | Purpose | Validation and mutation |
@@ -174,12 +189,20 @@ homelabctl control logout
 | `deploy diff [--image-tag tag]` | Preview Helmfile changes | Read-only; image tag defaults to the committed Git SHA |
 | `deploy apply [release] [--stage stage] [--image-tag tag]` | Apply all changes, one release or one stage | Release/stage are exclusive; selected releases include declared Helmfile dependencies |
 | `deploy sync [--image-tag tag]` | Reconcile every release without diff gating | Mutating; intentionally explicit; image tag must already be published |
+| `deploy platform --through stage --confirm` | Apply stages in the supported dependency order | Defaults through identity and refuses later stages until Butler bootstrap is `operational` |
 | `infra fmt` | Check Terraform formatting | Does not rewrite files |
 | `infra validate` | Backend-free init and validation | May download providers |
 | `infra plan` | Query and plan configured infrastructure | Does not apply; may access backend/provider APIs |
 
 Terraform apply and destroy are deliberately absent. The inherited cloud-init
 path remains unsafe until token delivery and Tailscale networking are replaced.
+
+The ordered stages are `foundation`, `networking`, `secrets`, `identity`,
+`data`, `observability`, `cicd` and `applications`. A first installation stops
+after identity, runs `control bootstrap`, enrolls the Pocket ID owner, runs
+`control login` and `control verify-identity`, then continues through the
+remaining stages. `--recovery-address` can target an explicitly private
+recovery endpoint; otherwise the CLI creates a loopback-only port-forward.
 
 ## Builds and documentation
 

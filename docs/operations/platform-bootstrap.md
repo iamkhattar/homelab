@@ -13,9 +13,17 @@ Deploy commands default to the full Git SHA, so that immutable image must exist.
 ```bash
 homelabctl cluster status
 homelabctl deploy diff
+homelabctl deploy platform --through identity --confirm
 ```
 
 Stop if the context is unexpected or the diff deletes persistent state.
+
+`deploy platform` is the normal installation path. It applies the Helmfile
+stages in this fixed order: `foundation`, `networking`, `secrets`, `identity`,
+`data`, `observability`, `cicd`, then `applications`. `--through identity` is
+the safe default. Later stages are refused until Butler records successful
+Pocket ID authentication to both Butler and Vault. The individual stage
+commands below remain useful for inspection and recovery.
 
 ## 1. Foundation
 
@@ -54,9 +62,10 @@ homelabctl control recovery
 ```
 
 The phase progresses through `initialize-vault`, `unseal-vault` and
-`configure-vault` to `operational`. The operation is idempotent and refuses an
-already initialized Vault if `butler-vault-init` is missing. Successful
-bootstrap creates the bounded normal and recovery Kubernetes-auth roles.
+`configure-vault`, then pauses at `awaiting-pocket-id-api-key`. The operation
+is idempotent and refuses an already initialized Vault if `butler-vault-init`
+is missing. Successful Vault foundation creates the bounded normal and
+recovery Kubernetes-auth roles; it does not claim that identity works yet.
 
 Export the root token and unseal key directly into a new encrypted file:
 
@@ -79,18 +88,20 @@ kubectl get vaultauth,vaultstaticsecret -A
 kubectl -n cert-manager describe clusterissuer vault
 ```
 
-The current certificate path is Vault private PKI. Fetch the public CA chain
-before opening HTTPS services:
+The current certificate path is Vault private PKI. Export the public CA chain
+through the already-authenticated Kubernetes connection before opening HTTPS
+services:
 
 ```bash
-kubectl -n security port-forward service/butler 8080:8080
-curl --fail http://127.0.0.1:8080/api/v1/pki/ca-chain \
+homelabctl trust export \
   --output /secure/homelab-recovery/homelab-ca.pem
 openssl x509 -in /secure/homelab-recovery/homelab-ca.pem \
   -noout -subject -issuer -fingerprint -sha256
 ```
 
-Verify and install the root CA on LAN clients. Public Namecheap DNS-01
+The CLI validates every certificate, refuses to overwrite a file, and prints
+each SHA-256 fingerprint. Independently compare the fingerprint before
+installing the root CA on LAN clients. Public Namecheap DNS-01
 certificates are separate future networking work.
 
 ## 4. Pocket ID and management handoff
@@ -116,26 +127,30 @@ rm /secure/pocket-id-api-key
 
 Butler reconciles `homelab-admin`, `homelab-operator` and `homelab-viewer`, plus
 stable OIDC clients for Butler, Vault, Grafana and Vaultwarden. Assign the first
-owner to `homelab-admin`, open `https://butler.home.6940469.xyz`, and verify the
-Pocket ID PKCE login.
+owner to `homelab-admin`. Bootstrap now pauses at
+`awaiting-identity-verification`.
 
-Normal CLI management uses an audience-bound Pocket ID token and the same API
-as the embedded UI:
+Complete both real login paths from the operator workstation:
 
 ```bash
-export BUTLER_TOKEN='short-lived-pocket-id-id-token'
+homelabctl control login
 homelabctl control status
-homelabctl control groups
-homelabctl control users list
-homelabctl control clients list
-homelabctl control applications list
-unset BUTLER_TOKEN
+homelabctl control verify-identity --confirm
+homelabctl control recovery
 ```
+
+`verify-identity` first proves the cached Pocket ID session reaches normal
+Butler as an administrator. It then opens Vault's Pocket ID OIDC flow on a
+loopback callback, verifies that the resulting short-lived token has exactly
+the required `vault-admin` and `k8s-admin` capabilities, revokes that token,
+and submits only the Pocket ID subject, Butler role and Vault policy names to
+the private recovery API. No Vault token enters Butler, a file, or a Kubernetes
+Secret. The recovery phase becomes `operational` only after both proofs pass.
 
 ## 5. Shared data and API provisioning
 
 ```bash
-homelabctl deploy apply --stage data
+homelabctl deploy platform --through data --confirm
 kubectl -n databases get pods,pvc
 kubectl -n storage get pods,pvc
 ```
@@ -147,7 +162,7 @@ key. Garage on Titan remains local object storage, not an off-node backup.
 ## 6. Observability
 
 ```bash
-homelabctl deploy apply --stage observability
+homelabctl deploy platform --through observability --confirm
 kubectl -n monitoring get pods,pvc
 kubectl -n monitoring logs daemonset/alloy --tail=100
 ```
@@ -178,4 +193,6 @@ Stop rather than applying later stages when:
 - Pocket ID login, Butler audience validation or role mapping fails;
 - Alloy, a bounded observability PVC, or alert delivery is unhealthy.
 
-Only then apply `cicd` and applications one release at a time.
+Only then continue with `homelabctl deploy platform --through cicd --confirm`
+and finally `--through applications`. Helmfile remains idempotent, so earlier
+stages are intentionally rechecked on each ordered run.

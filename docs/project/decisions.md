@@ -19,9 +19,10 @@ runbooks so they do not become accidental or get repeatedly reopened.
 | Isolate the docs Node project under `docs/` | Accepted | Node dependencies and container context stay independent of Go services and repository root tooling. |
 | Use `homelabctl` for normal runbooks | Accepted | Operators get one typed, auditable interface; native commands remain visible implementation details and break-glass tools. |
 | Remote nodes are labelled and tainted | Accepted | Hetzner capacity is opt-in for workloads and cannot silently receive home-only services. |
-| Single-node storage implementation | Open | Existing Longhorn material must be audited; restore simplicity and off-node backup matter more than local replica count. |
-| Internal DNS and certificate strategy | Open | Must work for household devices without exposing private services or creating fragile manual configuration. |
-| Vault unseal and recovery model | Open | Must be designed before deployment and cannot depend solely on services inside the same cluster. |
+| Start with K3s local-path storage | Accepted | One node gains nothing from replicated Longhorn scheduling. Stateful services use bounded local PVCs while the off-node backup target remains a separate required decision. |
+| Use `home.6940469.xyz` with private-address public DNS records | Accepted | LAN and future Tailscale clients use one name without exposing a service; the router has no public ingress forwards. |
+| Begin with Vault private PKI | Accepted transitional design | The authenticated Kubernetes CA export establishes trust now. Publicly trusted DNS-01 certificates replace it after DNS automation is selected. |
+| Use manual Vault unseal and an encrypted off-node recovery export | Accepted | The Kubernetes recovery Secret supports single-node repair but is not the only copy; `homelabctl` exports it directly to age ciphertext. |
 | Native Zigbee versus Zigbee2MQTT | Open | Decide after USB passthrough and Home Assistant operational requirements are tested. |
 
 ## How to change a decision

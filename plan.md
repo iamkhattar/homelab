@@ -496,8 +496,7 @@ The workflow is initiated by `homelabctl control bootstrap`:
    the caller has the bootstrap role;
 5. Butler presents the planned Vault mounts, auth methods, policies, roles and
    recovery settings for explicit operator confirmation;
-6. the operator supplies only public PGP/age recipients and non-secret
-   bootstrap inputs;
+6. the operator supplies only non-secret bootstrap inputs;
 7. Butler verifies that the Vault endpoint belongs to the expected cluster and
    that Vault is not already initialized;
 8. Butler calls Vault's initialization API and receives the initial root token
@@ -564,8 +563,8 @@ leases Butler issued and recorded as non-secret operation metadata.
 Foundational Vault changes require an explicit elevated `homelabctl` operation.
 Butler's normal runtime identity is for bounded control-plane reconciliation.
 The dedicated `butler-identity-bootstrap` policy is bound only to the private
-recovery workload identity and can update the exact `auth/oidc/config` and
-approved `auth/oidc/role/*` paths, but cannot enable auth methods, change other
+recovery workload identity and can update the exact `auth/jwt/config` and
+approved `auth/jwt/role/*` paths, but cannot enable auth methods, change other
 policies or access secrets. It is invoked during guided identity bootstrap and
 later only through an explicit Kubernetes-authenticated OIDC reconfiguration
 operation. Normal Butler cannot use this policy.
@@ -1068,13 +1067,13 @@ directly from Vault or retain the submitted bootstrap copy.
 ### 9.2 Vault human authentication
 
 Pocket ID protects Vault's normal human UI and CLI access through Vault's OIDC
-auth method mounted at `auth/oidc`. This is separate from Kubernetes auth used
+auth method mounted at `auth/jwt`. This is separate from Kubernetes auth used
 by workloads and separate from Vault's recovery mechanisms.
 
 ```mermaid
 flowchart LR
   Human["Human operator"] --> PocketID["Pocket ID"]
-  PocketID -->|"OIDC authorization code flow"| VaultOIDC["Vault auth/oidc"]
+  PocketID -->|"OIDC authorization code flow"| VaultOIDC["Vault auth/jwt"]
   VaultOIDC -->|"group-bound short-lived Vault token"| VaultPolicy["Vault viewer, operator or admin policy"]
 
   Butler["Butler workload"] -->|"projected ServiceAccount token"| K8sAuth["Vault auth/kubernetes"]
@@ -1089,7 +1088,7 @@ the dedicated `butler-identity-bootstrap` policy; normal Butler never receives
 that capability. Configure the exact redirect URIs for:
 
 - the private Vault UI hostname at
-  `https://vault.home.6940469.xyz/ui/vault/auth/oidc/oidc/callback`;
+  `https://vault.home.6940469.xyz/ui/vault/auth/jwt/oidc/callback`;
 - Vault CLI browser login at `http://localhost:8250/oidc/callback`, unless the
   final CLI workflow deliberately selects another fixed loopback port.
 
@@ -1103,7 +1102,7 @@ The Vault OIDC client secret is provider-issued. Butler receives it once from
 Pocket ID and writes it directly to Vault's OIDC auth configuration over TLS;
 it is stored inside Vault's encrypted storage and never placed in Helm values,
 a ConfigMap, a Kubernetes Secret or Butler state. The normal Butler Vault
-policy cannot later read that client secret or rewrite `auth/oidc/config`.
+policy cannot later read that client secret or rewrite `auth/jwt/config`.
 
 Vault UI and CLI sessions use short-lived Vault tokens derived from OIDC policy
 mapping. Human operators do not retain static Vault tokens or use Kubernetes
@@ -1755,7 +1754,8 @@ homelabctl
 ├── context list|show|use
 ├── node prepare|connect|reboot|diagnose
 ├── cluster bootstrap|upgrade|status|snapshot|recovery
-├── deploy diff|apply|sync
+├── trust export
+├── deploy diff|apply|sync|platform
 ├── vault break-glass init|unseal|status|reconfigure
 ├── auth login|logout|status
 ├── identity users|groups|clients
@@ -1764,7 +1764,7 @@ homelabctl
 │   └── kubernetes roles|issue|revoke
 ├── integrations list|status|reconcile
 ├── secrets list|status|generate|import|rotate
-├── control bootstrap|status|events|operations|recovery
+├── control bootstrap|verify-identity|status|events|operations|recovery
 ├── infra plan|apply
 ├── build
 ├── docs
@@ -1826,18 +1826,7 @@ Target stages:
 - default NetworkPolicies;
 - quotas and LimitRanges.
 
-### Stage 2: secrets bootstrap
-
-- Vault;
-- Butler in private/bootstrap mode;
-- the Vault portion of Butler's guided bootstrap, initiated by
-  `homelabctl control bootstrap` and continued in its embedded loopback UI;
-- Vault Kubernetes auth, the Kubernetes secrets engine and its minimal
-  TokenRequest-only Kubernetes permissions;
-- VSO;
-- namespace-local Vault connections and auth resources.
-
-### Stage 3: networking and certificates
+### Stage 2: networking and certificates
 
 - Tailscale Kubernetes Operator with OAuth credentials delivered through VSO;
 - operator `Connector` advertising only `<titan-lan-ip>/32`;
@@ -1851,7 +1840,47 @@ Target stages:
 - Traefik;
 - internal DNS integration outside or alongside the cluster.
 
-### Stage 4: observability
+### Stage 3: secrets bootstrap
+
+- Vault;
+- Butler in private/bootstrap mode;
+- the Vault portion of Butler's guided bootstrap, initiated by
+  `homelabctl control bootstrap`;
+- Vault Kubernetes auth, the Kubernetes secrets engine and its minimal
+  TokenRequest-only Kubernetes permissions;
+- VSO;
+- namespace-local Vault connections and auth resources.
+
+### Stage 4: identity
+
+- Pocket ID with persistent storage and VSO-delivered secrets;
+- continuation of Butler's guided bootstrap through Pocket ID runtime readiness;
+- interactive initial owner/passkey enrollment coordinated and verified by
+  Butler;
+- Butler-created Pocket ID groups and OIDC clients through the management API;
+- Butler-configured Vault OIDC auth method and group-to-policy mappings;
+- `homelabctl control login` proves Pocket ID access to normal Butler;
+- `homelabctl control verify-identity` proves the Vault OIDC policy, revokes
+  the temporary Vault token and sends only non-secret evidence to recovery
+  Butler;
+- successful Pocket ID login to both Butler and Vault before Butler marks
+  bootstrap operational.
+
+### Stage 5: shared data services
+
+- one single-node PostgreSQL service with a separate database, login and
+  generated password for KitchenOwl, Paperless-ngx and Vaultwarden;
+- one authenticated standalone Redis service for real cache/queue consumers;
+- one single-node Garage service for S3-compatible application storage;
+- credentials generated by Butler in Vault and delivered by VSO;
+- application-only data-plane ingress and security-only Garage administration;
+- local persistence, explicit budgets and off-node backup before important
+  records are entrusted to these services.
+
+Garage is shared object storage, not a backup: a Garage volume on Titan fails
+with Titan. Backup copies still leave the node.
+
+### Stage 6: observability
 
 - kube-prometheus-stack or another reviewed Prometheus Operator stack;
 - kube-state-metrics for Kubernetes object state such as desired and available
@@ -1882,36 +1911,7 @@ Alloy must not scrape those same targets. Alloy still owns OTLP ingestion and
 logs. If a later design moves scraping into Alloy, the overlapping Prometheus
 jobs are disabled before the switch so duplicate series are never stored.
 
-### Stage 5: identity
-
-- Pocket ID with persistent storage and VSO-delivered secrets;
-- continuation of Butler's guided bootstrap through Pocket ID runtime readiness;
-- interactive initial owner/passkey enrollment coordinated and verified by
-  Butler;
-- Butler Pocket ID API access through a VSO Secret;
-- Butler-created Pocket ID groups and OIDC clients through the management API;
-- Butler-configured Vault OIDC auth method and group-to-policy mappings;
-- successful Pocket ID login to both Butler and Vault before Butler marks
-  bootstrap operational;
-- Pocket ID authentication for every normal Butler UI and API request;
-- optional shared authentication proxy;
-- initial groups and application clients.
-
-### Stage 6: shared data services
-
-- one single-node PostgreSQL service with a separate database, login and
-  generated password for KitchenOwl, Paperless-ngx and Vaultwarden;
-- one authenticated standalone Redis service for cache and queue workloads;
-- one single-node Garage service for S3-compatible application storage;
-- credentials generated by Butler in Vault and delivered by VSO;
-- application-only data-plane ingress and security-only Garage administration;
-- local persistence, explicit budgets and off-node backup before important
-  records are entrusted to these services.
-
-Garage is shared object storage, not a backup: a Garage volume on Titan fails
-with Titan. Backup copies still leave the node.
-
-### Stage 7: cluster delivery
+### Stage 7: cluster delivery (`cicd`)
 
 - Actions Runner Controller and a separate `titan` runner scale-set;
 - `minRunners: 0` and `maxRunners: 1` for the single-node resource budget;
@@ -1937,7 +1937,7 @@ path. LAN SSH and local `homelabctl deploy` remain the recovery path.
   each application are verified;
 - per-application VSO objects, NetworkPolicies, resource budgets and PVCs.
 
-### Stage 9: home automation
+### Deferred: home automation
 
 Home automation is preserved in the repository but follows the initial
 application and delivery foundation. It is not part of the first sync.
@@ -1949,7 +1949,7 @@ application and delivery foundation. It is not part of the first sync.
 - explicit Titan node affinity;
 - backups and restore test.
 
-### Stage 10: remote capacity
+### Deferred: remote capacity
 
 - additional operator egress, per-Service ingress or cross-cluster proxies only
   for demonstrated use cases;
@@ -1960,8 +1960,10 @@ Helmfile `needs` relationships reference active releases. In particular,
 Butler is now an active predecessor of VSO, removing the former dependency on
 a commented release.
 
-`homelabctl deploy apply --stage <stage>` should eventually map to Helmfile
-selectors and run preflight and post-deployment checks.
+`homelabctl deploy platform --through <stage> --confirm` implements this order.
+It stops at identity by default and refuses data and all later stages until the
+persisted Butler bootstrap phase is `operational`. The lower-level
+`deploy apply --stage <stage>` command remains available for targeted recovery.
 
 ## 13. Component review
 
@@ -2425,29 +2427,23 @@ Acceptance:
 
 ## 19. Open decisions
 
-These choices must be resolved before their implementation phase:
+These choices remain genuinely open; accepted repository decisions have been
+removed from this list:
 
-1. Final internal service subdomain beneath the accepted `6940469.xyz` zone,
-   proposed as `home.6940469.xyz`.
-2. DNS-01 automation while registration and current DNS are on Namecheap:
+1. DNS-01 automation while registration and current DNS are on Namecheap:
    delegated challenge zone, alternate authoritative DNS hosting, or a reviewed
    Namecheap webhook; then define the narrowest usable credential.
-3. Internal DNS resolver location and backup resolver behaviour.
-4. Vault integrated Raft versus another storage backend.
-5. Manual unseal versus a specific external auto-unseal provider.
-6. Shamir share count, threshold, encryption recipients and off-cluster custody
+2. Internal DNS resolver location and backup resolver behaviour.
+3. Shamir share count, threshold, encryption recipients and off-cluster custody
    locations.
-7. Persistent storage implementation and off-node backup target.
-8. kube-prometheus-stack versus separately managed observability charts.
-9. Exact Tempo retention, trace sampling policy and local volume budget after
+4. The concrete off-node backup target and restore schedule for Vault Raft,
+   shared databases, Garage metadata and application volumes.
+5. Exact Tempo retention, trace sampling policy and local volume budget after
    measuring Butler and application trace volume.
-10. ZHA versus Zigbee2MQTT and therefore whether Mosquitto is required.
-11. Which selected applications need a dedicated namespace after their measured
-    sensitivity, traffic and operational cost are reviewed.
-12. Which Pocket ID API operations safely support owner-lockout recovery, and
+6. ZHA versus Zigbee2MQTT and therefore whether Mosquitto is required.
+7. Which Pocket ID API operations safely support owner-lockout recovery, and
     which cases must use a documented backup restore or upstream recovery flow.
-13. Whether Butler custom resources begin at `v1alpha1` in the first API phase
-    or follow after the HTTP identity API.
+8. The off-cluster Alertmanager receiver and its credential-delivery path.
 
 ## 20. Definition of done
 
