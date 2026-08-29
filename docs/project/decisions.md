@@ -23,6 +23,13 @@ runbooks so they do not become accidental or get repeatedly reopened.
 | Use `home.6940469.xyz` with private-address public DNS records | Accepted | LAN and future Tailscale clients use one name without exposing a service; the router has no public ingress forwards. |
 | Begin with Vault private PKI | Accepted transitional design | The authenticated Kubernetes CA export establishes trust now. Publicly trusted DNS-01 certificates replace it after DNS automation is selected. |
 | Use manual Vault unseal and an encrypted off-node recovery export | Accepted | The Kubernetes recovery Secret supports single-node repair but is not the only copy; `homelabctl` exports it directly to age ciphertext. |
+| Deliver workload secrets through Vault Secrets Operator | Accepted | Applications consume ordinary scoped Kubernetes Secrets while Vault remains the source of truth; workloads do not receive broad Vault credentials. |
+| Use projected Kubernetes auth for normal Butler operation | Accepted | Butler receives short-lived, audience-bound identity from its ServiceAccount. Its private recovery deployment is separately authorised and is not an everyday root-token runtime. |
+| Use Pocket ID for supported human application login | Accepted | Butler, Vault and applications with suitable OIDC support share one passkey-based identity layer. Lower-level console, SSH and encrypted recovery material remain independent break-glass paths. |
+| Keep one namespace per application | Accepted | Namespace-scoped service accounts, Secrets, policies and quotas make application boundaries visible and testable. Shared platform services keep dedicated functional namespaces. |
+| Use Prometheus, Loki, Tempo, Grafana and Alloy | Accepted | The bounded single-node stack provides correlated metrics, logs and traces without introducing separate agents for each signal. Retention must be tuned from Titan measurements. |
+| Run Tailscale through the Kubernetes Operator only | Accepted | Remote application access may disappear with Kubernetes; host recovery stays on the trusted LAN through console or SSH and no host Tailscale daemon expands the recovery dependency chain. |
+| Scale GitHub Actions runners to zero | Accepted | Ephemeral runners provide the later deployment mechanism without a permanently idle workload. Their GitHub App and Kubernetes permissions remain least privilege. |
 | Native Zigbee versus Zigbee2MQTT | Open | Decide after USB passthrough and Home Assistant operational requirements are tested. |
 
 ## How to change a decision
