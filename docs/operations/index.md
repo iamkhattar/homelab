@@ -9,8 +9,10 @@ boundary and ends with verification.
 | Situation | Runbook |
 | --- | --- |
 | K3s has not been installed yet | [Install the K3s cluster](/operations/install) |
+| K3s is healthy and the platform is not installed | [Bootstrap the cluster platform](/operations/platform-bootstrap) |
 | Apply Debian updates, reboot or upgrade K3s | [Maintenance and upgrades](/operations/maintenance) |
 | Create, export or reason about recovery material | [Backup and recovery](/operations/backup-recovery) |
+| Record a deployment, upgrade or restore result | [Change and evidence record](/operations/change-evidence) |
 | Titan, SSH, K3s or workloads are unhealthy | [Troubleshooting](/operations/troubleshooting) |
 
 ## Standard operating loop
@@ -22,7 +24,8 @@ boundary and ends with verification.
 5. Preview where the underlying tool supports a meaningful preview.
 6. Apply one bounded change.
 7. Verify node, cluster and workload health.
-8. Update the current-state page when deployment reality changed.
+8. Complete a [change and evidence record](/operations/change-evidence).
+9. Update the current-state page when deployment reality changed.
 
 ::: warning Single-node maintenance
 Titan has no failover node. Reboots, K3s restarts and some storage changes cause

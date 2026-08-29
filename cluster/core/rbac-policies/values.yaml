@@ -3,8 +3,6 @@ serviceAccounts:
     namespace: security
   - name: prometheus
     namespace: monitoring
-  - name: fluent-bit
-    namespace: monitoring
   - name: database-operator
     namespace: databases
   - name: storage-admin
@@ -46,12 +44,6 @@ clusterRoles:
       - nonResourceURLs: ["/metrics"]
         verbs: ["get"]
 
-  - name: fluent-bit
-    rules:
-      - apiGroups: [""]
-        resources: ["namespaces", "pods", "pods/log"]
-        verbs: ["get", "list", "watch"]
-
   - name: storage-admin
     rules:
       - apiGroups: [""]
@@ -88,10 +80,6 @@ clusterRoleBindings:
     serviceAccount: prometheus
     namespace: monitoring
     clusterRole: prometheus
-  - name: fluent-bit
-    serviceAccount: fluent-bit
-    namespace: monitoring
-    clusterRole: fluent-bit
   - name: storage-admin
     serviceAccount: storage-admin
     namespace: storage

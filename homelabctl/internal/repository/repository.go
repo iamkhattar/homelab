@@ -134,6 +134,9 @@ func ChangedServiceNames(root, base string) ([]string, error) {
 			if len(parts) >= 2 && parts[0] == "services" && parts[1] != "" {
 				serviceNames[parts[1]] = struct{}{}
 			}
+			if len(parts) >= 1 && parts[0] == "butler" {
+				serviceNames["butler"] = struct{}{}
+			}
 		}
 	}
 	names := make([]string, 0, len(serviceNames))
@@ -190,14 +193,15 @@ func GoFiles(root string) ([]string, error) {
 func Services(root string) ([]Service, error) {
 	serviceRoot := filepath.Join(root, "services")
 	entries, err := os.ReadDir(serviceRoot)
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("reading services directory: %w", err)
 	}
 
 	var services []Service
+	butlerDir := filepath.Join(root, "butler")
+	if _, err := os.Stat(filepath.Join(butlerDir, "Dockerfile")); err == nil {
+		services = append(services, Service{Name: "butler", Dir: butlerDir})
+	}
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue

@@ -1,0 +1,10 @@
+The titan runner scale set is registered with minRunners=0 and maxRunners=1.
+
+Vault must contain secret/cicd/github-actions with GitHub App keys:
+  github_app_id
+  github_app_installation_id
+  github_app_private_key
+
+Deployment workflows should run homelabctl as a job container and obtain a
+short-lived, bounded Kubernetes credential. The runner itself is not granted
+cluster-admin and does not receive a static kubeconfig.

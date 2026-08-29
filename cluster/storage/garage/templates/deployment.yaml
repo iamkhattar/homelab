@@ -18,13 +18,20 @@ spec:
         app.kubernetes.io/name: {{ .Release.Name }}
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Release.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           ports:
             - name: s3
               containerPort: {{ .Values.service.s3Port }}
+              protocol: TCP
+            - name: rpc
+              containerPort: {{ .Values.service.rpcPort }}
               protocol: TCP
             - name: web
               containerPort: {{ .Values.service.webPort }}
@@ -32,19 +39,20 @@ spec:
             - name: admin
               containerPort: {{ .Values.service.adminPort }}
               protocol: TCP
-          env:
-            {{- range .Values.envFromSecrets }}
-            {{- $secretName := .secretName }}
-            {{- range $envVar, $secretKey := .keys }}
-            - name: {{ $envVar }}
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $secretName }}
-                  key: {{ $secretKey }}
-            {{- end }}
-            {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: admin
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: admin
+            initialDelaySeconds: 20
+            periodSeconds: 20
           volumeMounts:
             - name: config
               mountPath: /etc/garage.toml
@@ -59,8 +67,8 @@ spec:
             {{- end }}
       volumes:
         - name: config
-          configMap:
-            name: {{ .Release.Name }}-config
+          secret:
+            secretName: {{ .Release.Name }}-config
         {{- if .Values.persistence.data.enabled }}
         - name: data
           persistentVolumeClaim:

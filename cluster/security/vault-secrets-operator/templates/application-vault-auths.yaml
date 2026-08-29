@@ -1,0 +1,22 @@
+{{- range $index, $auth := .Values.applicationVaultAuths }}
+{{- if $index }}
+---
+{{- end }}
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultAuth
+metadata:
+  name: default
+  namespace: {{ $auth.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $.Release.Name }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+spec:
+  vaultConnectionRef: security/default
+  method: kubernetes
+  mount: kubernetes
+  kubernetes:
+    role: {{ $auth.role }}
+    serviceAccount: default
+    audiences:
+      - vault
+{{- end }}

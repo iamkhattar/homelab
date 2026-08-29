@@ -2,17 +2,156 @@ prometheus:
   server:
     persistentVolume:
       enabled: true
-      size: 10Gi
-    retention: "15d"
+      size: 8Gi
+    retention: "7d"
+    extraFlags:
+      - web.enable-lifecycle
+      - web.enable-remote-write-receiver
     resources:
       requests:
         cpu: 250m
-        memory: 512Mi
+        memory: 384Mi
       limits:
         cpu: 1000m
-        memory: 1Gi
+        memory: 768Mi
   alertmanager:
-    enabled: false
+    enabled: true
+    persistence:
+      enabled: true
+      size: 1Gi
+  serverFiles:
+    alerting_rules.yml:
+      groups:
+        - name: butler
+          rules:
+            - alert: ButlerUnavailable
+              expr: kube_deployment_status_replicas_available{namespace="security",deployment="butler"} < 1
+              for: 5m
+              labels: {severity: critical, service: butler}
+              annotations:
+                summary: Butler normal control plane is unavailable
+                description: Butler has had no available replica for five minutes. Use homelabctl control recovery over the LAN.
+            - alert: ButlerRecoveryUnavailable
+              expr: kube_deployment_status_replicas_available{namespace="security",deployment="butler-recovery"} < 1
+              for: 5m
+              labels: {severity: critical, service: butler-recovery}
+              annotations:
+                summary: Butler recovery plane is unavailable
+                description: The independent Butler recovery deployment has no available replica.
+            - alert: ButlerReconciliationFailures
+              expr: increase(butler_reconcile_runs_total{butler_reconciler_success="false"}[15m]) > 0
+              labels: {severity: warning, service: butler}
+              annotations:
+                summary: Butler reconciliation is failing
+                description: At least one Butler domain reconciler failed during the last 15 minutes.
+            - alert: VaultSealed
+              expr: vault_core_unsealed == 0
+              for: 2m
+              labels: {severity: critical, service: vault}
+              annotations:
+                summary: Vault is sealed
+                description: Vault has remained sealed for more than two minutes.
+            - alert: PersistentVolumeFilling
+              expr: kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes < 0.15
+              for: 15m
+              labels: {severity: warning}
+              annotations:
+                summary: Persistent volume is filling
+                description: A persistent volume has less than 15 percent free capacity.
+        - name: kubernetes-platform
+          rules:
+            - alert: KubernetesNodeNotReady
+              expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+              for: 5m
+              labels: {severity: critical, service: kubernetes}
+              annotations:
+                summary: Kubernetes node is not ready
+                description: Node {{ $labels.node }} has not been Ready for five minutes.
+            - alert: KubernetesDeploymentUnavailable
+              expr: kube_deployment_status_replicas_available < kube_deployment_spec_replicas
+              for: 10m
+              labels: {severity: warning, service: kubernetes}
+              annotations:
+                summary: Deployment has unavailable replicas
+                description: Deployment {{ $labels.namespace }}/{{ $labels.deployment }} has been below its desired replica count for ten minutes.
+            - alert: KubernetesStatefulSetUnavailable
+              expr: kube_statefulset_status_replicas_ready < kube_statefulset_replicas
+              for: 10m
+              labels: {severity: warning, service: kubernetes}
+              annotations:
+                summary: StatefulSet has unavailable replicas
+                description: StatefulSet {{ $labels.namespace }}/{{ $labels.statefulset }} has been below its desired replica count for ten minutes.
+            - alert: KubernetesPodCrashLooping
+              expr: increase(kube_pod_container_status_restarts_total[15m]) > 3
+              for: 5m
+              labels: {severity: warning, service: kubernetes}
+              annotations:
+                summary: Pod is repeatedly restarting
+                description: Container {{ $labels.container }} in {{ $labels.namespace }}/{{ $labels.pod }} restarted repeatedly.
+            - alert: KubernetesPodPending
+              expr: kube_pod_status_phase{phase="Pending"} == 1
+              for: 15m
+              labels: {severity: warning, service: kubernetes}
+              annotations:
+                summary: Pod has remained pending
+                description: Pod {{ $labels.namespace }}/{{ $labels.pod }} has been Pending for fifteen minutes.
+            - alert: KubernetesDaemonSetUnavailable
+              expr: kube_daemonset_status_number_available < kube_daemonset_status_desired_number_scheduled
+              for: 10m
+              labels: {severity: warning, service: kubernetes}
+              annotations:
+                summary: DaemonSet has unavailable pods
+                description: DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset }} is below its desired availability.
+            - alert: KubernetesJobFailed
+              expr: kube_job_status_failed > 0
+              for: 5m
+              labels: {severity: warning, service: kubernetes}
+              annotations:
+                summary: Kubernetes job failed
+                description: Job {{ $labels.namespace }}/{{ $labels.job_name }} has failed.
+            - alert: KubernetesContainerOOMKilled
+              expr: increase(kube_pod_container_status_restarts_total[15m]) > 0 and on(namespace,pod,container) kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+              labels: {severity: warning, service: kubernetes}
+              annotations:
+                summary: Container was OOM-killed
+                description: Container {{ $labels.container }} in {{ $labels.namespace }}/{{ $labels.pod }} exhausted its memory limit.
+            - alert: KubernetesPersistentVolumeClaimPending
+              expr: kube_persistentvolumeclaim_status_phase{phase="Pending"} == 1
+              for: 15m
+              labels: {severity: warning, service: kubernetes}
+              annotations:
+                summary: PersistentVolumeClaim remains pending
+                description: Claim {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} has not bound to storage.
+            - alert: NodeFilesystemFilling
+              expr: node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"} < 0.15
+              for: 15m
+              labels: {severity: warning, service: node}
+              annotations:
+                summary: Node filesystem is filling
+                description: Filesystem {{ $labels.mountpoint }} on {{ $labels.instance }} has less than 15 percent space remaining.
+        - name: platform-services
+          rules:
+            - alert: CertificateExpiringSoon
+              expr: certmanager_certificate_expiration_timestamp_seconds - time() < 1209600
+              for: 1h
+              labels: {severity: warning, service: cert-manager}
+              annotations:
+                summary: Certificate expires within fourteen days
+                description: Certificate {{ $labels.namespace }}/{{ $labels.name }} expires soon.
+            - alert: VaultUnavailable
+              expr: kube_statefulset_status_replicas_ready{namespace="security",statefulset=~"vault.*"} < 1
+              for: 5m
+              labels: {severity: critical, service: vault}
+              annotations:
+                summary: Vault is unavailable
+                description: Vault has no ready replica, so dependent secret delivery is blocked.
+            - alert: PocketIDUnavailable
+              expr: kube_deployment_status_replicas_available{namespace="security",deployment=~"pocket-id.*"} < 1
+              for: 5m
+              labels: {severity: critical, service: pocket-id}
+              annotations:
+                summary: Pocket ID is unavailable
+                description: Pocket ID has no available replica, so interactive sign-in is unavailable.
   kube-state-metrics:
     enabled: true
   prometheus-node-exporter:

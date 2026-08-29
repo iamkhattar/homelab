@@ -22,7 +22,7 @@ services; they are not prerequisites for securely bootstrapping Titan.
 | [`ansible/`](ansible/) | Debian baseline, SSH hardening and K3s lifecycle |
 | [`cluster/`](cluster/) | Helmfile-managed cluster foundations and workloads |
 | [`infra/`](infra/) | Optional Hetzner infrastructure managed with Terraform |
-| [`services/`](services/) | Custom services, currently including Butler |
+| [`butler/`](butler/) | Butler control-plane service, API and embedded operator UI |
 | [`docs/`](docs/) | Isolated VitePress handbook and internal documentation site |
 
 Desired state remains in the native configuration for each layer. The CLI owns
@@ -93,6 +93,12 @@ homelabctl deploy apply
 homelabctl cluster status
 homelabctl cluster snapshot save --name before-maintenance --ask-become-pass
 homelabctl cluster upgrade --ask-become-pass
+
+# Bootstrap and operate Butler over private port-forwards.
+homelabctl control recovery
+homelabctl control bootstrap --confirm
+BUTLER_TOKEN="$(security find-generic-password -w -s homelab-butler)" \
+  homelabctl control status
 
 # Update the installed CLI from a verified release.
 homelabctl update

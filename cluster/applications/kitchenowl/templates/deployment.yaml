@@ -18,13 +18,17 @@ spec:
         app.kubernetes.io/name: {{ .Release.Name }}
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: backend
-          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
-          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+        - name: kitchenowl
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           ports:
-            - name: backend
-              containerPort: {{ .Values.backend.port }}
+            - name: http
+              containerPort: {{ .Values.service.containerPort }}
               protocol: TCP
           env:
             {{- range $key, $value := .Values.env }}
@@ -42,24 +46,16 @@ spec:
             {{- end }}
             {{- end }}
           resources:
-            {{- toYaml .Values.resources.backend | nindent 12 }}
+            {{- toYaml .Values.resources | nindent 12 }}
+          readinessProbe:
+            httpGet: {path: /, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 10
           {{- if .Values.persistence.enabled }}
           volumeMounts:
             - name: data
               mountPath: {{ .Values.persistence.mountPath }}
           {{- end }}
-        - name: frontend
-          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
-          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: {{ .Values.frontend.port }}
-              protocol: TCP
-          env:
-            - name: BACK_URL
-              value: "http://localhost:{{ .Values.backend.port }}"
-          resources:
-            {{- toYaml .Values.resources.frontend | nindent 12 }}
       {{- if .Values.persistence.enabled }}
       volumes:
         - name: data

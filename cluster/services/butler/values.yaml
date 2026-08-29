@@ -12,19 +12,20 @@ service:
   port: 8080
   containerPort: 8080
 
+ingress:
+  enabled: true
+  host: butler.home.6940469.xyz
+  className: traefik
+  clusterIssuer: vault
+  tlsSecretName: butler-tls
+
 # Environment variables passed to the butler container. Tiny set — anything
 # substantive lives in the config ConfigMap below. These are kept here as
 # escape hatches for log level + alt config path overrides.
 env:
   LOG_LEVEL: "info"
-
-# When true, mount VAULT_TOKEN from the butler-vault-init Secret created by
-# the lifecycle reconciler after first init. optional: true means the pod
-# doesn't crashloop before init has happened.
-vaultInitSecret:
-  enabled: true
-  name: butler-vault-init
-  rootTokenKey: root-token
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy.monitoring.svc.cluster.local:4318"
+  BUTLER_OPERATIONS_PATH: "/var/lib/butler/operations.json"
 
 resources:
   requests:
@@ -34,8 +35,20 @@ resources:
     cpu: 250m
     memory: 256Mi
 
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+
 serviceAccount:
   name: butler
+
+recovery:
+  enabled: true
+  serviceAccount: butler-recovery
+  clientServiceAccount: butler-recovery-client
+  service:
+    port: 8081
 
 podSecurityContext:
   runAsNonRoot: true
@@ -72,6 +85,36 @@ networkPolicy:
 config:
   vault:
     address: http://vault.security.svc.cluster.local:8200
+    kubernetesAuth:
+      role: butler
+      tokenPath: /var/run/secrets/butler-vault/token
+      consumers:
+        - name: vso-kitchenowl
+          namespace: kitchenowl
+          serviceAccounts: [default]
+          paths:
+            - applications/kitchenowl
+            - applications/kitchenowl/database
+        - name: vso-paperless-ngx
+          namespace: paperless-ngx
+          serviceAccounts: [default]
+          paths:
+            - applications/paperless-ngx
+            - applications/paperless-ngx/database
+            - applications/paperless-ngx/redis
+        - name: vso-vaultwarden
+          namespace: vaultwarden
+          serviceAccounts: [default]
+          paths:
+            - applications/vaultwarden
+            - applications/vaultwarden/database
+            - oauth/vaultwarden
+        - name: vso-grafana
+          namespace: monitoring
+          serviceAccounts: [default]
+          paths:
+            - monitoring/grafana
+            - oauth/grafana
   server:
     port: "8080"
   reconcile:
@@ -79,28 +122,51 @@ config:
   oidc:
     # Set to https://auth.<domain> once Pocket-ID is reachable; empty disables
     # OIDC bootstrap of Vault auth/jwt and butler API authz.
-    issuer: ""
+    issuer: "https://auth.home.6940469.xyz"
     audience: butler
-  oauthClients: []
-  # Example: enable in Phase 1B once Pocket-ID admin API is reachable.
-  #  - name: vault
-  #    kind: confidential
-  #    redirectURIs:
-  #      - http://localhost:8250/oidc/callback
-  #      - https://vault.shivlab.com/ui/vault/auth/oidc/oidc/callback
-  #  - name: butler
-  #    kind: confidential
-  #    redirectURIs:
-  #      - http://localhost:8251/oidc/callback
+    allowedAudiences:
+      - homelabctl
+    adminURL: http://pocket-id.security.svc.cluster.local
+  # Butler owns group definitions through Pocket ID's admin API. Human users,
+  # passkeys, and group membership remain deliberate operator actions.
+  pocketIdGroups:
+    - name: homelab-admin
+      friendlyName: Homelab administrators
+    - name: homelab-operator
+      friendlyName: Homelab operators
+    - name: homelab-viewer
+      friendlyName: Homelab viewers
+  oauthClients:
+    - name: homelabctl
+      kind: public
+      redirectURIs:
+        - http://127.0.0.1:17654/callback
+    - name: butler
+      kind: public
+      redirectURIs:
+        - https://butler.home.6940469.xyz/auth/callback
+    - name: vault
+      kind: confidential
+      redirectURIs:
+        - http://localhost:8250/oidc/callback
+        - https://vault.home.6940469.xyz/ui/vault/auth/jwt/oidc/callback
+    - name: grafana
+      kind: confidential
+      redirectURIs:
+        - https://grafana.home.6940469.xyz/login/generic_oauth
+    - name: vaultwarden
+      kind: confidential
+      redirectURIs:
+        - https://vaultwarden.home.6940469.xyz/identity/connect/oidc-signin
   pki:
     rootCN: "Homelab Root CA"
     intCN: "Homelab Intermediate CA"
     organization: homelab
     allowedDomains:
-      - shivlab.com
+      - home.6940469.xyz
     roleMaxTTL: 720h
   k8sIssuance:
-    enabled: false
+    enabled: true
     hostNamespace: kube-system
     tokenReviewerNamespace: security
     tokenReviewerSA: vault-k8s-token-reviewer
@@ -137,3 +203,95 @@ config:
       keys:
         encryption-key:
           length: 32
+    - path: databases/postgresql
+      keys:
+        postgres-password:
+          length: 32
+        kitchenowl-password:
+          length: 32
+        paperless-password:
+          length: 32
+        vaultwarden-password:
+          length: 32
+        vaultwarden-url:
+          template: "postgresql://vaultwarden:{{vaultwarden-password}}@postgresql.databases.svc.cluster.local:5432/vaultwarden"
+        init.sql:
+          template: |
+            CREATE ROLE kitchenowl LOGIN PASSWORD '{{kitchenowl-password}}';
+            CREATE DATABASE kitchenowl OWNER kitchenowl;
+            CREATE ROLE paperless LOGIN PASSWORD '{{paperless-password}}';
+            CREATE DATABASE paperless OWNER paperless;
+            CREATE ROLE vaultwarden LOGIN PASSWORD '{{vaultwarden-password}}';
+            CREATE DATABASE vaultwarden OWNER vaultwarden;
+    - path: databases/redis
+      keys:
+        redis-password:
+          length: 32
+        redis-url:
+          template: "redis://:{{redis-password}}@redis-master.databases.svc.cluster.local:6379/0"
+    - path: storage/garage
+      keys:
+        rpc-secret:
+          hexLength: 32
+        admin-token:
+          length: 32
+        metrics-token:
+          length: 32
+    - path: applications/kitchenowl
+      keys:
+        jwt-secret:
+          length: 48
+    - path: applications/paperless-ngx
+      keys:
+        secret-key:
+          length: 48
+        admin-user:
+          static: admin
+        admin-password:
+          length: 32
+    - path: applications/vaultwarden
+      keys:
+        admin-token:
+          length: 48
+    - path: monitoring/grafana
+      keys:
+        admin-user:
+          static: admin
+        admin-password:
+          length: 32
+  managedCredentials:
+    - sourcePath: databases/postgresql
+      destinationPath: applications/kitchenowl/database
+      keys:
+        password: kitchenowl-password
+      static:
+        username: kitchenowl
+    - sourcePath: databases/postgresql
+      destinationPath: applications/paperless-ngx/database
+      keys:
+        password: paperless-password
+      static:
+        username: paperless
+    - sourcePath: databases/redis
+      destinationPath: applications/paperless-ngx/redis
+      keys:
+        redis-url: redis-url
+    - sourcePath: databases/postgresql
+      destinationPath: applications/vaultwarden/database
+      keys:
+        database-url: vaultwarden-url
+  garage:
+    enabled: true
+    endpoint: http://garage.storage.svc.cluster.local:3903
+    adminTokenPath: storage/garage
+    adminTokenKey: admin-token
+    layout:
+      zone: titan
+      # Logical Garage capacity budget; keep below the actual persistent disk.
+      capacityBytes: 53687091200
+    buckets:
+      - name: homelab-backups
+        credentialPath: storage/garage/clients/backups
+        read: true
+        write: true
+        owner: false

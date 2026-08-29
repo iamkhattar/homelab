@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: vaultwarden/server
-  tag: "1.32.5"
+  tag: "1.37.0"
   pullPolicy: IfNotPresent
 
 service:
@@ -11,17 +11,27 @@ service:
   containerPort: 80
 
 env:
-  DOMAIN: "https://vault.example.com"  # Update with your domain
+  DOMAIN: "https://vaultwarden.home.6940469.xyz"
   SIGNUPS_ALLOWED: "false"
   INVITATIONS_ALLOWED: "true"
   SHOW_PASSWORD_HINT: "false"
   ROCKET_PORT: "80"
+  SSO_ENABLED: "true"
+  SSO_ONLY: "false"
+  SSO_AUTHORITY: "https://auth.home.6940469.xyz"
+  SSO_SCOPES: "email profile"
 
 envFromSecrets:
   - secretName: vaultwarden-credentials
     keys:
       ADMIN_TOKEN: admin-token
+  - secretName: vaultwarden-database
+    keys:
       DATABASE_URL: database-url
+  - secretName: vaultwarden-oidc
+    keys:
+      SSO_CLIENT_ID: client_id
+      SSO_CLIENT_SECRET: client_secret
 
 persistence:
   enabled: true

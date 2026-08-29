@@ -19,14 +19,18 @@ func TestOperationalCommandsConstructExpectedDryRuns(t *testing.T) {
 		want []string
 	}{
 		{name: "deploy diff", args: []string{"deploy", "diff"}, want: []string{"helmfile diff", "/cluster"}},
-		{name: "deploy selected release", args: []string{"deploy", "apply", "cert-manager"}, want: []string{"helmfile apply --selector name=cert-manager"}},
+		{name: "deploy selected release", args: []string{"deploy", "apply", "cert-manager"}, want: []string{"helmfile apply --selector name=cert-manager --include-needs"}},
+		{name: "deploy selected stage", args: []string{"deploy", "apply", "--stage", "data"}, want: []string{"helmfile apply --selector stage=data --include-needs"}},
 		{name: "deploy sync", args: []string{"deploy", "sync"}, want: []string{"helmfile sync"}},
+		{name: "deploy ordered identity platform", args: []string{"deploy", "platform", "--through", "identity", "--confirm"}, want: []string{"stage=foundation", "stage=networking", "stage=secrets", "stage=identity"}},
+		{name: "deploy gated observability platform", args: []string{"deploy", "platform", "--through", "observability", "--confirm"}, want: []string{"stage=data", "butler-bootstrap-state", "stage=observability"}},
 		{name: "terraform format", args: []string{"infra", "fmt"}, want: []string{"terraform fmt -check -recursive", "/infra"}},
 		{name: "terraform validate", args: []string{"infra", "validate"}, want: []string{"terraform init -backend=false -input=false", "terraform validate"}},
 		{name: "terraform plan", args: []string{"infra", "plan"}, want: []string{"terraform plan"}},
 		{name: "cluster nodes", args: []string{"--context", "titan-admin", "cluster", "nodes"}, want: []string{"kubectl --context titan-admin get nodes -o wide --show-labels"}},
 		{name: "cluster unhealthy status", args: []string{"cluster", "status"}, want: []string{"get nodes -o wide", "--field-selector=status.phase!=Running,status.phase!=Succeeded"}},
 		{name: "cluster all pods", args: []string{"cluster", "status", "--all-pods"}, want: []string{"get pods --all-namespaces"}},
+		{name: "export authenticated CA trust", args: []string{"trust", "export", "--output", "/tmp/homelab-test-ca.pem"}, want: []string{"get configmap homelab-ca-bundle", "--output=jsonpath"}},
 		{name: "inventory verbose check", args: []string{"inventory", "check", "--verbose"}, want: []string{"ansible-inventory --graph", "ansible k3s_cluster --module-name ansible.builtin.ping -vv"}},
 		{name: "cluster upgrade", args: []string{"cluster", "upgrade", "--limit", "titan", "--ask-become-pass"}, want: []string{"playbooks/upgrade.yml --limit titan --ask-become-pass"}},
 	}
@@ -45,6 +49,22 @@ func TestOperationalCommandsConstructExpectedDryRuns(t *testing.T) {
 				if !strings.Contains(stderr.String(), fragment) {
 					t.Errorf("dry-run output %q does not contain %q", stderr.String(), fragment)
 				}
+			}
+			if strings.Contains(test.name, "platform") {
+				previous := -1
+				for _, stage := range platformStages {
+					position := strings.Index(stderr.String(), "stage="+stage)
+					if position < 0 {
+						continue
+					}
+					if position <= previous {
+						t.Errorf("platform stages are not ordered in output %q", stderr.String())
+					}
+					previous = position
+				}
+			}
+			if test.name == "deploy gated observability platform" && strings.Count(stderr.String(), "butler-bootstrap-state") != 1 {
+				t.Errorf("bootstrap acceptance gate should run exactly once: %q", stderr.String())
 			}
 			if test.name == "cluster all pods" && strings.Contains(stderr.String(), "--field-selector") {
 				t.Errorf("--all-pods output unexpectedly contains a field selector: %q", stderr.String())
@@ -108,6 +128,10 @@ func TestControlFlagsRejectInvalidCombinationsBeforeCommands(t *testing.T) {
 		{args: []string{"setup", "unknown"}, want: "unknown setup target"},
 		{args: []string{"build", "services", "api", "--changed", "--base", "main"}, want: "cannot be combined"},
 		{args: []string{"build", "services", "--changed"}, want: "--base is required"},
+		{args: []string{"deploy", "apply", "postgresql", "--stage", "data"}, want: "cannot be used together"},
+		{args: []string{"deploy", "platform", "--through", "unknown", "--confirm"}, want: "--through must be one of"},
+		{args: []string{"deploy", "platform"}, want: "--confirm is required"},
+		{args: []string{"control", "verify-identity"}, want: "--confirm is required"},
 	}
 
 	for _, test := range tests {
@@ -162,7 +186,7 @@ func TestCICheckGoTestRunsEveryDiscoveredModule(t *testing.T) {
 
 func TestCICheckReportingModeGeneratesEveryReportThroughPinnedTools(t *testing.T) {
 	repo := testRepository(t)
-	for _, module := range []string{"homelabctl", filepath.Join("services", "butler")} {
+	for _, module := range []string{"homelabctl", "butler"} {
 		directory := filepath.Join(repo, module)
 		if err := os.MkdirAll(directory, 0o755); err != nil {
 			t.Fatal(err)
@@ -182,12 +206,12 @@ func TestCICheckReportingModeGeneratesEveryReportThroughPinnedTools(t *testing.T
 	}
 	for _, fragment := range []string{
 		"gotestsum --format standard-quiet --junitfile " + filepath.Join(repo, "test-results", "homelabctl.xml"),
-		"gosec -track-suppressions -fmt sarif -out " + filepath.Join(repo, "sarif", "gosec-services-butler.sarif"),
+		"gosec -track-suppressions -fmt sarif -out " + filepath.Join(repo, "sarif", "gosec-butler.sarif"),
 		"docker run --rm --volume " + repo + ":/workspace:ro --volume " + filepath.Join(repo, "sarif") + ":/reports --volume " + filepath.Join(repo, "trivy-cache") + ":/cache --workdir /workspace " + trivyImage + " fs --cache-dir /cache --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 0 --format sarif --output /reports/trivy.sarif",
 		"docker run --rm --volume " + repo + ":/workspace:ro --volume " + filepath.Join(repo, "sarif") + ":/reports --volume " + filepath.Join(repo, "trivy-cache") + ":/cache --workdir /workspace " + trivyImage + " fs --cache-dir /cache --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --format table --ignorefile /workspace/.trivyignore.yaml",
 		"docker run --rm --volume " + repo + ":/workspace:ro --volume " + filepath.Join(repo, "sbom") + ":/reports --volume " + filepath.Join(repo, "trivy-cache") + ":/cache --workdir /workspace " + trivyImage + " fs --cache-dir /cache --format spdx-json --output /reports/homelab.spdx.json",
 		"--skip-dirs ansible/.ansible --skip-dirs ansible/.venv --skip-dirs ansible/collections --skip-dirs bin --skip-dirs \"cluster/**/charts\"",
-		"--skip-dirs docs/node_modules --skip-dirs docs/.vitepress/cache --skip-dirs docs/.vitepress/dist --skip-dirs docs/.vitepress/.temp --skip-dirs infra/.terraform --skip-dirs node_modules",
+		"--skip-dirs docs/node_modules --skip-dirs docs/.vitepress/cache --skip-dirs docs/.vitepress/dist --skip-dirs docs/.vitepress/.temp --skip-files infra/config/.ssh/id_rsa --skip-dirs infra/.terraform --skip-dirs node_modules",
 	} {
 		if !strings.Contains(stderr.String(), fragment) {
 			t.Errorf("reporting dry-run %q does not contain %q", stderr.String(), fragment)
@@ -221,7 +245,7 @@ func TestSetupReportsInstallsPinnedTools(t *testing.T) {
 
 func TestSetupGoDownloadsEveryModule(t *testing.T) {
 	repo := testRepository(t)
-	for _, module := range []string{"homelabctl", filepath.Join("services", "butler")} {
+	for _, module := range []string{"homelabctl", "butler"} {
 		if err := writeEmpty(filepath.Join(repo, module, "go.mod")); err != nil {
 			t.Fatal(err)
 		}
@@ -235,7 +259,7 @@ func TestSetupGoDownloadsEveryModule(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	for _, module := range []string{"homelabctl", filepath.Join("services", "butler")} {
+	for _, module := range []string{"homelabctl", "butler"} {
 		fragment := "+ (" + filepath.Join(repo, module) + ") go mod download"
 		if !strings.Contains(stderr.String(), fragment) {
 			t.Errorf("setup go output %q does not contain %q", stderr.String(), fragment)

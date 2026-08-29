@@ -3,8 +3,8 @@ name: grafana
 description: A Helm chart to deploy Grafana for the homelab k3s cluster
 type: application
 version: 0.1.0
-appVersion: "11.3.0"
+appVersion: "12.3.1"
 dependencies:
   - name: grafana
-    version: "8.8.2"
+    version: "10.5.15"
     repository: https://grafana.github.io/helm-charts

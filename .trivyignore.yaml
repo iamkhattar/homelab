@@ -1,4 +1,13 @@
 misconfigurations:
+  # Butler's ConfigMap contains desired-state key names and generation rules
+  # such as `postgres-password: {length: 32}`. It contains no credential value;
+  # generated values are written to Vault and delivered by VSO.
+  - id: KSV-0109
+    paths:
+      - cluster/services/butler/templates/configmap.yaml
+    expired_at: 2026-11-30
+    statement: Butler ConfigMap contains secret schema metadata, never secret values.
+
   # These workloads predate the security baseline. Enabling an immutable root
   # filesystem and non-root execution needs per-image writable-path and UID/GID
   # validation on Titan. Keep the exception path-scoped and time-bounded so a

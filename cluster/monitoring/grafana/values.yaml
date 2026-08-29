@@ -21,10 +21,41 @@ grafana:
           url: http://prometheus-server.monitoring.svc.cluster.local:80
           access: proxy
           isDefault: true
+          uid: prometheus
         - name: Loki
           type: loki
           url: http://loki.monitoring.svc.cluster.local:3100
           access: proxy
+          uid: loki
+        - name: Tempo
+          type: tempo
+          url: http://tempo.monitoring.svc.cluster.local:3100
+          access: proxy
+          uid: tempo
+          jsonData:
+            tracesToLogsV2:
+              datasourceUid: loki
+              filterByTraceID: true
+              filterBySpanID: true
+            serviceMap:
+              datasourceUid: prometheus
+  envValueFrom:
+    GF_AUTH_GENERIC_OAUTH_CLIENT_ID:
+      secretKeyRef: {name: grafana-oidc, key: client_id}
+    GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
+      secretKeyRef: {name: grafana-oidc, key: client_secret}
+  grafana.ini:
+    server:
+      root_url: https://grafana.home.6940469.xyz
+    auth.generic_oauth:
+      enabled: true
+      name: Pocket ID
+      allow_sign_up: true
+      scopes: openid profile email groups
+      auth_url: https://auth.home.6940469.xyz/authorize
+      token_url: https://auth.home.6940469.xyz/api/oidc/token
+      api_url: https://auth.home.6940469.xyz/api/oidc/userinfo
+      role_attribute_path: "contains(groups[*], 'homelab-admin') && 'Admin' || contains(groups[*], 'homelab-operator') && 'Editor' || 'Viewer'"
   dashboardProviders:
     dashboardproviders.yaml:
       apiVersion: 1
@@ -47,3 +78,63 @@ grafana:
         gnetId: 1860
         revision: 37
         datasource: Prometheus
+      kubernetes-views-global:
+        gnetId: 15757
+        revision: 43
+        datasource: Prometheus
+      kubernetes-views-namespaces:
+        gnetId: 15758
+        revision: 42
+        datasource: Prometheus
+      kubernetes-views-pods:
+        gnetId: 15760
+        revision: 36
+        datasource: Prometheus
+      cert-manager:
+        gnetId: 20842
+        revision: 3
+        datasource: Prometheus
+      vault:
+        gnetId: 12904
+        revision: 2
+        datasource: Prometheus
+      platform-components:
+        json: |
+          {
+            "title": "Homelab platform components",
+            "uid": "homelab-platform-components",
+            "schemaVersion": 39,
+            "tags": ["homelab", "platform", "workloads"],
+            "time": {"from": "now-6h", "to": "now"},
+            "templating": {"list": [
+              {"name":"namespace","type":"query","label":"Namespace","datasource":{"type":"prometheus","uid":"prometheus"},"query":{"query":"label_values(kube_pod_info, namespace)","refId":"namespace"},"includeAll":true,"allValue":".*","refresh":1},
+              {"name":"pod","type":"query","label":"Pod","datasource":{"type":"prometheus","uid":"prometheus"},"query":{"query":"label_values(kube_pod_info{namespace=~\"$namespace\"}, pod)","refId":"pod"},"includeAll":true,"allValue":".*","refresh":1}
+            ]},
+            "panels": [
+              {"id":1,"type":"stat","title":"Ready pods","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum(kube_pod_status_ready{namespace=~\"$namespace\",pod=~\"$pod\",condition=\"true\"})","refId":"A"}],"gridPos":{"h":5,"w":6,"x":0,"y":0}},
+              {"id":2,"type":"stat","title":"Unavailable deployments","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum(kube_deployment_spec_replicas{namespace=~\"$namespace\"} - kube_deployment_status_replicas_available{namespace=~\"$namespace\"})","refId":"A"}],"gridPos":{"h":5,"w":6,"x":6,"y":0}},
+              {"id":3,"type":"stat","title":"Unavailable StatefulSet pods","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum(kube_statefulset_replicas{namespace=~\"$namespace\"} - kube_statefulset_status_replicas_ready{namespace=~\"$namespace\"})","refId":"A"}],"gridPos":{"h":5,"w":6,"x":12,"y":0}},
+              {"id":4,"type":"stat","title":"Restarts (1h)","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum(increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\",pod=~\"$pod\"}[1h]))","refId":"A"}],"gridPos":{"h":5,"w":6,"x":18,"y":0}},
+              {"id":5,"type":"table","title":"Deployment availability","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"kube_deployment_status_replicas_available{namespace=~\"$namespace\"}","format":"table","instant":true,"refId":"A"}],"gridPos":{"h":9,"w":12,"x":0,"y":5}},
+              {"id":6,"type":"table","title":"StatefulSet availability","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"kube_statefulset_status_replicas_ready{namespace=~\"$namespace\"}","format":"table","instant":true,"refId":"A"}],"gridPos":{"h":9,"w":12,"x":12,"y":5}},
+              {"id":7,"type":"timeseries","title":"Container CPU","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum by (namespace,pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\",pod=~\"$pod\",container!=\"\"}[5m]))","legendFormat":"{{namespace}}/{{pod}}","refId":"A"}],"gridPos":{"h":9,"w":12,"x":0,"y":14}},
+              {"id":8,"type":"timeseries","title":"Container memory","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum by (namespace,pod) (container_memory_working_set_bytes{namespace=~\"$namespace\",pod=~\"$pod\",container!=\"\"})","legendFormat":"{{namespace}}/{{pod}}","refId":"A"}],"gridPos":{"h":9,"w":12,"x":12,"y":14}},
+              {"id":9,"type":"logs","title":"Component logs","datasource":{"type":"loki","uid":"loki"},"targets":[{"expr":"{namespace=~\"$namespace\",pod=~\"$pod\"} |~ \"(?i)(warn|error|fatal|panic)\"","refId":"A"}],"gridPos":{"h":12,"w":24,"x":0,"y":23}}
+            ]
+          }
+      butler-control-plane:
+        json: |
+          {
+            "title": "Butler control plane",
+            "uid": "butler-control-plane",
+            "schemaVersion": 39,
+            "tags": ["butler", "control-plane"],
+            "time": {"from": "now-6h", "to": "now"},
+            "panels": [
+              {"id":1,"type":"stat","title":"Normal replicas","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"kube_deployment_status_replicas_available{namespace=\"security\",deployment=\"butler\"}","refId":"A"}],"gridPos":{"h":6,"w":6,"x":0,"y":0}},
+              {"id":2,"type":"stat","title":"Recovery replicas","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"kube_deployment_status_replicas_available{namespace=\"security\",deployment=\"butler-recovery\"}","refId":"A"}],"gridPos":{"h":6,"w":6,"x":6,"y":0}},
+              {"id":3,"type":"timeseries","title":"Reconciliation runs","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum by (butler_reconciler_name, butler_reconciler_success) (rate(butler_reconcile_runs_total[5m]))","legendFormat":"{{butler_reconciler_name}} {{butler_reconciler_success}}","refId":"A"}],"gridPos":{"h":8,"w":12,"x":12,"y":0}},
+              {"id":4,"type":"logs","title":"Butler logs","datasource":{"type":"loki","uid":"loki"},"targets":[{"expr":"{namespace=\"security\", container=~\"butler|recovery\"}","refId":"A"}],"gridPos":{"h":10,"w":12,"x":0,"y":8}},
+              {"id":5,"type":"traces","title":"Recent Butler traces","datasource":{"type":"tempo","uid":"tempo"},"targets":[{"query":"{ resource.service.name = \"butler\" }","queryType":"traceql","refId":"A"}],"gridPos":{"h":10,"w":12,"x":12,"y":8}}
+            ]
+          }

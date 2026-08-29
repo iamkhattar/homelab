@@ -22,6 +22,7 @@ export default defineConfig({
           { text: 'Engineering overview', link: '/engineering/' },
           { text: 'homelabctl', link: '/homelabctl/' },
           { text: 'Ansible', link: '/ansible/' },
+          { text: 'Cluster platform', link: '/engineering/cluster-platform' },
           { text: 'Documentation', link: '/documentation/hosting' },
         ],
       },
@@ -90,8 +91,10 @@ function mainSidebar() {
       items: [
         { text: 'Runbook index', link: '/operations/' },
         { text: 'Install K3s', link: '/operations/install' },
+        { text: 'Bootstrap the platform', link: '/operations/platform-bootstrap' },
         { text: 'Routine maintenance', link: '/operations/maintenance' },
         { text: 'Backup and recovery', link: '/operations/backup-recovery' },
+        { text: 'Change and evidence record', link: '/operations/change-evidence' },
         { text: 'Troubleshooting', link: '/operations/troubleshooting' },
       ],
     },
@@ -130,6 +133,8 @@ function mainSidebar() {
       collapsed: false,
       items: [
         { text: 'Engineering overview', link: '/engineering/' },
+        { text: 'Cluster platform and applications', link: '/engineering/cluster-platform' },
+        { text: 'Butler control plane', link: '/engineering/butler-control-plane' },
         { text: 'Documentation system', link: '/documentation/hosting' },
       ],
     },

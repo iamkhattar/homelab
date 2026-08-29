@@ -12,16 +12,12 @@ repositories:
     url: https://helm.releases.hashicorp.com
   - name: prometheus-community
     url: https://prometheus-community.github.io/helm-charts
+  - name: metrics-server
+    url: https://kubernetes-sigs.github.io/metrics-server/
   - name: grafana
     url: https://grafana.github.io/helm-charts
-  - name: fluent
-    url: https://fluent.github.io/helm-charts
   - name: bitnami
     url: https://charts.bitnami.com/bitnami
-  - name: crowdsec
-    url: https://crowdsecurity.github.io/helm-charts
-  - name: gatekeeper
-    url: https://open-policy-agent.github.io/gatekeeper/charts
   - name: tailscale
     url: https://pkgs.tailscale.com/helmcharts
   - name: traefik
@@ -33,11 +29,19 @@ releases:
     chart: ./core/namespaces
     historyMax: 5
     namespace: kube-system
+    labels: {stage: foundation, domain: platform, criticality: core}
   - name: rbac-policies
     chart: ./core/rbac-policies
     historyMax: 5
     namespace: kube-system
     needs: [kube-system/namespaces]
+    labels: {stage: foundation, domain: platform, criticality: core}
+  - name: metrics-server
+    chart: ./core/metrics-server
+    historyMax: 5
+    namespace: kube-system
+    needs: [kube-system/namespaces, kube-system/rbac-policies]
+    labels: {stage: foundation, domain: platform, criticality: core}
   - name: cert-manager
     chart: ./core/cert-manager
     historyMax: 5
@@ -47,6 +51,7 @@ releases:
     # (created on butler's first reconcile). The issuer reports NotReady
     # until both are present; cert-manager retries automatically.
     needs: [kube-system/namespaces]
+    labels: {stage: networking, domain: platform, criticality: core}
 
 ###  NETWORKING  ###
   - name: traefik
@@ -54,6 +59,7 @@ releases:
     historyMax: 5
     namespace: networking
     needs: [kube-system/namespaces, kube-system/rbac-policies]
+    labels: {stage: networking, domain: platform, criticality: core}
 
 ###  SECURITY  ###
   - name: vault
@@ -61,12 +67,22 @@ releases:
     historyMax: 5
     namespace: security
     needs: [kube-system/namespaces, kube-system/rbac-policies]
+    labels: {stage: secrets, domain: platform, criticality: essential}
+  - name: butler
+    chart: ./services/butler
+    historyMax: 5
+    namespace: security
+    needs: [kube-system/namespaces, kube-system/rbac-policies, cert-manager/cert-manager, networking/traefik, security/vault]
+    labels: {stage: secrets, domain: control-plane, criticality: essential}
+    values:
+      - ./services/butler/helmfile-values.yaml.gotmpl
   - name: vault-secrets-operator
     chart: ./security/vault-secrets-operator
     historyMax: 5
     namespace: security
     disableValidation: true
     needs: [kube-system/namespaces, security/butler]
+    labels: {stage: secrets, domain: platform, criticality: essential}
   - name: pocket-id
     chart: ./security/pocket-id
     historyMax: 5
@@ -78,66 +94,68 @@ releases:
       - cert-manager/cert-manager
       - networking/traefik
       - security/vault-secrets-operator
+    labels: {stage: identity, domain: identity, criticality: essential}
     values:
       - ./security/pocket-id/helmfile-values.yaml.gotmpl
-  # - name: crowdsec
-  #   chart: ./security/crowdsec
-  #   historyMax: 5
-  #   namespace: security
-  #   needs: [kube-system/namespaces]
-  # - name: opa-gatekeeper
-  #   chart: ./security/opa
-  #   historyMax: 5
-  #   namespace: security
-  #   needs: [kube-system/namespaces]
-
-###  SERVICES  ###
-  # - name: butler
-  #   chart: ./services/butler
-  #   historyMax: 5
-  #   namespace: security
-  #   needs: [kube-system/namespaces, security/vault]
-
 ###  DATABASES  ###
-  # - name: postgresql
-  #   chart: ./databases/postgresql
-  #   historyMax: 5
-  #   namespace: databases
-  #   needs: [kube-system/namespaces, kube-system/rbac-policies, security/vault-secrets-operator]
-  # - name: redis
-  #   chart: ./databases/redis
-  #   historyMax: 5
-  #   namespace: databases
-  #   needs: [kube-system/namespaces, kube-system/rbac-policies, security/vault-secrets-operator]
+  - name: postgresql
+    chart: ./databases/postgresql
+    historyMax: 5
+    namespace: databases
+    needs: [kube-system/namespaces, kube-system/rbac-policies, security/vault-secrets-operator]
+    labels: {stage: data, domain: data, criticality: essential}
+  - name: redis
+    chart: ./databases/redis
+    historyMax: 5
+    namespace: databases
+    needs: [kube-system/namespaces, kube-system/rbac-policies, security/vault-secrets-operator]
+    labels: {stage: data, domain: data, criticality: shared}
 
 ###  STORAGE  ###
-  # - name: garage
-  #   chart: ./storage/garage
-  #   historyMax: 5
-  #   namespace: storage
-  #   needs: [kube-system/namespaces, kube-system/rbac-policies, security/vault-secrets-operator]
+  - name: garage
+    chart: ./storage/garage
+    historyMax: 5
+    namespace: storage
+    needs: [kube-system/namespaces, kube-system/rbac-policies, security/vault-secrets-operator]
+    labels: {stage: data, domain: data, criticality: shared}
 
 ###  MONITORING  ###
-  # - name: prometheus
-  #   chart: ./monitoring/prometheus
-  #   historyMax: 5
-  #   namespace: monitoring
-  #   needs: [kube-system/namespaces, kube-system/rbac-policies]
-  # - name: loki
-  #   chart: ./monitoring/loki
-  #   historyMax: 5
-  #   namespace: monitoring
-  #   needs: [kube-system/namespaces, kube-system/rbac-policies]
-  # - name: fluent-bit
-  #   chart: ./monitoring/fluent-bit
-  #   historyMax: 5
-  #   namespace: monitoring
-  #   needs: [kube-system/namespaces, kube-system/rbac-policies, monitoring/loki]
-  # - name: grafana
-  #   chart: ./monitoring/grafana
-  #   historyMax: 5
-  #   namespace: monitoring
-  #   needs: [kube-system/namespaces, monitoring/prometheus, monitoring/loki, security/vault-secrets-operator]
+  - name: prometheus
+    chart: ./monitoring/prometheus
+    historyMax: 5
+    namespace: monitoring
+    needs: [kube-system/namespaces, kube-system/rbac-policies]
+    labels: {stage: observability, domain: observability, criticality: important}
+  - name: loki
+    chart: ./monitoring/loki
+    historyMax: 5
+    namespace: monitoring
+    needs: [kube-system/namespaces]
+    labels: {stage: observability, domain: observability, criticality: important}
+  - name: tempo
+    chart: ./monitoring/tempo
+    historyMax: 5
+    namespace: monitoring
+    needs: [kube-system/namespaces]
+    labels: {stage: observability, domain: observability, criticality: standard}
+  - name: alloy
+    chart: ./monitoring/alloy
+    historyMax: 5
+    namespace: monitoring
+    needs: [monitoring/prometheus, monitoring/loki, monitoring/tempo]
+    labels: {stage: observability, domain: observability, criticality: important}
+  - name: grafana
+    chart: ./monitoring/grafana
+    historyMax: 5
+    namespace: monitoring
+    needs: [monitoring/prometheus, monitoring/loki, monitoring/tempo, security/pocket-id, security/vault-secrets-operator]
+    labels: {stage: observability, domain: observability, criticality: important}
+  - name: monitoring-policies
+    chart: ./monitoring/policies
+    historyMax: 5
+    namespace: monitoring
+    needs: [monitoring/alloy, monitoring/grafana]
+    labels: {stage: observability, domain: observability, criticality: core}
 
 ###  SMART HOME  ###
   # - name: mosquitto
@@ -157,31 +175,36 @@ releases:
   #   needs: [kube-system/namespaces, smart-home/mosquitto]
 
 ###  APPLICATIONS  ###
-  # - name: homepage
-  #   chart: ./applications/homepage
-  #   historyMax: 5
-  #   namespace: applications
-  #   needs: [kube-system/namespaces]
-  # - name: paperless-ngx
-  #   chart: ./applications/paperless-ngx
-  #   historyMax: 5
-  #   namespace: applications
-  #   needs: [kube-system/namespaces, databases/postgresql, databases/redis, security/vault-secrets-operator]
-  # - name: kitchenowl
-  #   chart: ./applications/kitchenowl
-  #   historyMax: 5
-  #   namespace: applications
-  #   needs: [kube-system/namespaces, security/vault-secrets-operator]
-  # - name: ntfy
-  #   chart: ./applications/ntfy
-  #   historyMax: 5
-  #   namespace: applications
-  #   needs: [kube-system/namespaces]
-  # - name: vaultwarden
-  #   chart: ./applications/vaultwarden
-  #   historyMax: 5
-  #   namespace: applications
-  #   needs: [kube-system/namespaces, security/vault-secrets-operator]
+  - name: homepage
+    chart: ./applications/homepage
+    historyMax: 5
+    namespace: homepage
+    needs: [kube-system/namespaces]
+    labels: {stage: applications, domain: applications, criticality: standard}
+  - name: paperless-ngx
+    chart: ./applications/paperless-ngx
+    historyMax: 5
+    namespace: paperless-ngx
+    needs: [kube-system/namespaces, databases/postgresql, databases/redis, security/vault-secrets-operator]
+    labels: {stage: applications, domain: applications, criticality: important}
+  - name: kitchenowl
+    chart: ./applications/kitchenowl
+    historyMax: 5
+    namespace: kitchenowl
+    needs: [kube-system/namespaces, security/vault-secrets-operator]
+    labels: {stage: applications, domain: applications, criticality: standard}
+  - name: ntfy
+    chart: ./applications/ntfy
+    historyMax: 5
+    namespace: ntfy
+    needs: [kube-system/namespaces]
+    labels: {stage: applications, domain: applications, criticality: standard}
+  - name: vaultwarden
+    chart: ./applications/vaultwarden
+    historyMax: 5
+    namespace: vaultwarden
+    needs: [kube-system/namespaces, databases/postgresql, security/vault-secrets-operator]
+    labels: {stage: applications, domain: applications, criticality: important}
 
 ###  NETWORKING  ###
   # - name: tailscale
@@ -191,8 +214,15 @@ releases:
   #   needs: [kube-system/namespaces]
 
 ###  CI/CD  ###
-  # - name: actions-runner-controller
-  #   chart: ./cicd/actions-runner-controller
-  #   historyMax: 5
-  #   namespace: cicd
-  #   needs: [kube-system/namespaces]
+  - name: actions-runner-controller
+    chart: ./cicd/actions-runner-controller
+    historyMax: 5
+    namespace: cicd
+    needs: [kube-system/namespaces]
+    labels: {stage: cicd, domain: delivery, criticality: standard}
+  - name: homelab-runners
+    chart: ./cicd/actions-runner-scale-set
+    historyMax: 5
+    namespace: cicd
+    needs: [kube-system/namespaces, security/vault-secrets-operator, cicd/actions-runner-controller]
+    labels: {stage: cicd, domain: delivery, criticality: standard}

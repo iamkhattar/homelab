@@ -13,7 +13,34 @@ This runs Helmfile's diff workflow from `cluster/` and does not apply releases.
 Use it before every routine deployment. A clean diff is not a substitute for
 application-specific backup or migration checks.
 
+All deploy subcommands pass `HOMELAB_IMAGE_TAG` to Helmfile. By default it is
+the repository's full committed Git SHA—the same immutable tag CI publishes.
+The image must exist in the registry before applying that commit. To select a
+shared release tag deliberately, use `--image-tag`:
+
+```bash
+homelabctl deploy diff --image-tag v0.1.123
+```
+
 ## Apply desired state
+
+For a platform installation or upgrade, use the dependency-ordered workflow:
+
+```bash
+homelabctl deploy platform --through identity --confirm
+homelabctl control bootstrap --confirm
+# Complete Pocket ID owner enrollment and import its management API key.
+homelabctl control login
+homelabctl control verify-identity --confirm
+homelabctl deploy platform --through applications --confirm
+```
+
+The safe default stops at `identity`. Before `data`, `observability`, `cicd` or
+`applications`, the CLI reads `security/butler-bootstrap-state` and requires
+the phase to be `operational`. Each ordered invocation re-applies earlier
+stages because Helmfile reconciliation is idempotent.
+
+The lower-level commands remain available for a targeted repair or inspection.
 
 Apply every changed release:
 
@@ -27,8 +54,22 @@ Select one release by its exact Helmfile release name:
 homelabctl deploy apply cert-manager
 ```
 
-The optional argument becomes a `name=<release>` Helmfile selector. It does not
-select a namespace, chart directory or Kubernetes resource.
+Apply one dependency stage:
+
+```bash
+homelabctl deploy apply --stage data
+```
+
+The current stage labels are `foundation`, `networking`, `secrets`, `identity`,
+`data`, `observability`, `cicd` and `applications`. A release argument and
+`--stage` cannot be combined. Selected deploys pass Helmfile's
+`--include-needs`, so declared dependencies are included; the operator must
+still stop at the documented readiness checkpoints because a Helm dependency
+edge does not prove that an API or generated Secret is ready.
+
+The optional argument becomes a `name=<release>` Helmfile selector and
+`--stage` becomes `stage=<stage>`. Neither selects a namespace, chart directory
+or individual Kubernetes resource.
 
 `deploy sync` forces every declared release to the desired state without diff
 gating:
@@ -75,7 +116,8 @@ needs redesign so K3s tokens cannot enter Terraform state or instance logs.
 
 ## Build service images
 
-Build every directory under `services/` that contains a Dockerfile:
+Build the top-level Butler image and every directory under `services/` that
+contains a Dockerfile:
 
 ```bash
 homelabctl build services --tag dev
@@ -117,10 +159,24 @@ homelabctl build homelabctl \
 ```
 
 The multi-stage Dockerfile compiles a static Linux binary with Go 1.27. The
-runtime is an Alpine image containing trusted CA certificates, Git and the
-OpenSSH client. It runs as the unprivileged UID/GID `65532`, uses `/workspace`
-as its working directory, and starts `homelabctl` directly. The current Git SHA
-is embedded in the binary and OCI image metadata by the build command.
+runtime is an Alpine image containing the following deliberately bounded
+operator toolset:
+
+| Tool | Purpose inside a runner job |
+| --- | --- |
+| Helmfile, Helm and helm-diff | Render, preview and reconcile cluster releases |
+| kubectl | Read cluster state and perform explicitly authorized Kubernetes operations |
+| curl | Call health endpoints and API-driven management surfaces |
+| jq and yq | Inspect structured API responses and rendered YAML without fragile text parsing |
+| OpenSSL | Diagnose certificate chains, expiry and TLS handshakes |
+| bind tools | Diagnose the private DNS path for `home.6940469.xyz` |
+| Git and OpenSSH | Work with the checked-out repository and authenticated Git transports |
+| Bash and CA certificates | Run workflow glue and validate trusted HTTPS endpoints |
+
+The kubectl version matches Titan's K3s minor release. The image runs as the
+unprivileged UID/GID `65532`, uses `/workspace` as its working directory, and
+starts `homelabctl` directly. The current Git SHA is embedded in the binary and
+OCI image metadata by the build command.
 
 Run a repository-independent command directly:
 
@@ -137,11 +193,11 @@ docker run --rm \
   --repo-root /workspace ci check --only workflows
 ```
 
-This is deliberately a minimal operator image, not yet a privileged CI runner.
-It does not contain Ansible, Docker, Helmfile, kubectl or Terraform, and it does
-not receive a Docker socket, kubeconfig or cluster-wide credentials by default.
-The future runner or Kubernetes operator must add only the tools and narrowly
-scoped credentials required by its execution model. Treat the container as
+This is a deployment-capable operator image, not a general privileged CI image.
+It contains no Ansible, Docker, Terraform, Vault CLI, Go or Node.js, receives no
+Docker socket, and has no kubeconfig or cluster authority by default. ARC jobs
+must add only a
+short-lived, narrowly scoped Kubernetes credential. Treat the container as
 immutable: deploy a newer image tag instead of running `homelabctl update`
 inside it.
 
@@ -262,7 +318,7 @@ Security findings are gating failures. The aggregate runner continues after a
 failed stage, however, so all possible reports are produced. GitHub Actions
 uses `if: always()` to retain `test-results/`, `sarif/` and `sbom/` for 14 days
 even when checks fail. Each SARIF file is uploaded separately with a stable,
-unique category (`gosec-homelabctl`, `gosec-services-butler` or
+unique category (`gosec-homelabctl`, `gosec-butler` or
 `trivy-repository`) because GitHub treats each as an independent analysis. The
 workflow uploads SARIF to code scanning when the event has
 permission. Fork pull requests still receive the downloadable artifact but do
@@ -347,7 +403,7 @@ job uses that same version with the pinned GoReleaser action to publish static
 
 The check job restores Go modules and compiler output with granular cache
 actions keyed by the operating system, architecture, Go version and both
-`homelabctl/go.sum` and `services/butler/go.sum`. `homelabctl setup go` downloads
+`homelabctl/go.sum` and `butler/go.sum`. `homelabctl setup go` downloads
 both modules before the cache is saved, and the save happens before tests or
 scans can fail. The publication and release jobs use setup-go's built-in cache
 for their local CLI build because those jobs only run after checks succeed.

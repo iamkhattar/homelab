@@ -50,6 +50,9 @@ A roadmap phase or increment is not complete until all of these are true:
 
 ## Phase 1 — Recoverable Titan foundation
 
+**State:** repository automation is ready; execution and recovery evidence on
+Titan remain outstanding.
+
 **Goal:** one dependable Debian host and one healthy K3s server.
 
 Work:
@@ -71,18 +74,28 @@ Acceptance criteria:
 
 ## Phase 2 — Cluster platform
 
+**State:** initial repository design complete; DNS publication, workstation CA
+trust, off-node backup selection and Titan restore testing remain outstanding.
+
 **Goal:** give applications stable networking, certificates, storage and backup.
 
-Decisions and work:
+Accepted implementation:
 
-- choose an internal DNS suffix and how LAN clients resolve it;
-- deploy ingress separately because bundled Traefik is disabled;
-- choose certificate issuance for private names;
-- audit existing Helmfile charts before applying anything inherited from the old
-  Hetzner cluster;
-- choose a single-node persistent-storage approach based on restore simplicity;
+- use `home.6940469.xyz` with private-address public DNS records and no router
+  port-forward;
+- deploy Traefik through Helmfile because bundled K3s Traefik is disabled;
+- begin with Vault private PKI and export its CA through authenticated
+  Kubernetes;
+- use bounded K3s local-path PVCs instead of claiming single-node Longhorn is
+  highly available;
+- keep one namespace per selected application.
+
+Remaining work:
+
+- select DNS-01 automation before moving to publicly trusted certificates;
 - define off-node application backup targets, schedules and restore tests;
-- establish resource requests, limits and namespace conventions.
+- measure the committed resource and retention budgets on Titan and adjust only
+  from observed pressure.
 
 Longhorn should not be assumed to provide high availability on one machine. Any
 storage choice must be evaluated by how it restores after loss of Titan's disk,
@@ -96,15 +109,19 @@ Acceptance criteria:
 
 ## Phase 3 — Observability
 
+**State:** ready in the repository; Titan deployment and signal verification remain outstanding.
+
 **Goal:** detect host and workload problems before adding household-critical apps.
 
-Planned stack:
+Implemented stack:
 
-- Prometheus for Kubernetes, node and application metrics;
+- Prometheus for Kubernetes, node and application metrics, with
+  kube-state-metrics and node-exporter;
 - Grafana for dashboards and alert investigation;
 - Loki for bounded log retention;
-- node exporter and Kubernetes state metrics;
-- alert delivery to an off-cluster channel.
+- monolithic Tempo for traces and Grafana Alloy for Kubernetes logs and OTLP;
+- Alertmanager with initial Butler, Vault and storage rules; the final
+  off-cluster receiver is an explicit deployment-time decision still to make.
 
 Before deployment, set disk, memory and retention budgets appropriate for a
 single mini PC. Avoid collecting high-cardinality data without a use case.
@@ -118,6 +135,10 @@ Acceptance criteria:
 - observability storage cannot consume the disk without a bound.
 
 ## Phase 4 — Identity and secrets
+
+**State:** repository implementation complete, including the real Butler and
+Vault login acceptance gate; first-owner bootstrap, recovery export and Titan
+verification remain outstanding.
 
 **Goal:** centralise application sign-in and runtime secrets without creating a
 bootstrap loop.
@@ -140,7 +161,62 @@ Acceptance criteria:
 - applications receive secrets without plaintext values being committed to Git;
 - access policy is deny-by-default and understandable from the repository.
 
-## Phase 5 — Home automation
+The repository workflow applies through identity, pauses for the interactive
+Pocket ID owner ceremony, then runs `homelabctl control verify-identity`. Data
+and later stages remain blocked until the persisted bootstrap phase is
+`operational`.
+
+## Phase 5 — Shared data and cluster delivery
+
+**Goal:** provide the selected applications with bounded shared state and a
+scale-to-zero deployment path.
+
+`homelabctl deploy platform --through STAGE --confirm` now encodes the stage
+order. It re-applies earlier idempotent stages and checks Butler's operational
+acceptance gate before entering this phase.
+
+Work:
+
+- deploy one PostgreSQL instance with a separate database, role and
+  Vault-generated password per application;
+- deploy authenticated standalone Redis for real cache/queue consumers;
+- deploy Garage as internal S3-compatible storage without calling its local
+  copy a backup;
+- deploy Actions Runner Controller and a one-runner `titan` scale set whose
+  idle capacity is zero;
+- deliver GitHub App credentials through VSO and deployment credentials as
+  short-lived, bounded leases;
+- prove initial bootstrap from the control machine and routine deployment from
+  an ephemeral runner.
+
+Acceptance criteria:
+
+- each client can reach only its declared data services;
+- database credentials are distinct and never committed to Git;
+- state can be restored from a copy outside Titan;
+- the runner returns to zero pods after a job and cannot read unrelated Secrets
+  or use cluster-admin.
+
+## Phase 6 — Selected applications
+
+**Goal:** deploy the deliberately small initial application set.
+
+Deploy Homepage, KitchenOwl, ntfy, Vaultwarden and Paperless-ngx one at a time.
+An application remains internal until its Pocket ID pattern, HTTPS name,
+NetworkPolicy, telemetry, backup and restore have been verified. Vaultwarden
+uses native Pocket ID OIDC; applications without suitable native OIDC use the
+reviewed shared ingress authentication pattern.
+
+Acceptance criteria:
+
+- every app has a separate Vault path and only its required database/cache
+  identity;
+- every stateful app has a successful restore rehearsal;
+- no selected service is reachable from the public internet;
+- Homepage shows only reviewed internal links and has read-only Kubernetes API
+  access.
+
+## Phase 7 — Home automation
 
 **Goal:** run Home Assistant and Zigbee reliably enough for household use.
 
@@ -160,7 +236,7 @@ Acceptance criteria:
 - Home Assistant state can be restored on a clean deployment;
 - essential lights or devices retain a manual path during cluster downtime.
 
-## Phase 6 — Self-hosted operator services
+## Phase 8 — Self-hosted operator services
 
 **Goal:** host this handbook and selected operator tooling internally.
 
@@ -170,7 +246,7 @@ health and rollout checks to `homelabctl`.
 
 This phase follows identity so operational details are not accidentally exposed.
 
-## Phase 7 — Tailscale and Hetzner capacity
+## Phase 9 — Tailscale and Hetzner capacity
 
 **Goal:** add optional remote workers without making them part of the trusted
 default scheduling pool.
@@ -195,3 +271,7 @@ Acceptance criteria:
 - SMART/NVMe health and temperature monitoring;
 - signed provenance or attestations for the checksum-protected `homelabctl` release artifacts;
 - a concise change log recording upgrades, restore tests and hardware changes.
+
+These are not prerequisites for the first installation. The immediate gate is
+a healthy, reproducible K3s node plus a verified encrypted recovery copy held
+away from both Titan and the operator workstation.

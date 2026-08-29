@@ -3,4 +3,4 @@ name: paperless-ngx
 description: A Helm chart to deploy Paperless-ngx for the homelab k3s cluster
 type: application
 version: 0.1.0
-appVersion: "2.14.0"
+appVersion: "2.20.15"

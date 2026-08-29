@@ -395,9 +395,23 @@ Before disconnecting the console, confirm:
 - [ ] the physical console remains accessible for recovery.
 
 Update [current state](/project/current-state) only after these checks have been
-performed against the physical machine. Then proceed through the project
-roadmap one recoverable layer at a time; do not jump directly to Vault or Home
-Assistant before storage, ingress, DNS and backup decisions are complete.
+performed against the physical machine. Complete a
+[change and evidence record](/operations/change-evidence) for the first build,
+then proceed through the project roadmap one recoverable layer at a time. Do
+not jump directly to Vault or Home Assistant before storage, ingress, DNS and
+backup decisions are complete.
+
+Before starting the platform bootstrap, record these deployment decisions:
+
+- the encrypted off-node backup destination and who can recover its key;
+- the private DNS records for `home.6940469.xyz` and
+  `*.home.6940469.xyz`, both resolving to Titan's reserved LAN address;
+- the off-cluster Alertmanager receiver to be tested before alerts are trusted;
+- the Vault recovery share count, threshold, encrypted recipients and custody
+  locations.
+
+DNS-01 automation and the Zigbee integration choice are later decisions. They
+do not block the initial private-PKI platform or the recoverable K3s foundation.
 
 ## If a checkpoint fails
 

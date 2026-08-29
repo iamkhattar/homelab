@@ -17,6 +17,10 @@ spec:
       targetPort: web
       protocol: TCP
       name: web
+    - port: {{ .Values.service.rpcPort }}
+      targetPort: rpc
+      protocol: TCP
+      name: rpc
     - port: {{ .Values.service.adminPort }}
       targetPort: admin
       protocol: TCP

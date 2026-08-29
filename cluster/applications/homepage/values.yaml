@@ -2,8 +2,8 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/gethomepage/homepage
-  tag: latest
-  pullPolicy: Always
+  tag: v1.10.1
+  pullPolicy: IfNotPresent
 
 service:
   type: ClusterIP
@@ -11,7 +11,7 @@ service:
   containerPort: 3000
 
 env:
-  HOMEPAGE_ALLOWED_HOSTS: "*"
+  HOMEPAGE_ALLOWED_HOSTS: "homepage.home.6940469.xyz"
 
 persistence:
   enabled: false
@@ -68,19 +68,19 @@ config:
             description: Metrics collection
     - Applications:
         - Paperless-ngx:
-            href: http://paperless-ngx.applications.svc.cluster.local:8000
+            href: http://paperless-ngx.paperless-ngx.svc.cluster.local:8000
             icon: paperless-ngx
             description: Document management
         - Vaultwarden:
-            href: http://vaultwarden.applications.svc.cluster.local:80
+            href: http://vaultwarden.vaultwarden.svc.cluster.local:80
             icon: vaultwarden
             description: Password manager
         - KitchenOwl:
-            href: http://kitchenowl.applications.svc.cluster.local:8080
+            href: http://kitchenowl.kitchenowl.svc.cluster.local:8080
             icon: kitchenowl
             description: Grocery and recipe management
         - ntfy:
-            href: http://ntfy.applications.svc.cluster.local:80
+            href: http://ntfy.ntfy.svc.cluster.local:80
             icon: ntfy
             description: Push notifications
     - Infrastructure:

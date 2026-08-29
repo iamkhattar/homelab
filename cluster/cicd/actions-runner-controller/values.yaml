@@ -1,5 +1,15 @@
 gha-runner-scale-set-controller:
   replicaCount: 1
+  serviceAccount:
+    create: true
+    name: arc-controller
+  flags:
+    logLevel: info
+    logFormat: json
+  metrics:
+    controllerManagerAddr: ":8080"
+    listenerAddr: ":8080"
+    listenerEndpoint: "/metrics"
   resources:
     requests:
       cpu: 100m
@@ -8,7 +18,5 @@ gha-runner-scale-set-controller:
       cpu: 250m
       memory: 256Mi
 
-# After deploying the controller, create a RunnerScaleSet CR
-# to register runners with your GitHub org/repo.
-# GitHub PAT or App credentials should be stored in Vault at:
-# secret/cicd/github-actions
+# Runner scale sets are separate releases so their credentials, capacity and
+# permissions can change without replacing the controller.

@@ -3,4 +3,4 @@ name: ntfy
 description: A Helm chart to deploy ntfy push notification server for the homelab k3s cluster
 type: application
 version: 0.1.0
-appVersion: "2.11.0"
+appVersion: "2.26.3"

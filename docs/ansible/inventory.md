@@ -60,6 +60,7 @@ server_config_yaml: |
   etcd-snapshot-retention: 14
   disable:
     - traefik
+    - metrics-server
   node-label:
     - homelab.io/location=home
     - homelab.io/hardware=mini-pc

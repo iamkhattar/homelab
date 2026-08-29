@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/paperless-ngx/paperless-ngx
-  tag: "2.14"
+  tag: "2.20.15"
   pullPolicy: IfNotPresent
 
 service:
@@ -11,22 +11,27 @@ service:
   containerPort: 8000
 
 env:
-  PAPERLESS_URL: "https://paperless.example.com"  # Update with your domain
+  PAPERLESS_URL: "https://paperless.home.6940469.xyz"
   PAPERLESS_DBENGINE: postgresql
   PAPERLESS_DBHOST: postgresql.databases.svc.cluster.local
   PAPERLESS_DBPORT: "5432"
   PAPERLESS_DBNAME: paperless
-  PAPERLESS_REDIS: "redis://redis-master.databases.svc.cluster.local:6379"
   PAPERLESS_OCR_LANGUAGE: eng
-  PAPERLESS_TIME_ZONE: "UTC"  # Update with your timezone
+  PAPERLESS_TIME_ZONE: "Europe/London"
 
 envFromSecrets:
   - secretName: paperless-credentials
     keys:
-      PAPERLESS_DBPASS: db-password
       PAPERLESS_SECRET_KEY: secret-key
       PAPERLESS_ADMIN_USER: admin-user
       PAPERLESS_ADMIN_PASSWORD: admin-password
+  - secretName: paperless-database
+    keys:
+      PAPERLESS_DBPASS: password
+      PAPERLESS_DBUSER: username
+  - secretName: redis-client
+    keys:
+      PAPERLESS_REDIS: redis-url
 
 persistence:
   data:

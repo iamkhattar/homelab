@@ -1,0 +1,1 @@
+Send OTLP telemetry to alloy.monitoring.svc.cluster.local on 4317 or 4318.

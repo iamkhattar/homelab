@@ -1,32 +1,30 @@
 replicaCount: 1
 
-backend:
-  image:
-    repository: tombursch/kitchenowl-backend
-    tag: latest
-    pullPolicy: IfNotPresent
-  port: 5000
-
-frontend:
-  image:
-    repository: tombursch/kitchenowl-web
-    tag: latest
-    pullPolicy: IfNotPresent
-  port: 80
+image:
+  repository: tombursch/kitchenowl
+  tag: v0.7.10
+  pullPolicy: IfNotPresent
 
 service:
   type: ClusterIP
   port: 80
-  containerPort: 80
+  containerPort: 8080
 
 env:
   JWT_SECRET_KEY: ""  # Set via Vault secret
-  FRONT_URL: "https://kitchen.example.com"  # Update with your domain
+  FRONT_URL: "https://kitchen.home.6940469.xyz"
+  DB_DRIVER: postgresql
+  DB_HOST: postgresql.databases.svc.cluster.local
+  DB_NAME: kitchenowl
 
 envFromSecrets:
   - secretName: kitchenowl-credentials
     keys:
       JWT_SECRET_KEY: jwt-secret
+  - secretName: kitchenowl-database
+    keys:
+      DB_USER: username
+      DB_PASSWORD: password
 
 persistence:
   enabled: true
@@ -36,17 +34,17 @@ persistence:
   storageClass: ""
 
 resources:
-  backend:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-  frontend:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile: {type: RuntimeDefault}
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities: {drop: ["ALL"]}

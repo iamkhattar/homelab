@@ -1,0 +1,1 @@
+Monitoring is default-denied except for internal telemetry, DNS, API access and declared scrape ports.

@@ -3,8 +3,8 @@ name: loki
 description: A Helm chart to deploy Loki for the homelab k3s cluster
 type: application
 version: 0.1.0
-appVersion: "3.3.0"
+appVersion: "3.6.12"
 dependencies:
   - name: loki
-    version: "6.24.0"
+    version: "7.3.0"
     repository: https://grafana.github.io/helm-charts

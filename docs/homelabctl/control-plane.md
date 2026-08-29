@@ -1,14 +1,32 @@
-# Future control-plane integration
+# Butler control-plane integration
 
-This page describes intended behaviour, not commands available today.
+The connected control commands are implemented against Butler's versioned API.
+They remain separate from local recovery commands, which must work when Butler
+or the cluster is unavailable.
 
-::: warning Greenfield design
-The current `services/butler` implementation is experimental legacy work. It is
-not the specification for the new control plane, and its endpoints, reconcilers,
-Vault lifecycle, authentication model and storage choices carry no compatibility
-requirement. The service may be replaced, renamed or removed as this design is
-implemented.
-:::
+## Interactive sign-in
+
+```sh
+homelabctl control login
+homelabctl control status
+homelabctl control verify-identity --confirm
+homelabctl control logout
+```
+
+Login opens Pocket ID, uses Authorization Code with PKCE on a fixed loopback
+callback, validates issuer, audience, state and nonce, then saves the short-lived
+ID token in the private user config directory. `--token` and `BUTLER_TOKEN` are
+explicit overrides and take precedence over the cached session.
+
+## Short-lived Kubernetes access
+
+```sh
+homelabctl control credentials issue --role homelab-viewer --ttl 15m
+homelabctl control credentials issue --role homelab-operator --ttl 30m --format json
+```
+
+The default response is a Kubernetes `ExecCredential`. Butler enforces the
+role, namespace and maximum TTL server-side and never persists the token.
 
 ## Two operating planes
 
@@ -22,18 +40,18 @@ implemented.
 The connected service must never become necessary to reinstall K3s, restore its
 datastore or redeploy the service itself.
 
-## Intended command families
+## Command families
 
 ```text
-homelabctl
-├── context list|show|use
-├── auth login|logout|status
-├── control status|reconcile|events
-└── trust show|install
+homelabctl control
+├── login|logout
+├── bootstrap|verify-identity|recovery
+├── status|operations|events
+├── users|groups|clients|applications
+└── credentials issue
 ```
 
-These names are reserved design direction. They must not appear in runnable
-runbooks until implemented and tested.
+Use `homelabctl control --help` for the executable reference.
 
 ## Context model
 
@@ -49,9 +67,11 @@ contexts:
     oidc-issuer: https://id.home.arpa
 ```
 
-Tokens must live in the operating-system credential store, not this file. Local
-commands may require only the repository or Kubernetes portion; connected
-commands should work without a checkout.
+Tokens do not belong in this future context file. The current Pocket ID session
+uses a private mode-0600 file in the user config directory; an OS credential
+store is a later hardening option. Local commands may require only the
+repository or Kubernetes portion; connected commands should work without a
+checkout.
 
 ## Control API responsibilities
 
@@ -70,17 +90,18 @@ arbitrary shell commands, raw secret retrieval or the only recovery credentials.
 Desired state remains in Git and chart values. The API reports and reconciles
 that state; it does not become a second configuration database.
 
-## Intended API behaviour
+## API behaviour
 
-The initial versioned API should expose resources such as:
+The versioned API exposes resources including:
 
 ```text
 GET  /api/v1/status
-GET  /api/v1/components
-POST /api/v1/reconciliations
-GET  /api/v1/reconciliations/{id}
+GET  /api/v1/operations
+POST /api/v1/reconcile
 GET  /api/v1/events
 GET  /api/v1/pki/ca-chain
+POST /api/v1/access/kubernetes-credentials
+POST /api/v1/bootstrap/identity-verification
 ```
 
 A reconcile request should return an operation identifier and run as a
@@ -89,14 +110,13 @@ holding an HTTP request open or starting overlapping reconciliations.
 
 ## Authentication requirements
 
-Human login will use Pocket ID through an appropriate public-client flow. The
-API must validate issuer, audience, expiry and authorisation claims and fail
+Human login uses Pocket ID Authorization Code with PKCE. The API validates
+issuer, audience, expiry and authorisation claims and fails
 closed when authentication configuration is missing. Viewer and operator
 permissions should be distinct; a valid identity alone must not authorise a
 mutation.
 
-Refresh credentials belong in the OS credential store. CI must use a separate
-machine identity rather than a copied human token.
+CI must use a separate machine identity rather than a copied human token.
 
 ## Bootstrap and trust boundary
 
@@ -105,20 +125,23 @@ an unauthenticated endpoint. Initial trust should be established through an
 already authenticated Kubernetes connection or an independently verified CA
 fingerprint.
 
-Vault initialisation and unseal material also remain outside this service. The
-service should eventually authenticate to an unsealed Vault with a narrowly
-scoped workload identity; it must not retain a permanent root token or store the
-only unseal key inside the same Kubernetes cluster.
+Recovery Butler owns the explicitly confirmed, one-time Vault initialization.
+For this single-node design it stores the root token and unseal key in the
+narrowly RBAC-protected `butler-vault-init` Secret, which the operator must
+export immediately to an age-encrypted off-cluster copy. Normal Butler cannot
+read that Secret. After foundation setup, both Butler runtimes authenticate to
+Vault with projected Kubernetes ServiceAccount tokens and bounded roles.
 
-## Implementation stages
+Bootstrap remains `awaiting-identity-verification` until the operator proves a
+Pocket ID admin login to normal Butler and completes Vault's separate browser
+OIDC flow. `homelabctl` verifies the Vault policies, revokes the temporary token
+and submits only non-secret acceptance evidence through the recovery API.
 
-1. context file and command-specific repository requirements;
-2. typed HTTP client with timeouts, TLS policy and stable error responses;
-3. read-only health and status commands;
-4. Pocket ID login and OS-keychain token storage;
-5. role-aware asynchronous reconciliation;
-6. event history and structured output;
-7. narrowly scoped application and backup operations.
+## Current boundary
 
-Each stage must satisfy the repository-wide [definition of
-done](/project/roadmap#definition-of-done-for-every-phase).
+The typed client, Pocket ID browser login, role-aware API, persisted operation
+history, application integrations, bounded credential issuance and recovery
+workflow are implemented. Titan deployment, first-owner enrollment, real
+integration execution and restore rehearsal remain operational checkpoints,
+not repository claims. See [current state](/project/current-state) and the
+[platform bootstrap runbook](/operations/platform-bootstrap).

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Butler Recovery</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background:#07111f; color:#dbeafe }
+    body { margin:0; min-height:100vh; display:grid; place-items:center; background:radial-gradient(circle at top,#172554,#07111f 55%) }
+    main { width:min(680px,calc(100% - 2rem)); background:#0f172acc; border:1px solid #334155; border-radius:1.25rem; padding:2rem; box-shadow:0 30px 90px #0008 }
+    .tag { color:#67e8f9; font-size:.75rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase }
+    h1 { margin:.5rem 0; font-size:2rem } p { color:#94a3b8; line-height:1.6 }
+    label { display:block; margin:1.25rem 0 .4rem; font-weight:650 }
+    input { box-sizing:border-box; width:100%; padding:.8rem; border-radius:.65rem; border:1px solid #475569; background:#020617; color:#e2e8f0 }
+    button { margin-top:1rem; border:0; border-radius:.65rem; padding:.8rem 1rem; background:#0891b2; color:white; font-weight:750; cursor:pointer }
+    button.danger { background:#be123c; margin-left:.5rem } pre { overflow:auto; padding:1rem; border-radius:.7rem; background:#020617; min-height:5rem }
+  </style>
+</head>
+<body><main>
+  <div class="tag">Kubernetes-authenticated recovery plane</div>
+  <h1>Butler recovery</h1>
+  <p>This endpoint has no ingress and does not depend on Pocket ID, Vault authentication, or VSO. Reach it only through <code>homelabctl control recovery</code>.</p>
+  <label for="token">Short-lived recovery token</label><input id="token" type="password" autocomplete="off">
+  <label for="pocket-key">Pocket ID management API key</label><input id="pocket-key" type="password" autocomplete="off">
+  <button onclick="status()">Check status</button><button onclick="importKey()">Import Pocket ID key</button><button class="danger" onclick="advance()">Advance bootstrap</button>
+  <pre id="output">Waiting for an authenticated request.</pre>
+  <script>
+    const out=document.querySelector('#output'), token=()=>document.querySelector('#token').value;
+    async function call(path,options={}) { options.headers={...(options.headers||{}),Authorization:`Bearer ${token()}`}; const r=await fetch(path,options); out.textContent=await r.text(); }
+    function status(){return call('/api/v1/recovery/status')}
+    function importKey(){return call('/api/v1/bootstrap/pocket-id-api-key',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey:document.querySelector('#pocket-key').value})})}
+    function advance(){if(confirm('Advance the one-time Vault bootstrap state?')) return call('/api/v1/bootstrap/advance',{method:'POST',headers:{'Content-Type':'application/json'},body:'{"confirm":true}'})}
+  </script>
+</main></body></html>

@@ -2,6 +2,13 @@ loki:
   deploymentMode: SingleBinary
   loki:
     auth_enabled: false
+    limits_config:
+      retention_period: 168h
+      ingestion_rate_mb: 4
+      ingestion_burst_size_mb: 8
+    compactor:
+      retention_enabled: true
+      delete_request_store: filesystem
     commonConfig:
       replication_factor: 1
     storage:
@@ -19,14 +26,14 @@ loki:
     replicas: 1
     persistence:
       enabled: true
-      size: 10Gi
+      size: 8Gi
     resources:
       requests:
         cpu: 100m
-        memory: 256Mi
+        memory: 192Mi
       limits:
         cpu: 500m
-        memory: 512Mi
+        memory: 384Mi
   gateway:
     enabled: false
   backend:

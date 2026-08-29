@@ -1,0 +1,74 @@
+alloy:
+  controller:
+    type: daemonset
+  alloy:
+    listenAddr: 0.0.0.0
+    resources:
+      requests: {cpu: 100m, memory: 128Mi}
+      limits: {cpu: 500m, memory: 384Mi}
+    extraPorts:
+      - {name: otlp-grpc, port: 4317, targetPort: 4317, protocol: TCP}
+      - {name: otlp-http, port: 4318, targetPort: 4318, protocol: TCP}
+    configMap:
+      content: |-
+        logging { level = "info" }
+
+        discovery.kubernetes "pods" { role = "pod" }
+        discovery.relabel "pod_logs" {
+          targets = discovery.kubernetes.pods.targets
+          rule {
+            source_labels = ["__meta_kubernetes_namespace"]
+            target_label  = "namespace"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_name"]
+            target_label  = "pod"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_container_name"]
+            target_label  = "container"
+          }
+        }
+        loki.source.kubernetes "pods" {
+          targets = discovery.relabel.pod_logs.output
+          forward_to = [loki.process.pods.receiver]
+        }
+        loki.process "pods" {
+          stage.static_labels { values = {cluster = "titan"} }
+          forward_to = [loki.write.default.receiver]
+        }
+        loki.write "default" {
+          endpoint { url = "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push" }
+        }
+
+        prometheus.remote_write "default" {
+          endpoint { url = "http://prometheus-server.monitoring.svc.cluster.local/api/v1/write" }
+        }
+        otelcol.receiver.otlp "default" {
+          grpc { endpoint = "0.0.0.0:4317" }
+          http { endpoint = "0.0.0.0:4318" }
+          output {
+            metrics = [otelcol.processor.batch.default.input]
+            logs = [otelcol.processor.batch.default.input]
+            traces = [otelcol.processor.batch.default.input]
+          }
+        }
+        otelcol.processor.batch "default" {
+          output {
+            metrics = [otelcol.exporter.prometheus.default.input]
+            logs = [otelcol.exporter.loki.default.input]
+            traces = [otelcol.exporter.otlp.tempo.input]
+          }
+        }
+        otelcol.exporter.prometheus "default" {
+          forward_to = [prometheus.remote_write.default.receiver]
+        }
+        otelcol.exporter.loki "default" {
+          forward_to = [loki.write.default.receiver]
+        }
+        otelcol.exporter.otlp "tempo" {
+          client {
+            endpoint = "tempo.monitoring.svc.cluster.local:4317"
+            tls { insecure = true }
+          }
+        }

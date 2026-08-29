@@ -16,9 +16,9 @@ The repo has five top-level layers:
 
 3. **`docs/`** — VitePress operations guide. Covers Debian installation, the Ansible design, K3s installation and maintenance, backup/recovery, troubleshooting, and the future Hetzner/Tailscale boundary.
 
-4. **`cluster/`** — Helmfile at `cluster/` root orchestrates Helm releases with dependency ordering via `needs`. Charts are organized into `core/` (namespaces, RBAC, cert-manager), `storage/` (Longhorn), and `apps/` (user-facing applications like Home Assistant, Vault, MQTT).
+4. **`cluster/`** — Helmfile at `cluster/` root orchestrates releases with dependency ordering via `needs`. Charts are organized by platform domain: `core/`, `networking/`, `security/`, `databases/`, `storage/`, `monitoring/`, `cicd/`, `applications/`, `services/`, and deferred `smart-home/` workloads.
 
-5. **`homelabctl/` and `services/`** — The Go operator/CI CLI and custom services that are built and deployed from this repository.
+5. **`homelabctl/` and `butler/`** — The Go operator/CI CLI and Butler control plane. Butler is a top-level, domain-packaged service with separate Pocket ID-authenticated normal and Kubernetes TokenReview-authenticated recovery runtimes.
 
 ## Key Commands
 
@@ -46,6 +46,16 @@ homelabctl cluster snapshot save --name before-change
 homelabctl cluster recovery export --destination /path/to/encrypted-staging
 homelabctl cluster upgrade
 homelabctl cluster reboot
+```
+
+### Butler control plane
+
+```
+homelabctl control recovery
+homelabctl control bootstrap --confirm
+homelabctl control status
+homelabctl control users list
+homelabctl control applications list
 ```
 
 ### Deployments and optional infrastructure
@@ -85,7 +95,7 @@ binary exists: from `homelabctl/`, build `./cmd/homelabctl` into `../bin/`.
 
 ## CI/CD
 
-- **CI workflow** (`.github/workflows/ci.yml`): driven by `homelabctl`. It checks Go, docs, Ansible and Terraform, then builds changed service images plus the documentation image and pushes them from `main`.
+- **CI workflow** (`.github/workflows/ci.yml`): driven by `homelabctl`. It checks Go, docs, Ansible, Terraform, gosec and Trivy; retains test/SARIF/SBOM reports; builds changed images on pull requests; and publishes all release images from `main` so Butler and homelabctl share the release version.
 - **Auto-assign workflow** (`.github/workflows/auto-assign.yml`): assigns the PR author as a reviewer.
 - Push-model only: there is no in-cluster GitOps controller (no Argo CD / Flux). All deploys are initiated with `homelabctl deploy`.
 
@@ -93,7 +103,9 @@ binary exists: from `homelabctl/`, build `./cmd/homelabctl` into `../bin/`.
 
 - Namespaces are managed declaratively in `cluster/core/namespaces/values.yaml` — add new namespaces there, not via `kubectl`.
 - RBAC service accounts and roles are in `cluster/core/rbac-policies/values.yaml`.
-- Helm chart dependencies (e.g., cert-manager, longhorn) are declared in each chart's `Chart.yaml` and locked in `Chart.lock`.
+- Helm chart dependencies are declared in each chart's `Chart.yaml` and locked in `Chart.lock`.
+- Vault is the source of truth for application credentials. Normal workloads receive only scoped Kubernetes Secrets through Vault Secrets Operator; do not put secret values in ConfigMaps or Helm values.
+- The `butler-vault-init` Secret is recovery-only: normal Butler must never mount or read it, and operators must export it directly to an age-encrypted off-cluster bundle.
 - Terraform state is remote (Terraform Cloud); never commit `.tfstate` files.
 - Sensitive variables (`*.tfvars`, SSH keys, kubeconfig) are gitignored.
 - Do not pass secrets in command-line extra vars or render K3s tokens into new cloud-init templates. Keep `no_log: true` scoped to the individual tasks that handle secrets.

@@ -1,3 +1,0 @@
-CrowdSec has been deployed to the cluster.
-
-LAPI: crowdsec-lapi.security.svc.cluster.local:8080

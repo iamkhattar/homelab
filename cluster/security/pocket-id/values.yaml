@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/pocket-id/pocket-id
-  tag: v2
+  tag: v2.14.0
   pullPolicy: IfNotPresent
 
 service:
@@ -12,9 +12,17 @@ service:
 
 env:
   PUBLIC_APP_URL: ""  # Set via helmfile
+  INTERNAL_APP_URL: "http://pocket-id.security.svc.cluster.local"
   TRUST_PROXY: "true"
   ANALYTICS_DISABLED: "true"
   VERSION_CHECK_DISABLED: "true"
+  OTEL_SERVICE_NAME: "pocket-id"
+  OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=homelab,k8s.namespace.name=security"
+  OTEL_TRACES_EXPORTER: "otlp"
+  OTEL_METRICS_EXPORTER: "otlp"
+  OTEL_LOGS_EXPORTER: "none"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy.monitoring.svc.cluster.local:4318"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
 
 ingress:
   enabled: false
