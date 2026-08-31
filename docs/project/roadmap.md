@@ -74,15 +74,15 @@ Acceptance criteria:
 
 ## Phase 2 — Cluster platform
 
-**State:** initial repository design complete; DNS publication, workstation CA
-trust, off-node backup selection and Titan restore testing remain outstanding.
+**State:** private-address wildcard DNS is published and verified; workstation
+CA trust, off-node backup selection and Titan restore testing remain outstanding.
 
 **Goal:** give applications stable networking, certificates, storage and backup.
 
 Accepted implementation:
 
-- use `home.6940469.xyz` with private-address public DNS records and no router
-  port-forward;
+- dedicate `6940469.xyz` to flat application names, publish its wildcard and
+  apex to Titan's private address, and keep all router ingress forwarding off;
 - deploy Traefik through Helmfile because bundled K3s Traefik is disabled;
 - begin with Vault private PKI and export its CA through authenticated
   Kubernetes;

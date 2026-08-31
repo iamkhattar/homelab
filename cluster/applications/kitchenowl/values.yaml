@@ -12,7 +12,7 @@ service:
 
 env:
   JWT_SECRET_KEY: ""  # Set via Vault secret
-  FRONT_URL: "https://kitchen.home.6940469.xyz"
+  FRONT_URL: "https://kitchen.6940469.xyz"
   DB_DRIVER: postgresql
   DB_HOST: postgresql.databases.svc.cluster.local
   DB_NAME: kitchenowl

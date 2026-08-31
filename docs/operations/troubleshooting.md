@@ -78,6 +78,39 @@ Do not publish logs containing tokens or credentials. Compare the rendered
 configuration with the inventory and check disk capacity, time synchronisation
 and port conflicts.
 
+### Embedded etcd expects a different node address
+
+If `cluster status` returns `ServiceUnavailable`, K3s remains `activating`, and
+the journal repeatedly reports an etcd member mismatch similar to:
+
+```text
+Found [titan-...=https://192.168.1.163:2380]
+expect: titan-...=https://[IPv6-address]:2380
+```
+
+K3s auto-detected a different address after reboot. Do not reset etcd or remove
+its data. Pin the server to its DHCP-reserved Ethernet IPv4 address and physical
+interface in Titan's private inventory:
+
+```yaml
+server_config_yaml: |
+  node-ip: 192.168.1.163
+  advertise-address: 192.168.1.163
+  flannel-iface: eno1
+  # existing server settings continue here
+```
+
+Reconcile the existing installation, then verify it:
+
+```bash
+homelabctl cluster bootstrap --limit titan --ask-become-pass
+homelabctl cluster status --all-pods
+homelabctl cluster diagnose --limit titan --ask-become-pass
+```
+
+This preserves the existing embedded-etcd member because the pinned address
+matches its original peer URL.
+
 ## Node is NotReady
 
 ```bash

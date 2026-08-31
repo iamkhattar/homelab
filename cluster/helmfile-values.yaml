@@ -1,4 +1,4 @@
 ## Base domain for all cluster services.
 ## All services are exposed as subdomains: <service>.<domain>
 ## Update this value before deploying.
-domain: "home.6940469.xyz"
+domain: "6940469.xyz"

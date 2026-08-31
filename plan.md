@@ -833,8 +833,8 @@ to Traefik, Titan or an application.
 The public Namecheap DNS view contains private-address records for the homelab
 zone plus records required for DNS ownership and certificate automation:
 
-- `home.6940469.xyz A <titan-lan-ip>`;
-- `*.home.6940469.xyz A <titan-lan-ip>`;
+- `6940469.xyz A <titan-lan-ip>`;
+- `*.6940469.xyz A <titan-lan-ip>`;
 - the `_acme-challenge` delegation or CNAME;
 - temporary ACME TXT records managed by the selected solver;
 - an optional restrictive CAA record.
@@ -858,28 +858,29 @@ public.
 Some routers, ISP resolvers and security products apply DNS rebinding protection
 and reject a public DNS response containing an RFC1918 address. Test every
 required LAN and tailnet client. If a resolver blocks the record, configure a
-narrow rebinding exception for `home.6940469.xyz` on the trusted home resolver,
+narrow rebinding exception for `6940469.xyz` on the trusted home resolver,
 or use Tailscale split DNS for only that zone. Do not globally disable DNS
 rebinding protection.
 
 Because certificate information is published to Certificate Transparency logs,
-prefer one wildcard certificate for `*.home.6940469.xyz` rather than issuing
+prefer one wildcard certificate for `*.6940469.xyz` rather than issuing
 individual public certificates that disclose every application hostname. The
 wildcard/base zone will still be publicly visible. If even that disclosure is
 unacceptable, use Vault/private PKI and install the private CA on every client
 instead of public ACME certificates.
 
 The owned public DNS zone is `6940469.xyz`, currently registered and hosted on
-Namecheap DNS. Use a dedicated private-service subdomain, proposed as
-`home.6940469.xyz`, so homelab records and certificate automation remain
-isolated from anything hosted at the apex. The exact internal subdomain remains
-an explicit decision; ownership of `6940469.xyz` and its current Namecheap DNS
-hosting do not.
+Namecheap DNS, and is dedicated to the homelab. Application names are flat:
+`home.6940469.xyz` is the Homepage dashboard, while `auth.6940469.xyz`,
+`grafana.6940469.xyz`, `vault.6940469.xyz` and their peers are independent
+one-label names covered by the same wildcard. The apex may redirect to Homepage
+through Traefik once ingress exists.
 
 The target DNS model is:
 
-- Namecheap publishes `home.6940469.xyz` and `*.home.6940469.xyz` with Titan's
-  DHCP-reserved private LAN address;
+- Namecheap publishes `6940469.xyz` and `*.6940469.xyz` with Titan's
+  DHCP-reserved private LAN address; these records were verified through a
+  public recursive resolver on 2026-08-31;
 - no public IP address or globally routed IPv6 address is published for the
   homelab;
 - an operator-managed Tailscale `Connector` advertises only
@@ -900,7 +901,7 @@ zone make direct in-cluster Namecheap automation less attractive.
 Evaluate these options in order:
 
 1. **Delegate only ACME challenges.** Add an explicit CNAME or delegated
-   `_acme-challenge.home.6940469.xyz` zone targeting a provider supported by
+   `_acme-challenge.6940469.xyz` zone targeting a provider supported by
    cert-manager, and configure `cnameStrategy: Follow`. cert-manager receives a
    credential scoped only to the challenge zone.
 2. **Move authoritative DNS hosting while keeping Namecheap as registrar.**
@@ -938,7 +939,7 @@ a Vault secret:
 4. cert-manager issues a wildcard certificate;
 5. Traefik uses the wildcard as its default certificate.
 
-Consider including both `*.home.6940469.xyz` and `home.6940469.xyz` on the
+Include both `*.6940469.xyz` and `6940469.xyz` on the
 Certificate. Only Traefik should need access to the wildcard private key.
 
 ### 8.3 Tailscale Operator access model
@@ -1088,7 +1089,7 @@ the dedicated `butler-identity-bootstrap` policy; normal Butler never receives
 that capability. Configure the exact redirect URIs for:
 
 - the private Vault UI hostname at
-  `https://vault.home.6940469.xyz/ui/vault/auth/jwt/oidc/callback`;
+  `https://vault.6940469.xyz/ui/vault/auth/jwt/oidc/callback`;
 - Vault CLI browser login at `http://localhost:8250/oidc/callback`, unless the
   final CLI workflow deliberately selects another fixed loopback port.
 
@@ -1189,7 +1190,7 @@ spec:
     provider: pocket-id
     clientType: confidential
     redirectURIs:
-      - https://grafana.home.6940469.xyz/login/generic_oauth
+      - https://grafana.6940469.xyz/login/generic_oauth
     groups:
       - homelab-admin
   credentials:
@@ -2173,8 +2174,8 @@ task-oriented operator documentation.
 
 - accept or amend this plan;
 - update the decision log and roadmap;
-- confirm the final private subdomain and select the Namecheap DNS-01
-  automation path;
+- retain the accepted flat `*.6940469.xyz` naming scheme and select the
+  DNS-01 automation path for the Namecheap-hosted zone;
 - define Helmfile stage and domain labels;
 - remove invalid and circular `needs` relationships;
 - replace broad namespace design with the target namespace chart;
@@ -2275,9 +2276,9 @@ Acceptance:
 - validate ACME staging before production;
 - issue the wildcard certificate;
 - deploy the separately managed Traefik release;
-- publish the Namecheap wildcard/private-address records, validate them from LAN
-  and Tailscale clients, and configure narrow split-DNS fallback only where DNS
-  rebinding protection requires it;
+- preserve the verified Namecheap wildcard and apex private-address records,
+  validate them from Tailscale clients once the Connector exists, and configure
+  narrow split-DNS fallback only where DNS rebinding protection requires it;
 - publish a disposable HTTPS service.
 
 Acceptance:

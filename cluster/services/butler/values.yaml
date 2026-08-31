@@ -14,7 +14,7 @@ service:
 
 ingress:
   enabled: true
-  host: butler.home.6940469.xyz
+  host: butler.6940469.xyz
   className: traefik
   clusterIssuer: vault
   tlsSecretName: butler-tls
@@ -122,7 +122,7 @@ config:
   oidc:
     # Set to https://auth.<domain> once Pocket-ID is reachable; empty disables
     # OIDC bootstrap of Vault auth/jwt and butler API authz.
-    issuer: "https://auth.home.6940469.xyz"
+    issuer: "https://auth.6940469.xyz"
     audience: butler
     allowedAudiences:
       - homelabctl
@@ -144,26 +144,26 @@ config:
     - name: butler
       kind: public
       redirectURIs:
-        - https://butler.home.6940469.xyz/auth/callback
+        - https://butler.6940469.xyz/auth/callback
     - name: vault
       kind: confidential
       redirectURIs:
         - http://localhost:8250/oidc/callback
-        - https://vault.home.6940469.xyz/ui/vault/auth/jwt/oidc/callback
+        - https://vault.6940469.xyz/ui/vault/auth/jwt/oidc/callback
     - name: grafana
       kind: confidential
       redirectURIs:
-        - https://grafana.home.6940469.xyz/login/generic_oauth
+        - https://grafana.6940469.xyz/login/generic_oauth
     - name: vaultwarden
       kind: confidential
       redirectURIs:
-        - https://vaultwarden.home.6940469.xyz/identity/connect/oidc-signin
+        - https://vaultwarden.6940469.xyz/identity/connect/oidc-signin
   pki:
     rootCN: "Homelab Root CA"
     intCN: "Homelab Intermediate CA"
     organization: homelab
     allowedDomains:
-      - home.6940469.xyz
+      - 6940469.xyz
     roleMaxTTL: 720h
   k8sIssuance:
     enabled: true

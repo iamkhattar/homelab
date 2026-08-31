@@ -33,7 +33,7 @@ func newControlCommand(s *state) *cobra.Command {
 	cmd.PersistentFlags().StringVar(&options.recoveryAddress, "recovery-address", "", "existing Butler recovery URL; otherwise create a private kubectl port-forward")
 	cmd.PersistentFlags().StringVar(&options.namespace, "namespace", "security", "namespace containing Butler")
 	cmd.PersistentFlags().StringVar(&options.token, "token", "", "Pocket ID ID token override (or BUTLER_TOKEN)")
-	cmd.PersistentFlags().StringVar(&options.issuer, "issuer", "https://auth.home.6940469.xyz", "Pocket ID OIDC issuer")
+	cmd.PersistentFlags().StringVar(&options.issuer, "issuer", "https://auth.6940469.xyz", "Pocket ID OIDC issuer")
 	cmd.PersistentFlags().StringVar(&options.clientID, "client-id", "homelabctl", "Pocket ID public OIDC client ID")
 	cmd.PersistentFlags().StringVar(&options.session, "session-file", "", "OIDC session path (defaults to the private user config directory)")
 
@@ -110,7 +110,7 @@ func newControlVerifyIdentityCommand(s *state, options *controlOptions) *cobra.C
 	}
 	defaultVaultAddress := os.Getenv("VAULT_ADDR")
 	if defaultVaultAddress == "" {
-		defaultVaultAddress = "https://vault.home.6940469.xyz"
+		defaultVaultAddress = "https://vault.6940469.xyz"
 	}
 	command.Flags().StringVar(&vaultAddress, "vault-address", defaultVaultAddress, "Vault HTTPS address")
 	command.Flags().StringVar(&vaultRole, "vault-role", "homelab-admin", "Vault OIDC role expected to grant administrator policies")
@@ -164,7 +164,7 @@ func newControlCredentialsCommand(s *state, options *controlOptions) *cobra.Comm
 }
 
 func newControlLoginCommand(s *state, options *controlOptions) *cobra.Command {
-	login := &cobra.Command{Use: "login", Short: "Sign in to Pocket ID with browser-based PKCE", Long: "Open Pocket ID in a browser, complete Authorization Code with PKCE on a loopback callback, and cache the validated short-lived ID token with private permissions.", Example: "  homelabctl control login\n  homelabctl control login --issuer https://auth.home.6940469.xyz", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+	login := &cobra.Command{Use: "login", Short: "Sign in to Pocket ID with browser-based PKCE", Long: "Open Pocket ID in a browser, complete Authorization Code with PKCE on a loopback callback, and cache the validated short-lived ID token with private permissions.", Example: "  homelabctl control login\n  homelabctl control login --issuer https://auth.6940469.xyz", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		if s.dryRun {
 			s.info("would open Pocket ID in a browser and wait on http://" + controlapi.LoginCallbackAddress + "/callback")
 			return nil

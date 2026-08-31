@@ -29,7 +29,7 @@ service accounts, RBAC and HTTP surfaces.
 | Property | Normal Butler | Butler recovery |
 | --- | --- | --- |
 | Kubernetes ServiceAccount | `butler` | `butler-recovery` |
-| Network entry point | Traefik at `butler.home.6940469.xyz` | ClusterIP only; no Ingress |
+| Network entry point | Traefik at `butler.6940469.xyz` | ClusterIP only; no Ingress |
 | Human/client authentication | Pocket ID OIDC | ten-minute `butler-recovery-client` Kubernetes token |
 | Vault identity after bootstrap | `auth/kubernetes/role/butler` | `auth/kubernetes/role/butler-recovery` |
 | Recovery Secret access | none | exact access to `butler-vault-init` |

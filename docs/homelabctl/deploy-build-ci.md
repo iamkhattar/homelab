@@ -169,7 +169,7 @@ operator toolset:
 | curl | Call health endpoints and API-driven management surfaces |
 | jq and yq | Inspect structured API responses and rendered YAML without fragile text parsing |
 | OpenSSL | Diagnose certificate chains, expiry and TLS handshakes |
-| bind tools | Diagnose the private DNS path for `home.6940469.xyz` |
+| bind tools | Diagnose the private DNS path for `6940469.xyz` |
 | Git and OpenSSH | Work with the checked-out repository and authenticated Git transports |
 | Bash and CA certificates | Run workflow glue and validate trusted HTTPS endpoints |
 

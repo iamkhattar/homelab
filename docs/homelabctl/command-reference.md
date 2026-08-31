@@ -165,7 +165,7 @@ homelabctl control credentials issue --role homelab-viewer --ttl 15m
 homelabctl control applications put kitchenowl \
   --app-namespace kitchenowl \
   --authentication native-oidc \
-  --host kitchenowl.home.6940469.xyz
+  --host kitchenowl.6940469.xyz
 homelabctl control logout
 ```
 

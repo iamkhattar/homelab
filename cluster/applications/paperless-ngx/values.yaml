@@ -11,7 +11,7 @@ service:
   containerPort: 8000
 
 env:
-  PAPERLESS_URL: "https://paperless.home.6940469.xyz"
+  PAPERLESS_URL: "https://paperless.6940469.xyz"
   PAPERLESS_DBENGINE: postgresql
   PAPERLESS_DBHOST: postgresql.databases.svc.cluster.local
   PAPERLESS_DBPORT: "5432"

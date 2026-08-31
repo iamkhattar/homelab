@@ -6,8 +6,10 @@ the Mac; the scale-to-zero runner cannot deploy the platform that creates it.
 
 ## Before the first apply
 
-Resolve `*.home.6940469.xyz` to Titan's reserved LAN address and confirm there
-is no router port-forward. Publish the Butler image for the current commit.
+Confirm `*.6940469.xyz` and `6940469.xyz` resolve to Titan's reserved LAN
+address, no AAAA record exists and there is no router port-forward. Publish the
+Butler image for the current commit.
+
 Deploy commands default to the full Git SHA, so that immutable image must exist.
 
 ```bash
@@ -117,7 +119,7 @@ homelabctl deploy apply --stage identity
 kubectl -n security rollout status deployment/pocket-id
 ```
 
-Open `https://auth.home.6940469.xyz`, create the first owner, enroll a passkey,
+Open `https://auth.6940469.xyz`, create the first owner, enroll a passkey,
 and create one management API key. Pocket ID does not expose an unattended
 first-owner operation.
 
