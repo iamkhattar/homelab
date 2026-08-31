@@ -258,11 +258,34 @@ Titan:
 id
 sudo -v
 sudo id
+hostnamectl
+timedatectl
+ip -br address
+ip route show default
+getent ahosts deb.debian.org
+systemctl --failed
 ```
 
 The first `id` must identify the normal operator. `sudo id` must identify
 `root`. Exit and open one more new key-authenticated session before proceeding.
 The account password may be used for sudo, but it is never placed in inventory.
+The remaining checks must show hostname `titan`, synchronized time, `eno1` up
+with the reserved address, no Wi-Fi address, the default route through `eno1`,
+working DNS and no unexplained failed units.
+
+If Bash reports that it cannot change to `en_US.UTF-8`, the Mac is forwarding a
+locale that the minimal Debian installation has not generated. The baseline
+generates `en_GB.UTF-8` and `en_US.UTF-8` and selects the UK locale by default.
+For access needed before the first baseline run, repair it interactively on
+Titan with:
+
+```bash
+sudo dpkg-reconfigure locales
+```
+
+Enable `en_US.UTF-8 UTF-8`, retain the desired local locale, and select
+`en_GB.UTF-8` as the default. Verify `locale -a` contains `en_US.utf8`, then
+reconnect. Do not set `LC_ALL` globally in `.bashrc`.
 
 ## 12. Preview and apply the Debian baseline
 
@@ -290,9 +313,10 @@ homelabctl node prepare --limit titan --ask-become-pass
 ```
 
 The role performs Debian package upgrades, installs the administration
-baseline, enforces Titan's hostname, manages the declared key set, disables swap
-and sleep, bounds persistent logs, enables automatic security updates without
-automatic reboot, and enables Chrony and SSD trimming.
+baseline, generates the managed UTF-8 locales, enforces Titan's hostname,
+manages the declared key set, disables swap and sleep, bounds persistent logs,
+enables automatic security updates without automatic reboot, and enables
+Chrony and SSD trimming.
 
 There must be no failed or unreachable tasks. The prompt appears in new Bash
 login sessions as `[HOME | titan]`; it does not modify personal `.bashrc` files.
