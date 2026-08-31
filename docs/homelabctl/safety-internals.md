@@ -10,7 +10,8 @@ predictable.
 | --- | --- | --- |
 | `setup`, `docs` | Local Python/npm processes | Pinned repository dependencies |
 | `inventory init` | Direct local file operation | Private Ansible inventory |
-| `inventory`, `node` | Local Ansible, SSH and `ssh-copy-id` processes | Debian hosts and inventory |
+| `node connect/authorize-key` | Native Go inventory reader, then SSH or `ssh-copy-id` | First-node trust |
+| `inventory show/check`, `node prepare/diagnose/reboot` | Local Ansible processes | Debian hosts and effective inventory |
 | `cluster bootstrap/upgrade/reboot` | Local Ansible invoking remote K3s lifecycle | K3s installation and node state |
 | `cluster status/nodes` | Local kubectl | Kubernetes API |
 | `cluster snapshot/recovery/diagnose` | Local Ansible invoking fixed remote tasks | K3s datastore and evidence |
@@ -33,12 +34,19 @@ testable and consistent across local machines and CI. Git is still useful to
 clone the repository and for normal developer commits; it is not a runtime
 dependency for these CLI operations.
 
+The first-node SSH path also parses the private YAML inventory in-process.
+`node connect` and `node authorize-key` need only `ssh` or `ssh-copy-id`; they do
+not invoke `ansible-inventory`. Ansible remains the source of truth for full
+inventory rendering, connectivity checks and configuration management after
+the operator key and sudo boundary have been proved.
+
 The infrastructure engines intentionally remain external processes:
 
 | Concern | Owner | Why |
 | --- | --- | --- |
 | Repository SHA, refs, merge-base diff | `go-git` inside `homelabctl` | Stable Go API and no shell parsing |
 | Workflow YAML and repository CI policy | Go YAML parser inside `homelabctl` | Fast local validation with focused tests |
+| Bootstrap SSH connection variables | Go YAML parser inside `homelabctl` | Establish trust before Ansible is installed |
 | Human terminal presentation | Lip Gloss inside `homelabctl` | Consistent semantic styling with automatic plain-text fallback |
 | K3s host lifecycle | Ansible | Inventory, idempotence, privilege escalation and check mode |
 | Kubernetes resources | kubectl and Helmfile | Native contexts, plugins, diffs and release semantics |

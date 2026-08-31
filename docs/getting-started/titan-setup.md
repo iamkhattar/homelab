@@ -235,8 +235,9 @@ homelabctl node authorize-key titan \
 ```
 
 `authorize-key` validates that the selected file has a supported OpenSSH public
-key shape, resolves Titan through inventory and delegates password-authenticated
-installation to `ssh-copy-id`. It refuses a private-key file.
+key shape, resolves Titan from the private YAML inventory in Go and delegates
+password-authenticated installation to `ssh-copy-id`. It refuses a private-key
+file and does not require Ansible.
 
 Keep the console and original SSH session open. In a new terminal, prove this
 logs in with the key:
