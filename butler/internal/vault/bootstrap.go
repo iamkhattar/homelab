@@ -51,7 +51,7 @@ type BootstrapInput struct {
 	OIDCAudience     string
 	OIDCClientID     string
 	OIDCClientSecret string
-	OIDCCABundle     string // PEM, so Vault can verify Pocket-ID's TLS cert (which is signed by the homelab CA)
+	PublicDomain     string
 
 	// JWT roles — bind Pocket-ID groups to Vault policies. Reused from
 	// the K8sIssuance role specs so a single source of truth describes
@@ -68,7 +68,6 @@ type BootstrapInput struct {
 	RecoveryRole           string
 	RecoveryServiceAccount string
 	ConsumerRoles          []ConsumerRoleSpec
-	PKI                    PKIConfig
 }
 
 type ConsumerRoleSpec struct {
@@ -78,6 +77,8 @@ type ConsumerRoleSpec struct {
 	Paths           []string
 }
 
+// PKIConfig remains only for recognizing and cleaning up clusters created by
+// the superseded private-PKI design. Bootstrap no longer calls ensurePKI.
 type PKIConfig struct {
 	RootCN         string
 	IntCN          string
@@ -114,15 +115,12 @@ type K8sEngineRoleSpec struct {
 	MaxTTL             string
 }
 
-// PKI mount paths and well-known CA naming. Centralized here so the PKI
-// reconciler, the cert-manager policy, and the HTTP CA-chain endpoint stay
-// in sync.
 const (
 	pkiRootMount         = "pki"
 	pkiIntMount          = "pki_int"
 	pkiDefaultRole       = "homelab-default"
-	pkiRootTTL           = "87600h" // 10 years
-	pkiIntTTL            = "26280h" // 3 years
+	pkiRootTTL           = "87600h"
+	pkiIntTTL            = "26280h"
 	auditDevicePath      = "file"
 	auditDeviceFile      = "/vault/audit/audit.log"
 	certManagerNamespace = "cert-manager"
@@ -153,12 +151,6 @@ func (c *Client) Bootstrap(ctx context.Context, in BootstrapInput) error {
 		return err
 	}
 	if err := c.ensureConsumerRoles(ctx, in.ConsumerRoles); err != nil {
-		return err
-	}
-	if err := c.ensurePKI(ctx, in.PKI); err != nil {
-		return err
-	}
-	if err := c.ensureCertManagerAuth(ctx); err != nil {
 		return err
 	}
 	if err := c.ensureAuditDevice(ctx); err != nil {
@@ -390,11 +382,6 @@ func (c *Client) ensureJWTAuth(ctx context.Context, in BootstrapInput) error {
 		cfg["oidc_client_id"] = in.OIDCClientID
 		cfg["oidc_client_secret"] = in.OIDCClientSecret
 	}
-	if in.OIDCCABundle != "" {
-		// Pocket-ID is served on a Vault-PKI-signed cert; Vault needs to
-		// trust the homelab root CA for OIDC discovery to succeed.
-		cfg["oidc_discovery_ca_pem"] = in.OIDCCABundle
-	}
 
 	if _, err := c.raw.Logical().WriteWithContext(ctx, "auth/jwt/config", cfg); err != nil {
 		return fmt.Errorf("configuring jwt auth: %w", err)
@@ -507,8 +494,8 @@ func (c *Client) ensureK8sPolicies(ctx context.Context, _ K8sEngineConfig) error
 // best-effort and harmless if it's slightly wrong since Vault checks the
 // list on login.)
 func firstDomain(in BootstrapInput) string {
-	if len(in.PKI.AllowedDomains) > 0 {
-		return in.PKI.AllowedDomains[0]
+	if in.PublicDomain != "" {
+		return in.PublicDomain
 	}
 	return "6940469.xyz"
 }
@@ -814,10 +801,8 @@ func (c *Client) ensureAuditDevice(ctx context.Context) error {
 	return nil
 }
 
-// CAChain returns the PEM-encoded CA chain (root + intermediate) from the
-// Vault PKI mounts. Used by the HTTP /api/v1/pki/ca-chain endpoint and by
-// the CA-bundle ConfigMap reconciler so homelabctl trust export has a stable
-// authenticated source.
+// CAChain reads a legacy private-PKI chain for migration diagnostics. New
+// clusters use the publicly trusted cert-manager ACME issuer and never call it.
 func (c *Client) CAChain(ctx context.Context) (string, error) {
 	resp, err := c.raw.Logical().ReadWithContext(ctx, pkiIntMount+"/cert/ca_chain")
 	if err != nil {

@@ -21,6 +21,8 @@ func TestOperationalCommandsConstructExpectedDryRuns(t *testing.T) {
 		{name: "deploy diff", args: []string{"deploy", "diff"}, want: []string{"helmfile diff", "/cluster"}},
 		{name: "deploy selected release", args: []string{"deploy", "apply", "cert-manager"}, want: []string{"helmfile apply --selector name=cert-manager --include-needs"}},
 		{name: "deploy selected stage", args: []string{"deploy", "apply", "--stage", "data"}, want: []string{"helmfile apply --selector stage=data --include-needs"}},
+		{name: "certificate status", args: []string{"control", "certificate", "status"}, want: []string{"create token butler-recovery-client"}},
+		{name: "verify certificate dns", args: []string{"control", "certificate", "verify-dns", "--confirm"}, want: []string{"create token butler-recovery-client"}},
 		{name: "deploy sync", args: []string{"deploy", "sync"}, want: []string{"helmfile sync"}},
 		{name: "deploy ordered identity platform", args: []string{"deploy", "platform", "--through", "identity", "--confirm"}, want: []string{"stage=foundation", "stage=networking", "stage=secrets", "stage=identity"}},
 		{name: "deploy gated observability platform", args: []string{"deploy", "platform", "--through", "observability", "--confirm"}, want: []string{"stage=data", "butler-bootstrap-state", "stage=observability"}},
@@ -30,7 +32,6 @@ func TestOperationalCommandsConstructExpectedDryRuns(t *testing.T) {
 		{name: "cluster nodes", args: []string{"--context", "titan-admin", "cluster", "nodes"}, want: []string{"kubectl --context titan-admin get nodes -o wide --show-labels"}},
 		{name: "cluster unhealthy status", args: []string{"cluster", "status"}, want: []string{"get nodes -o wide", "--field-selector=status.phase!=Running,status.phase!=Succeeded"}},
 		{name: "cluster all pods", args: []string{"cluster", "status", "--all-pods"}, want: []string{"get pods --all-namespaces"}},
-		{name: "export authenticated CA trust", args: []string{"trust", "export", "--output", "/tmp/homelab-test-ca.pem"}, want: []string{"get configmap homelab-ca-bundle", "--output=jsonpath"}},
 		{name: "inventory verbose check", args: []string{"inventory", "check", "--verbose"}, want: []string{"ansible-inventory --graph", "ansible k3s_cluster --module-name ansible.builtin.ping -vv"}},
 		{name: "cluster upgrade", args: []string{"cluster", "upgrade", "--limit", "titan", "--ask-become-pass"}, want: []string{"playbooks/upgrade.yml --limit titan --ask-become-pass"}},
 	}

@@ -22,12 +22,14 @@
   <p>This endpoint has no ingress and does not depend on Pocket ID, Vault authentication, or VSO. Reach it only through <code>homelabctl control recovery</code>.</p>
   <label for="token">Short-lived recovery token</label><input id="token" type="password" autocomplete="off">
   <label for="pocket-key">Pocket ID management API key</label><input id="pocket-key" type="password" autocomplete="off">
-  <button onclick="status()">Check status</button><button onclick="importKey()">Import Pocket ID key</button><button class="danger" onclick="advance()">Advance bootstrap</button>
+  <button onclick="status()">Check status</button><button onclick="certificate()">Certificate status</button><button onclick="verifyDNS()">Verify DNS</button><button onclick="importKey()">Import Pocket ID key</button><button class="danger" onclick="advance()">Advance bootstrap</button>
   <pre id="output">Waiting for an authenticated request.</pre>
   <script>
     const out=document.querySelector('#output'), token=()=>document.querySelector('#token').value;
     async function call(path,options={}) { options.headers={...(options.headers||{}),Authorization:`Bearer ${token()}`}; const r=await fetch(path,options); out.textContent=await r.text(); }
     function status(){return call('/api/v1/recovery/status')}
+    function certificate(){return call('/api/v1/bootstrap/certificate')}
+    function verifyDNS(){if(confirm('Verify the public Namecheap CNAME against Butler’s stored target?')) return call('/api/v1/bootstrap/certificate/verify-dns',{method:'POST',headers:{'Content-Type':'application/json'},body:'{"confirm":true}'})}
     function importKey(){return call('/api/v1/bootstrap/pocket-id-api-key',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey:document.querySelector('#pocket-key').value})})}
     function advance(){if(confirm('Advance the one-time Vault bootstrap state?')) return call('/api/v1/bootstrap/advance',{method:'POST',headers:{'Content-Type':'application/json'},body:'{"confirm":true}'})}
   </script>

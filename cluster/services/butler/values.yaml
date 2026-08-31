@@ -16,8 +16,6 @@ ingress:
   enabled: true
   host: butler.6940469.xyz
   className: traefik
-  clusterIssuer: vault
-  tlsSecretName: butler-tls
 
 # Environment variables passed to the butler container. Tiny set — anything
 # substantive lives in the config ConfigMap below. These are kept here as
@@ -80,7 +78,7 @@ networkPolicy:
 # /etc/butler/config.yaml inside the container. This replaces the embedded
 # butler.yaml fallback at runtime.
 #
-# Everything butler used to require a rebuild for (PKI domain, OAuth clients,
+# Everything butler used to require a rebuild for (certificate domain, OAuth clients,
 # Vault JWT roles, K8s issuance roles) lives here.
 config:
   vault:
@@ -115,6 +113,11 @@ config:
           paths:
             - monitoring/grafana
             - oauth/grafana
+        - name: vso-cert-manager
+          namespace: cert-manager
+          serviceAccounts: [default]
+          paths:
+            - infrastructure/acme-dns
   server:
     port: "8080"
   reconcile:
@@ -158,13 +161,13 @@ config:
       kind: confidential
       redirectURIs:
         - https://vaultwarden.6940469.xyz/identity/connect/oidc-signin
-  pki:
-    rootCN: "Homelab Root CA"
-    intCN: "Homelab Intermediate CA"
-    organization: homelab
-    allowedDomains:
-      - 6940469.xyz
-    roleMaxTTL: 720h
+  certificates:
+    acmeDNSURL: https://auth.acme-dns.io
+    domain: 6940469.xyz
+    credentialPath: infrastructure/acme-dns
+    namespace: networking
+    certificateName: homelab-wildcard
+    tlsSecretName: homelab-wildcard-tls
   k8sIssuance:
     enabled: true
     hostNamespace: kube-system

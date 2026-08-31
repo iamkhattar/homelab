@@ -45,7 +45,7 @@ func (r *VaultBootstrap) Name() string {
 }
 
 // Reconcile drives the full Vault bootstrap each pass: init + unseal, then
-// the idempotent Bootstrap (KV, k8s auth, PKI, audit, jwt, policies, roles).
+// the idempotent Bootstrap (KV, k8s auth, audit, jwt, policies, roles).
 //
 // Resources that aren't always available (OAuth client creds for OIDC, the
 // PKI CA bundle) are looked up best-effort here and passed in via
@@ -87,12 +87,7 @@ func (r *VaultBootstrap) configure(ctx context.Context) error {
 		RecoveryRole:           "butler-recovery",
 		RecoveryServiceAccount: "butler-recovery",
 		ConsumerRoles:          buildConsumerRoles(r.cfg),
-		PKI: vault.PKIConfig{
-			RootCN: r.cfg.PKI.RootCN, IntCN: r.cfg.PKI.IntCN,
-			Organization:   r.cfg.PKI.Organization,
-			AllowedDomains: r.cfg.PKI.AllowedDomains,
-			RoleMaxTTL:     r.cfg.PKI.RoleMaxTTL,
-		},
+		PublicDomain:           r.cfg.Certificates.Domain,
 	}
 
 	// Best-effort: read OAuth client creds for Vault from KV. If they
@@ -112,10 +107,6 @@ func (r *VaultBootstrap) configure(ctx context.Context) error {
 			}
 		}
 
-		// CA bundle for Vault → Pocket-ID OIDC discovery. Same soft-fail.
-		if chain, err := r.vault.CAChain(ctx); err == nil {
-			in.OIDCCABundle = chain
-		}
 	}
 
 	if err := r.vault.Bootstrap(ctx, in); err != nil {

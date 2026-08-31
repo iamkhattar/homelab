@@ -40,6 +40,7 @@ func newControlCommand(s *state) *cobra.Command {
 	cmd.AddCommand(newControlLoginCommand(s, options))
 	cmd.AddCommand(newControlLogoutCommand(s, options))
 	cmd.AddCommand(newControlBootstrapCommand(s, options))
+	cmd.AddCommand(newControlCertificateCommand(s, options))
 	cmd.AddCommand(newControlVerifyIdentityCommand(s, options))
 	cmd.AddCommand(newControlRecoveryCommand(s, options))
 	cmd.AddCommand(newControlGetCommand(s, options, "status", "Show reconciler status", "/api/v1/status"))
@@ -51,6 +52,54 @@ func newControlCommand(s *state) *cobra.Command {
 	cmd.AddCommand(newControlApplicationsCommand(s, options))
 	cmd.AddCommand(newControlCredentialsCommand(s, options))
 	return cmd
+}
+
+func newControlCertificateCommand(s *state, options *controlOptions) *cobra.Command {
+	command := &cobra.Command{
+		Use:   "certificate",
+		Short: "Complete the one-time public certificate ceremony",
+		Long:  "Inspect Butler's acme-dns registration, verify the permanent Namecheap CNAME, and observe the production Let's Encrypt wildcard certificate without exposing DNS credentials.",
+	}
+	status := &cobra.Command{
+		Use:     "status",
+		Short:   "Show the generated CNAME and wildcard certificate readiness",
+		Long:    "Read the private recovery API and show only non-secret acme-dns registration metadata, DNS delegation state, and production wildcard certificate readiness.",
+		Example: "  homelabctl control certificate status",
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return withRecoveryClient(cmd.Context(), s, options, func(client *controlapi.Client) error {
+				var result interface{}
+				if err := client.Do(cmd.Context(), http.MethodGet, "/api/v1/bootstrap/certificate", nil, &result); err != nil {
+					return err
+				}
+				return printJSON(s, result)
+			})
+		},
+	}
+	var confirm bool
+	verify := &cobra.Command{
+		Use:     "verify-dns",
+		Short:   "Verify the permanent Namecheap CNAME",
+		Long:    "Resolve _acme-challenge through public DNS and accept it only when it exactly matches Butler's stored acme-dns registration. This never prints the acme-dns password.",
+		Example: "  homelabctl control certificate verify-dns --confirm",
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if !confirm {
+				return fmt.Errorf("--confirm is required to verify DNS delegation")
+			}
+			return withRecoveryClient(cmd.Context(), s, options, func(client *controlapi.Client) error {
+				var result interface{}
+				if err := client.Do(cmd.Context(), http.MethodPost, "/api/v1/bootstrap/certificate/verify-dns", map[string]bool{"confirm": true}, &result); err != nil {
+					return err
+				}
+				s.success("Namecheap DNS delegation verified; cert-manager can issue the production wildcard certificate")
+				return printJSON(s, result)
+			})
+		},
+	}
+	verify.Flags().BoolVar(&confirm, "confirm", false, "confirm validation of the permanent DNS delegation")
+	command.AddCommand(status, verify)
+	return command
 }
 
 func newControlVerifyIdentityCommand(s *state, options *controlOptions) *cobra.Command {

@@ -11,7 +11,7 @@ the node.
 | --- | --- |
 | Foundation | namespaces, base RBAC |
 | Secrets and identity | Vault, Butler, VSO, Pocket ID with Butler-managed groups/OIDC clients |
-| Networking | cert-manager with Vault private PKI, Traefik; public DNS-01 and Tailscale operator remain later work |
+| Networking | cert-manager with production Let's Encrypt DNS-01 through acme-dns, one wildcard certificate and Traefik; Tailscale operator remains later work |
 | Shared data | PostgreSQL, Redis, Garage with API-managed layout/bucket/key |
 | Observability | Prometheus, kube-state-metrics, node-exporter, Loki, Tempo, Alloy and Grafana |
 | Delivery | Actions Runner Controller and `titan` runner scale set |
@@ -33,9 +33,9 @@ namespaces + RBAC
       /       \
 networking   Vault
       \       /
-       Butler
+       Butler -- registers acme-dns into Vault
         |
-       VSO
+       VSO -- projects cert-manager credential
       /   \
 shared data  ARC credentials
       |           |

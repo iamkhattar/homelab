@@ -93,7 +93,7 @@ API has a stable contract and a second real consumer.
 | Terminal status, colour degradation and plain-text output | Lip Gloss in process |
 | Debian and K3s lifecycle | Ansible subprocess |
 | Kubernetes inspection | kubectl subprocess |
-| Initial homelab CA trust export | Authenticated kubectl read plus in-process X.509 validation |
+| Public certificate ceremony | Butler recovery API plus exact public CNAME verification |
 | Workload reconciliation | Helmfile subprocess |
 | Optional cloud planning | Terraform subprocess |
 | Service, homelabctl and documentation images | Docker subprocess |

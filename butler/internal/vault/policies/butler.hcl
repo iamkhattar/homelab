@@ -13,6 +13,4 @@ path "auth/kubernetes/*" { capabilities = ["create", "read", "update", "delete",
 path "auth/jwt/*" { capabilities = ["create", "read", "update", "delete", "list"] }
 path "secret/data/*" { capabilities = ["create", "read", "update", "delete"] }
 path "secret/metadata/*" { capabilities = ["read", "list", "delete"] }
-path "pki/*" { capabilities = ["create", "read", "update", "delete", "list"] }
-path "pki_int/*" { capabilities = ["create", "read", "update", "delete", "list"] }
 path "kubernetes/*" { capabilities = ["create", "read", "update", "delete", "list"] }

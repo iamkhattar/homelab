@@ -11,6 +11,7 @@ import (
 
 	"github.com/iamkhattar/homelab/butler/internal/access"
 	"github.com/iamkhattar/homelab/butler/internal/applications"
+	"github.com/iamkhattar/homelab/butler/internal/certificates"
 	"github.com/iamkhattar/homelab/butler/internal/config"
 	"github.com/iamkhattar/homelab/butler/internal/identity"
 	"github.com/iamkhattar/homelab/butler/internal/observability"
@@ -84,11 +85,25 @@ func main() {
 	// identity and only performs idempotent configuration/reconciliation.
 	vaultConfiguration := reconciler.NewVaultConfiguration(vc, k8s, cfg.Namespace, cfg)
 	if mode == "recovery" {
+		acmeDNSClient, err := certificates.NewClient(cfg.Certificates.ACMEDNSURL)
+		if err != nil {
+			slog.Error("configuring acme-dns client", "error", err)
+			os.Exit(1)
+		}
+		certificateManager, err := certificates.NewManager(certificates.Config{
+			APIURL: cfg.Certificates.ACMEDNSURL, Domain: cfg.Certificates.Domain,
+			CredentialPath: cfg.Certificates.CredentialPath, CertificateNS: cfg.Certificates.Namespace,
+			CertificateName: cfg.Certificates.CertificateName, TLSSecretName: cfg.Certificates.TLSSecretName,
+		}, vc, acmeDNSClient, nil)
+		if err != nil {
+			slog.Error("configuring certificate bootstrap", "error", err)
+			os.Exit(1)
+		}
 		identityBootstrap := recovery.Sequence{Steps: []recovery.Bootstrapper{
 			reconciler.NewPocketIDGroups(vc, cfg.OIDC.AdminURL, cfg.PocketIDGroups),
 			reconciler.NewOAuthClients(vc, cfg.OIDC.AdminURL, cfg.OAuthClients),
 		}}
-		serveRecovery(ctx, cfg, vc, k8s, reconciler.NewVaultBootstrap(vc, k8s, cfg.Namespace, cfg), identityBootstrap)
+		serveRecovery(ctx, cfg, vc, k8s, reconciler.NewVaultBootstrap(vc, k8s, cfg.Namespace, cfg), identityBootstrap, certificateManager)
 		return
 	}
 	if mode != "normal" {
@@ -102,7 +117,6 @@ func main() {
 
 	reconcilers := []reconciler.Reconciler{
 		vaultConfiguration,
-		reconciler.NewCABundle(vc, k8s),
 	}
 	if len(cfg.Secrets) > 0 {
 		reconcilers = append(reconcilers, reconciler.NewSecrets(vc, cfg.Secrets))
@@ -131,7 +145,7 @@ func main() {
 
 	sched := reconciler.NewScheduler(cfg.ReconcileInterval, reconcilers...)
 
-	auth, err := server.NewAuthMiddleware(ctx, cfg.OIDC.Issuer, cfg.OIDC.Audience, vc.CAChain)
+	auth, err := server.NewAuthMiddleware(ctx, cfg.OIDC.Issuer, cfg.OIDC.Audience, nil)
 	if err != nil {
 		slog.Error("setting up auth middleware", "error", err)
 		os.Exit(1)
@@ -184,7 +198,7 @@ func main() {
 	}
 }
 
-func serveRecovery(ctx context.Context, cfg *config.Config, vc *vault.Client, k8s kubernetes.Interface, bootstrapper, identityBootstrapper recovery.Bootstrapper) {
+func serveRecovery(ctx context.Context, cfg *config.Config, vc *vault.Client, k8s kubernetes.Interface, bootstrapper, identityBootstrapper recovery.Bootstrapper, certificateManager *certificates.Manager) {
 	// This succeeds after the one-time bootstrap has created the narrow
 	// recovery role. It is intentionally best-effort for the pristine-cluster
 	// case, where that role cannot exist yet. Re-authenticating here also makes
@@ -194,6 +208,7 @@ func serveRecovery(ctx context.Context, cfg *config.Config, vc *vault.Client, k8
 	}
 	auth := recovery.NewTokenReviewer(k8s, cfg.Namespace, "butler-recovery-client")
 	recoveryService := recovery.NewService(vc, k8s, cfg.Namespace, bootstrapper, identityBootstrapper)
+	recoveryService.UseCertificates(certificateManager)
 	srv := server.NewRecovery(auth, recoveryService)
 	httpSrv := &http.Server{Addr: ":" + cfg.Server.Port, Handler: otelhttp.NewHandler(server.RequestLogger(srv), "butler.recovery.http"), ReadHeaderTimeout: 10 * time.Second}
 	go func() {

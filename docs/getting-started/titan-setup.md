@@ -501,7 +501,8 @@ decisions:
   locations.
 
 DNS-01 automation and the Zigbee integration choice are later decisions. They
-do not block the initial private-PKI platform or the recoverable K3s foundation.
+do not block the recoverable K3s foundation or the later one-time public
+certificate ceremony.
 
 ## If a checkpoint fails
 

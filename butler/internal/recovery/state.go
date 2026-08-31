@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/iamkhattar/homelab/butler/internal/certificates"
 	"github.com/iamkhattar/homelab/butler/internal/vault"
 )
 
@@ -35,16 +36,17 @@ func (s *Service) ImportPocketIDAPIKey(ctx context.Context, apiKey string) error
 }
 
 type Status struct {
-	Mode                string    `json:"mode"`
-	Phase               string    `json:"phase"`
-	VaultReachable      bool      `json:"vaultReachable"`
-	VaultInitialized    bool      `json:"vaultInitialized"`
-	VaultSealed         bool      `json:"vaultSealed"`
-	RecoverySecretFound bool      `json:"recoverySecretFound"`
-	ButlerLoginVerified bool      `json:"butlerLoginVerified"`
-	VaultLoginVerified  bool      `json:"vaultLoginVerified"`
-	CheckedAt           time.Time `json:"checkedAt"`
-	Error               string    `json:"error,omitempty"`
+	Mode                string              `json:"mode"`
+	Phase               string              `json:"phase"`
+	VaultReachable      bool                `json:"vaultReachable"`
+	VaultInitialized    bool                `json:"vaultInitialized"`
+	VaultSealed         bool                `json:"vaultSealed"`
+	RecoverySecretFound bool                `json:"recoverySecretFound"`
+	ButlerLoginVerified bool                `json:"butlerLoginVerified"`
+	VaultLoginVerified  bool                `json:"vaultLoginVerified"`
+	Certificate         certificates.Status `json:"certificate"`
+	CheckedAt           time.Time           `json:"checkedAt"`
+	Error               string              `json:"error,omitempty"`
 }
 
 type Service struct {
@@ -53,7 +55,10 @@ type Service struct {
 	namespace            string
 	bootstrapper         Bootstrapper
 	identityBootstrapper Bootstrapper
+	certificates         *certificates.Manager
 }
+
+func (s *Service) UseCertificates(manager *certificates.Manager) { s.certificates = manager }
 
 func NewService(vc *vault.Client, k8s kubernetes.Interface, namespace string, bootstrapper Bootstrapper, identity ...Bootstrapper) *Service {
 	service := &Service{vault: vc, k8s: k8s, namespace: namespace, bootstrapper: bootstrapper}
@@ -88,6 +93,13 @@ func (s *Service) Status(ctx context.Context) Status {
 		status.ButlerLoginVerified = state.Data["butlerLoginVerified"] == "true"
 		status.VaultLoginVerified = state.Data["vaultLoginVerified"] == "true"
 	}
+	if s.certificates != nil && status.VaultInitialized && !status.VaultSealed {
+		if certificateStatus, err := s.certificates.Status(ctx); err == nil {
+			certificateStatus.DelegationValid = status.Phase != "awaiting-dns-delegation" && stateBool(ctx, s.k8s, s.namespace, "dnsDelegationVerified")
+			certificateStatus.CertificateReady = s.certificateReady(ctx)
+			status.Certificate = certificateStatus
+		}
+	}
 	return status
 }
 
@@ -104,6 +116,22 @@ func (s *Service) Advance(ctx context.Context, confirmed bool) error {
 	}
 	if err := s.bootstrapper.Reconcile(ctx); err != nil {
 		return err
+	}
+	if s.certificates == nil {
+		return fmt.Errorf("public certificate bootstrap is not configured")
+	}
+	certificateStatus, err := s.certificates.EnsureRegistration(ctx)
+	if err != nil {
+		return fmt.Errorf("registering DNS-01 account: %w", err)
+	}
+	if err := s.recordCertificateRegistration(ctx, certificateStatus); err != nil {
+		return err
+	}
+	if !stateBool(ctx, s.k8s, s.namespace, "dnsDelegationVerified") {
+		return s.setPhase(ctx, "awaiting-dns-delegation")
+	}
+	if !s.certificateReady(ctx) {
+		return s.setPhase(ctx, "awaiting-certificate")
 	}
 	configured, err := s.vault.SecretExists(ctx, "pocket-id/admin")
 	if err != nil {
@@ -127,6 +155,76 @@ func (s *Service) Advance(ctx context.Context, confirmed bool) error {
 		return fmt.Errorf("completing Vault OIDC handoff: %w", err)
 	}
 	return s.setPhase(ctx, "awaiting-identity-verification")
+}
+
+func (s *Service) VerifyDNSDelegation(ctx context.Context, confirmed bool) (certificates.Status, error) {
+	if !confirmed {
+		return certificates.Status{}, fmt.Errorf("explicit DNS verification confirmation is required")
+	}
+	if s.certificates == nil {
+		return certificates.Status{}, fmt.Errorf("public certificate bootstrap is not configured")
+	}
+	status, err := s.certificates.VerifyDelegation(ctx)
+	if err != nil {
+		return status, err
+	}
+	if err := s.setStateValues(ctx, map[string]string{"dnsDelegationVerified": "true", "phase": "awaiting-certificate"}); err != nil {
+		return status, err
+	}
+	return status, nil
+}
+
+func (s *Service) CertificateStatus(ctx context.Context) (certificates.Status, error) {
+	if s.certificates == nil {
+		return certificates.Status{}, fmt.Errorf("public certificate bootstrap is not configured")
+	}
+	status, err := s.certificates.Status(ctx)
+	if err != nil {
+		return status, err
+	}
+	status.DelegationValid = stateBool(ctx, s.k8s, s.namespace, "dnsDelegationVerified")
+	status.CertificateReady = s.certificateReady(ctx)
+	return status, nil
+}
+
+func (s *Service) certificateReady(ctx context.Context) bool {
+	namespace, name := s.certificates.TLSSecretRef()
+	secret, err := s.k8s.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	return err == nil && secret.Type == corev1.SecretTypeTLS && len(secret.Data[corev1.TLSCertKey]) > 0 && len(secret.Data[corev1.TLSPrivateKeyKey]) > 0
+}
+
+func (s *Service) recordCertificateRegistration(ctx context.Context, status certificates.Status) error {
+	return s.setStateValues(ctx, map[string]string{"dnsCNAMEHost": status.CNAMEHost, "dnsCNAMETarget": status.CNAMETarget})
+}
+
+func stateBool(ctx context.Context, k8s kubernetes.Interface, namespace, key string) bool {
+	state, err := k8s.CoreV1().ConfigMaps(namespace).Get(ctx, stateConfigMapName, metav1.GetOptions{})
+	return err == nil && state.Data[key] == "true"
+}
+
+func (s *Service) setStateValues(ctx context.Context, values map[string]string) error {
+	state, err := s.k8s.CoreV1().ConfigMaps(s.namespace).Get(ctx, stateConfigMapName, metav1.GetOptions{})
+	if k8serrors.IsNotFound(err) {
+		state = &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: stateConfigMapName, Namespace: s.namespace}, Data: map[string]string{}}
+		for key, value := range values {
+			state.Data[key] = value
+		}
+		state.Data["updatedAt"] = time.Now().UTC().Format(time.RFC3339)
+		_, err = s.k8s.CoreV1().ConfigMaps(s.namespace).Create(ctx, state, metav1.CreateOptions{})
+		return err
+	}
+	if err != nil {
+		return fmt.Errorf("reading bootstrap state: %w", err)
+	}
+	if state.Data == nil {
+		state.Data = map[string]string{}
+	}
+	for key, value := range values {
+		state.Data[key] = value
+	}
+	state.Data["updatedAt"] = time.Now().UTC().Format(time.RFC3339)
+	_, err = s.k8s.CoreV1().ConfigMaps(s.namespace).Update(ctx, state, metav1.UpdateOptions{})
+	return err
 }
 
 type IdentityEvidence struct {

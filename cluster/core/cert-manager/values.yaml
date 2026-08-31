@@ -3,12 +3,16 @@ cert-manager:
     enabled: true
     keep: false
 
-# Vault-backed ClusterIssuer config. Butler bootstraps the matching Vault
-# PKI mount + kubernetes auth role on first reconcile; until then the
-# issuer is NotReady and cert-manager retries.
-vaultIssuer:
-  server: http://vault.security.svc.cluster.local:8200
-  path: pki_int/sign/homelab-default
-  mountPath: /v1/auth/kubernetes
-  role: cert-manager
-  serviceAccountName: cert-manager
+letsencrypt:
+  server: https://acme-v02.api.letsencrypt.org/directory
+
+acmeDNS:
+  host: https://auth.acme-dns.io
+  secretName: acme-dns
+  secretKey: acmedns.json
+
+certificate:
+  name: homelab-wildcard
+  namespace: networking
+  secretName: homelab-wildcard-tls
+  domain: 6940469.xyz

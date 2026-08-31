@@ -4,13 +4,10 @@ kind: Ingress
 metadata:
   name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
-  annotations:
-    cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer | quote }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   tls:
     - hosts: [{{ .Values.ingress.host | quote }}]
-      secretName: {{ .Values.ingress.tlsSecretName }}
   rules:
     - host: {{ .Values.ingress.host | quote }}
       http:

@@ -5,6 +5,7 @@ import "testing"
 func TestValidatePocketIDControlPlane(t *testing.T) {
 	t.Parallel()
 	valid := Config{
+		Certificates:   CertificateConfig{ACMEDNSURL: "https://auth.acme-dns.io", Domain: "example.test", CredentialPath: "infrastructure/acme-dns", Namespace: "networking", CertificateName: "homelab-wildcard", TLSSecretName: "homelab-wildcard-tls"},
 		OIDC:           OIDCConfig{Issuer: "https://auth.example.test", Audience: "butler", AdminURL: "http://pocket-id.security.svc.cluster.local"},
 		PocketIDGroups: []PocketIDGroupSpec{{Name: "homelab-admin", FriendlyName: "Administrators"}},
 		OAuthClients:   []OAuthClientSpec{{Name: "butler", Kind: "public", RedirectURIs: []string{"https://butler.example.test/auth/callback"}}},
@@ -22,6 +23,7 @@ func TestValidatePocketIDControlPlane(t *testing.T) {
 		{"bad group", func(c *Config) { c.PocketIDGroups[0].Name = "Admin Group" }},
 		{"bad client kind", func(c *Config) { c.OAuthClients[0].Kind = "native" }},
 		{"relative redirect", func(c *Config) { c.OAuthClients[0].RedirectURIs[0] = "/callback" }},
+		{"insecure acme dns", func(c *Config) { c.Certificates.ACMEDNSURL = "http://auth.example.test" }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -31,7 +31,34 @@ func NewRecovery(auth RecoveryAuthorizer, service *recovery.Service) *RecoverySe
 	s.mux.Handle("POST /api/v1/bootstrap/advance", s.protected(http.HandlerFunc(s.handleAdvance)))
 	s.mux.Handle("PUT /api/v1/bootstrap/pocket-id-api-key", s.protected(http.HandlerFunc(s.handlePocketIDAPIKey)))
 	s.mux.Handle("POST /api/v1/bootstrap/identity-verification", s.protected(http.HandlerFunc(s.handleIdentityVerification)))
+	s.mux.Handle("GET /api/v1/bootstrap/certificate", s.protected(http.HandlerFunc(s.handleCertificateStatus)))
+	s.mux.Handle("POST /api/v1/bootstrap/certificate/verify-dns", s.protected(http.HandlerFunc(s.handleVerifyDNS)))
 	return s
+}
+
+func (s *RecoveryServer) handleCertificateStatus(w http.ResponseWriter, r *http.Request) {
+	status, err := s.service.CertificateStatus(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	writeJSON(w, http.StatusOK, status)
+}
+
+func (s *RecoveryServer) handleVerifyDNS(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Confirm bool `json:"confirm"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	status, err := s.service.VerifyDNSDelegation(r.Context(), body.Confirm)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	writeJSON(w, http.StatusOK, status)
 }
 
 func (s *RecoveryServer) handleIdentityVerification(w http.ResponseWriter, r *http.Request) {

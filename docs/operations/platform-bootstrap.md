@@ -4,6 +4,36 @@ Use this runbook only after Titan is healthy, kubeconfig points at Titan, and
 the first K3s recovery export exists off-node. The first deployment runs from
 the Mac; the scale-to-zero runner cannot deploy the platform that creates it.
 
+## Current installation checkpoint
+
+Titan passed the cluster-readiness checkpoint on 31 August 2026:
+
+- `homelabctl cluster status` reported the single `titan` control-plane and
+  etcd node as `Ready` at `192.168.1.163`;
+- `kubectl --context homelab get nodes` reported K3s `v1.36.4+k3s1`;
+- CoreDNS and local-path-provisioner were both `Running`; and
+- no pods were outside the `Running` or `Succeeded` phases.
+
+Do not repeat that checkpoint merely to advance this runbook. Continue to use
+`homelabctl cluster status` as a quick safety check before each apply.
+
+The intended one-time certificate ceremony is:
+
+1. Butler recovery initializes Vault and registers one acme-dns account.
+2. Butler writes the credential to Vault and displays the generated CNAME
+   target without logging the password.
+3. The operator adds `_acme-challenge.6940469.xyz` as a permanent CNAME in
+   Namecheap and asks Butler to verify it.
+4. Vault Secrets Operator projects the credential into the `cert-manager`
+   namespace.
+5. cert-manager obtains one production Let's Encrypt certificate for
+   `6940469.xyz` and `*.6940469.xyz`; Traefik serves it and cert-manager renews
+   it without further Namecheap changes.
+
+There is no staging-to-production promotion in the supported operator flow.
+The supported configuration contains only the production issuer. Test changes
+to the solver separately before altering an established registration.
+
 ## Before the first apply
 
 Confirm `*.6940469.xyz` and `6940469.xyz` resolve to Titan's reserved LAN
@@ -15,7 +45,7 @@ Deploy commands default to the full Git SHA, so that immutable image must exist.
 ```bash
 homelabctl cluster status
 homelabctl deploy diff
-homelabctl deploy platform --through identity --confirm
+homelabctl deploy platform --through secrets --confirm
 ```
 
 Stop if the context is unexpected or the diff deletes persistent state.
@@ -43,7 +73,7 @@ release that replaces the disabled K3s package. Do not continue until its
 deployment is available, the aggregated Metrics API reports `Available=True`
 and `kubectl top` returns Titan CPU and memory usage.
 
-## 2. Networking prerequisites
+## 2. Networking and certificate prerequisites
 
 ```bash
 homelabctl deploy apply --stage networking
@@ -51,7 +81,9 @@ kubectl -n networking rollout status deployment/traefik
 kubectl -n cert-manager get pods
 ```
 
-The Vault-backed `ClusterIssuer` remains `NotReady` until Vault PKI exists.
+`letsencrypt-production` and `homelab-wildcard` initially remain unready because
+the acme-dns credential does not exist yet. This is expected; cert-manager
+retries after VSO creates the Secret.
 
 ## 3. Vault, recovery Butler and VSO
 
@@ -70,10 +102,49 @@ homelabctl control recovery
 ```
 
 The phase progresses through `initialize-vault`, `unseal-vault` and
-`configure-vault`, then pauses at `awaiting-pocket-id-api-key`. The operation
+`configure-vault`, registers exactly one acme-dns account, stores its complete
+credential at `secret/infrastructure/acme-dns`, then pauses at
+`awaiting-dns-delegation`. The operation
 is idempotent and refuses an already initialized Vault if `butler-vault-init`
 is missing. Successful Vault foundation creates the bounded normal and
 recovery Kubernetes-auth roles; it does not claim that identity works yet.
+
+Display the non-secret registration metadata:
+
+```bash
+homelabctl control certificate status
+```
+
+In Namecheap **Advanced DNS**, add the displayed record exactly once:
+
+| Field | Value |
+| --- | --- |
+| Type | `CNAME Record` |
+| Host | `_acme-challenge` |
+| Value | the exact `cnameTarget` printed by Butler |
+| TTL | `Automatic` |
+
+Keep the record permanently. Do not change the existing apex or wildcard A
+records. Verify propagation and let Butler accept the exact match:
+
+```bash
+dig +short CNAME _acme-challenge.6940469.xyz
+homelabctl control certificate verify-dns --confirm
+```
+
+VSO projects only `acmedns.json` into the `cert-manager/acme-dns` Secret.
+Wait for the production certificate and advance bootstrap once more:
+
+```bash
+kubectl get clusterissuer letsencrypt-production
+kubectl -n networking get certificate homelab-wildcard --watch
+homelabctl control certificate status
+homelabctl control bootstrap --confirm
+```
+
+Continue only when `certificateReady` is true and the bootstrap phase is
+`awaiting-pocket-id-api-key`. cert-manager renews with the same account and
+CNAME; there is no later Namecheap ceremony.
 
 Export the root token and unseal key directly into a new encrypted file:
 
@@ -93,24 +164,11 @@ Verify normal Butler and VSO convergence:
 kubectl -n security rollout status deployment/butler
 kubectl -n security get vaultauth,vaultconnection
 kubectl get vaultauth,vaultstaticsecret -A
-kubectl -n cert-manager describe clusterissuer vault
+kubectl get clusterissuer letsencrypt-production
+kubectl -n cert-manager get secret acme-dns
+kubectl -n networking get certificate homelab-wildcard
+kubectl -n networking get secret homelab-wildcard-tls
 ```
-
-The current certificate path is Vault private PKI. Export the public CA chain
-through the already-authenticated Kubernetes connection before opening HTTPS
-services:
-
-```bash
-homelabctl trust export \
-  --output /secure/homelab-recovery/homelab-ca.pem
-openssl x509 -in /secure/homelab-recovery/homelab-ca.pem \
-  -noout -subject -issuer -fingerprint -sha256
-```
-
-The CLI validates every certificate, refuses to overwrite a file, and prints
-each SHA-256 fingerprint. Independently compare the fingerprint before
-installing the root CA on LAN clients. Public Namecheap DNS-01
-certificates are separate future networking work.
 
 ## 4. Pocket ID and management handoff
 
@@ -197,7 +255,8 @@ Stop rather than applying later stages when:
 - Vault cannot be unsealed with the encrypted recovery copy;
 - the bootstrap phase is not `operational`;
 - normal Butler has access to `butler-vault-init`;
-- VSO or the Vault `ClusterIssuer` cannot authenticate;
+- VSO cannot authenticate or the Let's Encrypt `ClusterIssuer` cannot read its
+  projected acme-dns account;
 - Pocket ID login, Butler audience validation or role mapping fails;
 - Alloy, a bounded observability PVC, or alert delivery is unhealthy.
 
