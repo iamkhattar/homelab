@@ -9,6 +9,15 @@
       The homelab base role supports Debian 12 and 13 and requires
       ansible-core 2.15 or newer.
 
+- name: Validate the managed locale configuration
+  ansible.builtin.assert:
+    that:
+      - homelab_base_generated_locales | length > 0
+      - homelab_base_default_locale in homelab_base_generated_locales
+    fail_msg: >-
+      homelab_base_generated_locales must be non-empty and contain
+      homelab_base_default_locale.
+
 - name: Update the apt package cache
   ansible.builtin.apt:
     update_cache: true
@@ -26,6 +35,19 @@
     name: "{{ homelab_base_packages }}"
     state: present
     lock_timeout: 120
+
+- name: Generate managed UTF-8 locales
+  community.general.locale_gen:
+    name: "{{ homelab_base_generated_locales }}"
+    state: present
+
+- name: Configure the default system locale
+  ansible.builtin.copy:
+    content: "LANG={{ homelab_base_default_locale }}\n"
+    dest: /etc/default/locale
+    owner: root
+    group: root
+    mode: "0644"
 
 - name: Gather service state for network safety checks
   ansible.builtin.service_facts:

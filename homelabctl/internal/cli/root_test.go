@@ -46,6 +46,16 @@ func TestNodePrepareDryRunBuildsSafeCommand(t *testing.T) {
 
 func TestNodeAuthorizeKeyDryRunUsesPublicKeyOnly(t *testing.T) {
 	repo := testRepository(t)
+	writePrivateInventory(t, repo, `
+k3s_cluster:
+  children:
+    server:
+      hosts:
+        titan:
+          ansible_host: 192.168.1.163
+          ansible_user: operator
+          ansible_port: 2222
+`)
 	key := filepath.Join(repo, "operator.pub")
 	if err := os.WriteFile(key, []byte("ssh-ed25519 AAAAAAAAAAAAAAAAAAAAAA== operator\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -59,8 +69,44 @@ func TestNodeAuthorizeKeyDryRunUsesPublicKeyOnly(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := stderr.String(); !strings.Contains(got, "ssh-copy-id -i "+key+" titan") {
+	got := stderr.String()
+	if !strings.Contains(got, "ssh-copy-id -i "+key+" -p 2222 operator@192.168.1.163") {
 		t.Fatalf("dry-run output did not contain expected key install: %q", got)
+	}
+	if strings.Contains(got, "ansible-inventory") {
+		t.Fatalf("SSH bootstrap unexpectedly invoked Ansible: %q", got)
+	}
+}
+
+func TestNodeConnectDryRunUsesNativeInventoryAndSSH(t *testing.T) {
+	repo := testRepository(t)
+	writePrivateInventory(t, repo, `
+k3s_cluster:
+  children:
+    server:
+      hosts:
+        titan:
+          ansible_host: 192.168.1.163
+          ansible_user: operator
+          ansible_ssh_private_key_file: /keys/titan
+  vars:
+    ansible_port: 22
+`)
+
+	var stderr bytes.Buffer
+	runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &stderr)
+	root := New(BuildInfo{}, runner)
+	root.SetArgs([]string{"--repo-root", repo, "--dry-run", "node", "connect", "titan"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	got := stderr.String()
+	if !strings.Contains(got, "ssh -i /keys/titan -o IdentitiesOnly=yes operator@192.168.1.163") {
+		t.Fatalf("dry-run output did not contain expected SSH command: %q", got)
+	}
+	if strings.Contains(got, "ansible-inventory") {
+		t.Fatalf("SSH bootstrap unexpectedly invoked Ansible: %q", got)
 	}
 }
 
@@ -468,4 +514,15 @@ func testRepository(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return root
+}
+
+func writePrivateInventory(t *testing.T, root, content string) {
+	t.Helper()
+	path := filepath.Join(root, "ansible", "inventory", "hosts.yml")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
 }

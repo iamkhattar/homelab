@@ -74,8 +74,8 @@ details.
 
 | Command | Purpose | Important validation |
 | --- | --- | --- |
-| `node connect HOST` | Open inventory-aware interactive SSH | Host uses inventory-safe letters, numbers, dots, underscores and hyphens |
-| `node authorize-key HOST --public-key PATH` | Bootstrap one operator public key | File must contain a supported OpenSSH public-key type and valid base64 data; private-key files fail |
+| `node connect HOST` | Open inventory-aware interactive SSH without Ansible | Native resolution validates the host, connection values and port before invoking `ssh` |
+| `node authorize-key HOST --public-key PATH` | Bootstrap one operator public key without Ansible | File must contain a supported OpenSSH public-key type and valid base64 data; private-key files fail |
 | `node prepare` | Apply or preview the Debian baseline | An explicitly supplied `--limit` cannot be blank |
 | `node diagnose` | Gather read-only host and SSH evidence | Uses the same safe limit handling |
 | `node reboot` | Reboot before K3s installation | Uses the same safe limit handling; waits through Ansible |

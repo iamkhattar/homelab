@@ -48,11 +48,13 @@ group nesting, without contacting a node.
 homelabctl node connect titan
 ```
 
-The CLI resolves `ansible_host`, `ansible_user` and `ansible_port` from the
-effective inventory, then opens an ordinary interactive SSH connection. On the
-first connection, compare the displayed Ed25519 host-key fingerprint with the
-fingerprint obtained from Titan's physical console. Do not accept an identity
-that has not been compared through that separate path.
+The CLI reads the private YAML inventory natively, resolves `ansible_host`,
+`ansible_user`, `ansible_port` and `ansible_ssh_private_key_file`, then opens an
+ordinary interactive SSH connection. Neither this command nor `authorize-key`
+requires an Ansible installation. On the first connection, compare the
+displayed Ed25519 host-key fingerprint with the fingerprint obtained from
+Titan's physical console. Do not accept an identity that has not been compared
+through that separate path.
 
 Install the selected public key through the bootstrap command, then prove a new
 session uses it before Ansible manages the authoritative key set:
@@ -63,9 +65,16 @@ homelabctl node authorize-key titan \
 homelabctl node connect titan
 ```
 
-The command accepts only a supported OpenSSH public-key file and delegates the
-password-authenticated installation to `ssh-copy-id`. Private key material is
-never copied to Titan.
+The command accepts only a supported OpenSSH public-key file, resolves Titan
+through the same native reader, and delegates password-authenticated
+installation to `ssh-copy-id`. Private key material is never copied to Titan.
+
+Native resolution supports the repository's nested group structure, inherited
+group variables, host overrides and compatible membership in multiple groups.
+It rejects a missing host, conflicting connection values, the example
+`change-me` user, unsafe SSH values and ports outside `1-65535`. Full Ansible
+variable evaluation remains owned by `inventory show`, `inventory check`,
+`node diagnose` and `node prepare` after the trust bootstrap.
 
 Later host-key changes stop both SSH and Ansible. Investigate them rather than
 deleting the known-host entry automatically.

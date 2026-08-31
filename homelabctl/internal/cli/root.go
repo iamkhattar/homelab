@@ -97,10 +97,6 @@ func (s *state) output(ctx context.Context, dir, name string, args ...string) (s
 	return s.runner.Output(ctx, dir, name, args...)
 }
 
-func (s *state) outputEnv(ctx context.Context, dir string, environment map[string]string, name string, args ...string) (string, error) {
-	return s.runner.OutputEnv(ctx, dir, environment, name, args...)
-}
-
 func (s *state) out() io.Writer { return s.runner.Stdout }
 
 func (s *state) print(format string, args ...any) {

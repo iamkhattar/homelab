@@ -25,7 +25,8 @@ authoritative first-build checklist. The shorter pages below provide focused
 background for individual stages.
 
 1. [Install Debian on Titan](/getting-started/debian-install).
-2. Give Titan a DHCP reservation in the router.
+2. [Move temporary Wi-Fi to wired Ethernet](/getting-started/titan-networking)
+   and give the wired interface a DHCP reservation in the router.
 3. [Prepare the Ansible control machine](/getting-started/control-machine).
 4. Create and edit the private inventory through `homelabctl inventory init`.
 5. Verify Titan's host key, install the operator public key with

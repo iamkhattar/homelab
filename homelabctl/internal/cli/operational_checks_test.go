@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,54 +10,29 @@ import (
 	"github.com/iamkhattar/homelab/homelabctl/internal/command"
 )
 
-func TestInventoryConnectionParsesAnsibleVariables(t *testing.T) {
-	tests := []struct {
-		name    string
-		payload string
-		want    inventoryConnection
-		wantErr string
-	}{
-		{
-			name:    "numeric port and all overrides",
-			payload: `{"ansible_host":"192.168.1.50","ansible_user":"operator","ansible_port":2222,"ansible_ssh_private_key_file":"/keys/titan"}`,
-			want:    inventoryConnection{Address: "192.168.1.50", User: "operator", Port: 2222, IdentityFile: "/keys/titan"},
-		},
-		{
-			name:    "string port",
-			payload: `{"ansible_host":"titan.home","ansible_port":"2200"}`,
-			want:    inventoryConnection{Address: "titan.home", Port: 2200},
-		},
-		{
-			name:    "defaults",
-			payload: `{"unrelated":true}`,
-			want:    inventoryConnection{Address: "titan", Port: 22},
-		},
-		{name: "missing host", payload: `{}`, wantErr: "was not found"},
-		{name: "invalid JSON", payload: `{`, wantErr: "parsing inventory variables"},
-		{name: "invalid string port", payload: `{"ansible_port":"ssh"}`, wantErr: "invalid ansible_port"},
+func TestInventoryConnectionReadsPrivateInventoryWithoutAnsible(t *testing.T) {
+	repo := testRepository(t)
+	writePrivateInventory(t, repo, `
+k3s_cluster:
+  children:
+    server:
+      hosts:
+        titan:
+          ansible_host: 192.168.1.163
+          ansible_user: operator
+          ansible_port: 2222
+          ansible_ssh_private_key_file: /keys/titan
+`)
+	runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+	s := &state{runner: runner, root: repo}
+
+	got, err := s.inventoryConnection("titan")
+	if err != nil {
+		t.Fatalf("inventoryConnection() error = %v", err)
 	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			repo := testRepository(t)
-			writeExecutable(t, filepath.Join(repo, "ansible", ".venv", "bin", "ansible-inventory"), "#!/bin/sh\nprintf '%s\\n' '"+test.payload+"'\n")
-			runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
-			s := &state{runner: runner, root: repo}
-
-			got, err := s.inventoryConnection(context.Background(), "titan")
-			if test.wantErr != "" {
-				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
-					t.Fatalf("inventoryConnection() error = %v, want %q", err, test.wantErr)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("inventoryConnection() error = %v", err)
-			}
-			if got != test.want {
-				t.Fatalf("inventoryConnection() = %+v, want %+v", got, test.want)
-			}
-		})
+	want := inventoryConnection{Address: "192.168.1.163", User: "operator", Port: 2222, IdentityFile: "/keys/titan"}
+	if got != want {
+		t.Fatalf("inventoryConnection() = %+v, want %+v", got, want)
 	}
 }
 

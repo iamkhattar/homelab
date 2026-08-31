@@ -43,11 +43,11 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 		example: "  homelabctl node reboot --limit titan --ask-become-pass",
 	},
 	"homelabctl node connect": {
-		long:    "Open interactive SSH using address, port, user, and optional identity file resolved from Ansible inventory.",
+		long:    "Open interactive SSH using address, port, user, and optional identity file resolved natively from the private YAML inventory. This bootstrap path does not require Ansible.",
 		example: "  homelabctl node connect titan",
 	},
 	"homelabctl node authorize-key": {
-		long:    "Validate and install one OpenSSH public key during first-node bootstrap. The command resolves the host from inventory and delegates password-authenticated installation to ssh-copy-id.",
+		long:    "Validate and install one OpenSSH public key during first-node bootstrap. The command resolves the host natively from the private YAML inventory and delegates password-authenticated installation to ssh-copy-id without requiring Ansible.",
 		example: "  homelabctl node authorize-key titan \\\n    --public-key \"$HOME/.ssh/homelab_titan_ed25519.pub\"",
 	},
 	"homelabctl node diagnose": {

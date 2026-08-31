@@ -3,13 +3,13 @@ package cli
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/iamkhattar/homelab/homelabctl/internal/inventory"
 	"github.com/spf13/cobra"
 )
 
@@ -54,19 +54,19 @@ func newNodeCommand(s *state) *cobra.Command {
 
 	connectCmd := &cobra.Command{
 		Use:   "connect HOST",
-		Short: "Open an SSH session using a host from the Ansible inventory",
+		Short: "Open SSH using a host from the private inventory",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validateInventoryHost(args[0]); err != nil {
 				return err
 			}
-			connection, err := s.inventoryConnection(cmd.Context(), args[0])
+			connection, err := s.inventoryConnection(args[0])
 			if err != nil {
 				return err
 			}
 			sshArgs := []string{}
 			if connection.IdentityFile != "" {
-				sshArgs = append(sshArgs, "-i", connection.IdentityFile)
+				sshArgs = append(sshArgs, "-i", connection.IdentityFile, "-o", "IdentitiesOnly=yes")
 			}
 			if connection.Port != 22 {
 				sshArgs = append(sshArgs, "-p", strconv.Itoa(connection.Port))
@@ -93,7 +93,7 @@ func newNodeCommand(s *state) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			connection, err := s.inventoryConnection(cmd.Context(), args[0])
+			connection, err := s.inventoryConnection(args[0])
 			if err != nil {
 				return err
 			}
@@ -192,11 +192,6 @@ func (s *state) runAnsible(ctx context.Context, name string, args ...string) err
 	return s.runEnv(ctx, dir, s.ansibleEnvironment(), ansibleExecutable(dir, name), args...)
 }
 
-func (s *state) outputAnsible(ctx context.Context, name string, args ...string) (string, error) {
-	dir := s.dir("ansible")
-	return s.outputEnv(ctx, dir, s.ansibleEnvironment(), ansibleExecutable(dir, name), args...)
-}
-
 func ansibleExecutable(ansibleDir, name string) string {
 	local := filepath.Join(ansibleDir, ".venv", "bin", name)
 	if info, err := os.Stat(local); err == nil && !info.IsDir() {
@@ -205,46 +200,8 @@ func ansibleExecutable(ansibleDir, name string) string {
 	return name
 }
 
-type inventoryConnection struct {
-	Address      string
-	User         string
-	Port         int
-	IdentityFile string
-}
+type inventoryConnection = inventory.Connection
 
-func (s *state) inventoryConnection(ctx context.Context, host string) (inventoryConnection, error) {
-	if s.dryRun {
-		return inventoryConnection{Address: host, Port: 22}, nil
-	}
-	out, err := s.outputAnsible(ctx, "ansible-inventory", "--host", host)
-	if err != nil {
-		return inventoryConnection{}, err
-	}
-	values := map[string]any{}
-	if err := json.Unmarshal([]byte(out), &values); err != nil {
-		return inventoryConnection{}, fmt.Errorf("parsing inventory variables for %s: %w", host, err)
-	}
-	if len(values) == 0 {
-		return inventoryConnection{}, fmt.Errorf("inventory host %q was not found", host)
-	}
-	connection := inventoryConnection{Address: host, Port: 22}
-	if value, ok := values["ansible_host"].(string); ok && value != "" {
-		connection.Address = value
-	}
-	if value, ok := values["ansible_user"].(string); ok {
-		connection.User = value
-	}
-	if value, ok := values["ansible_ssh_private_key_file"].(string); ok {
-		connection.IdentityFile = value
-	}
-	if value, ok := values["ansible_port"].(float64); ok {
-		connection.Port = int(value)
-	} else if value, ok := values["ansible_port"].(string); ok {
-		port, err := strconv.Atoi(value)
-		if err != nil {
-			return inventoryConnection{}, fmt.Errorf("invalid ansible_port %q for %s", value, host)
-		}
-		connection.Port = port
-	}
-	return connection, nil
+func (s *state) inventoryConnection(host string) (inventoryConnection, error) {
+	return inventory.ResolveConnection(s.dir("ansible", "inventory", "hosts.yml"), host)
 }
