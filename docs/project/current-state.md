@@ -39,10 +39,10 @@ they do not block the first recoverable Titan installation.
 
 | Area | Status | Evidence and next action |
 | --- | --- | --- |
-| Debian on Titan | In progress | Debian 13 is installed, local and key-authenticated remote login work, and the shell accepts the generated UTF-8 locale. Titan booted the signed `7.1.8+deb13-amd64` backports kernel because Linux 6.12 rejected the RTL8125D XID 689. Finish the managed baseline and post-reboot checks. |
-| Hostname | In progress | The physical console and remote SSH banner identify this machine as `titan`; Ansible enforcement has not run. The inventory does not force that name on other nodes. |
+| Debian on Titan | In progress | Debian 13 is installed, local and key-authenticated remote login work, and the shell accepts the generated UTF-8 locale. Read-only diagnostics confirmed the signed `7.1.8+deb13-amd64` backports kernel, synchronized NTP, valid SSH configuration, no failed units and ample disk space. Finish the managed baseline and post-reboot checks. |
+| Hostname | In progress | The physical console, remote SSH banner and Ansible diagnostics identify this machine as `titan`; Ansible enforcement has not run. The inventory does not force that name on other nodes. |
 | Wired networking | In progress | `eno1` is driven by in-tree `r8169`, receives the router-reserved address and carries successful SSH traffic. Static DHCP is configured on the Hyperoptic EX3301-T0 and Wi-Fi was disabled. Verify both facts across the first managed reboot. |
-| Ansible host baseline | Ready in repo | Local role, private inventory pattern, optional Titan shell marker, pinned K3s collection, diagnostics/recovery playbooks, detailed contributor manual, syntax checks and lint exist. Run the preparation checkpoints against Titan next. |
+| Ansible host baseline | In progress | Managed-key inventory ping returned `pong`; the read-only diagnostic completed with `changed=0`, `unreachable=0` and `failed=0`. Lint and syntax checks pass. Run and review the check-mode preparation next; no baseline changes have been applied yet. |
 | SSH hardening | In progress | Titan's host fingerprint was verified and the dedicated operator key now opens a clean session. Password login remains enabled intentionally until the first baseline succeeds; apply hardening in a separate pass and prove two new sessions. |
 | K3s server | Not deployed | Installation and verification runbooks exist; run them only after the host baseline succeeds. |
 | Cluster recovery | Not deployed | Embedded-etcd snapshots are configured, but an off-node export and restore test are still required. |
@@ -92,25 +92,21 @@ they do not block the first recoverable Titan installation.
 
 ## Immediate next checkpoint
 
-The next safe sequence starts after the now-complete SSH bootstrap:
+Inventory connectivity and read-only diagnostics are complete. Continue with:
 
-1. In a key-authenticated session, prove `id`, `sudo -v`, `sudo id`, time, DNS,
-   the wired default route and the absence of unexplained failed services.
-2. Run `homelabctl setup ansible` and `homelabctl ci check --only ansible` on
-   the Mac.
-3. Run `homelabctl inventory check --verbose` and
-   `homelabctl node diagnose --limit titan --ask-become-pass`.
-4. Keep SSH hardening disabled; preview `node prepare` in check mode, limited to
-   Titan and prompting for sudo, review it, then run the real preparation
-   command.
-5. If required, run `node reboot --limit titan --ask-become-pass`; verify the
+1. Keep SSH hardening disabled; preview `node prepare` in check mode, limited to
+   Titan and prompting for sudo. Review every proposed change before the real
+   preparation command.
+2. Apply the baseline only after the preview is understood, then run the
+   diagnostics again.
+3. If required, run `node reboot --limit titan --ask-become-pass`; verify the
    reserved wired address, disabled Wi-Fi and a mostly unchanged second
    preparation run.
-6. Enable SSH hardening in private inventory, prepare again, and prove two new
+4. Enable SSH hardening in private inventory, prepare again, and prove two new
    key-only sessions before closing the recovery session.
-7. Run `homelabctl cluster bootstrap` and complete every verification in the
+5. Run `homelabctl cluster bootstrap` and complete every verification in the
    install runbook.
-8. Run `homelabctl cluster recovery export`, then encrypt and move the exported
+6. Run `homelabctl cluster recovery export`, then encrypt and move the exported
    K3s token and first etcd snapshot off the workstation.
 
 Do not start the application platform until step 8 is complete. The detailed
