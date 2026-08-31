@@ -397,9 +397,11 @@ later build or release activity. Pull requests invoke `homelabctl ci build`
 without pushing. The main branch invokes `homelabctl ci publish` with the
 shared semantic version,
 immutable revision and `latest` tags for services, homelabctl and docs, then
-pushes them after authentication. In parallel after checks, a main-only release
-job uses that same version with the pinned GoReleaser action to publish static
-`homelabctl` archives and `checksums.txt`.
+pushes them after authentication. After image publication succeeds, a main-only
+release job creates or verifies an annotated tag for that version at the exact
+event commit, then uses the pinned GoReleaser action to publish static
+`homelabctl` archives and `checksums.txt`. A rerun accepts the existing tag only
+when it resolves to the same commit; a mismatched tag fails before release.
 
 The check job restores Go modules and compiler output with granular cache
 actions keyed by the operating system, architecture, Go version and both
@@ -420,7 +422,8 @@ commands continue to verify their locked dependency contracts.
 `homelabctl ci check --only workflows` parses every workflow and enforces the
 local contract: read-only default permissions, concurrency cancellation,
 bounded job timeouts, full Git history for merge-base selection, check-before-
-publish/release ordering, SHA-tagged PR builds, CI-gated main publication,
+publish/release ordering, exact-commit release tags, SHA-tagged PR builds,
+CI-gated main publication,
 main-only release execution, least-privilege release permissions, one shared
 immutable semantic release version, required report/SARIF uploads, and the
 absence of deploy, Terraform apply/destroy, Helmfile apply/sync and kubectl

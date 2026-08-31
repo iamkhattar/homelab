@@ -3,8 +3,8 @@
   ansible.builtin.assert:
     that:
       - ansible_version.full is version('2.15', '>=')
-      - ansible_distribution == 'Debian'
-      - ansible_distribution_major_version in ['12', '13']
+      - ansible_facts['distribution'] == 'Debian'
+      - ansible_facts['distribution_major_version'] in ['12', '13']
     fail_msg: >-
       The homelab base role supports Debian 12 and 13 and requires
       ansible-core 2.15 or newer.
@@ -41,13 +41,16 @@
     name: "{{ homelab_base_generated_locales }}"
     state: present
 
-- name: Configure the default system locale
+- name: Configure the default system locale files
   ansible.builtin.copy:
     content: "LANG={{ homelab_base_default_locale }}\n"
-    dest: /etc/default/locale
+    dest: "{{ item }}"
     owner: root
     group: root
     mode: "0644"
+  loop:
+    - /etc/default/locale
+    - /etc/locale.conf
 
 - name: Gather service state for network safety checks
   ansible.builtin.service_facts:
@@ -91,6 +94,16 @@
   community.general.timezone:
     name: "{{ homelab_base_timezone }}"
 
+- name: Resolve the administrator account
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ homelab_admin_user }}"
+
+- name: Inspect the administrator Bash configuration
+  ansible.builtin.stat:
+    path: "{{ ansible_facts.getent_passwd[homelab_admin_user][4] }}/.bashrc"
+  register: homelab_admin_bashrc
+
 - name: Install the homelab shell prompt
   when: homelab_base_shell_prompt_enabled | bool
   ansible.builtin.template:
@@ -99,6 +112,29 @@
     owner: root
     group: root
     mode: "0644"
+
+- name: Load the homelab prompt in interactive Bash sessions
+  when: homelab_base_shell_prompt_enabled | bool
+  ansible.builtin.blockinfile:
+    path: "{{ ansible_facts.getent_passwd[homelab_admin_user][4] }}/.bashrc"
+    create: true
+    insertafter: EOF
+    marker: "# {mark} ANSIBLE MANAGED HOMELAB PROMPT"
+    block: |
+      if [ -r /etc/profile.d/20-homelab-prompt.sh ]; then
+        . /etc/profile.d/20-homelab-prompt.sh
+      fi
+    owner: "{{ homelab_admin_user }}"
+    mode: "0644"
+
+- name: Remove the homelab prompt from Bash when disabled
+  when:
+    - not (homelab_base_shell_prompt_enabled | bool)
+    - homelab_admin_bashrc.stat.exists
+  ansible.builtin.blockinfile:
+    path: "{{ ansible_facts.getent_passwd[homelab_admin_user][4] }}/.bashrc"
+    marker: "# {mark} ANSIBLE MANAGED HOMELAB PROMPT"
+    state: absent
 
 - name: Remove the homelab shell prompt when disabled
   when: not (homelab_base_shell_prompt_enabled | bool)
@@ -145,7 +181,7 @@
 - name: Disable active swap
   when:
     - homelab_base_disable_swap | bool
-    - ansible_swaptotal_mb > 0
+    - ansible_facts['swaptotal_mb'] > 0
   ansible.builtin.command:
     cmd: swapoff --all
   changed_when: true
@@ -154,7 +190,7 @@
   when: homelab_base_disable_swap | bool
   ansible.builtin.replace:
     path: /etc/fstab
-    regexp: '^(\s*[^#\n]+\s+\S+\s+swap\s+.*)$'
+    regexp: "{{ homelab_base_swap_fstab_regexp }}"
     replace: '# \1'
 
 - name: Prevent sleep and hibernation
@@ -202,16 +238,25 @@
     mode: "0644"
 
 - name: Enable time synchronization
+  when: not ansible_check_mode
   ansible.builtin.systemd_service:
     name: chrony
     state: started
     enabled: true
 
 - name: Enable periodic SSD trimming
+  when: not ansible_check_mode
   ansible.builtin.systemd_service:
     name: fstrim.timer
     state: started
     enabled: true
+
+- name: Report services deferred by check mode
+  when: ansible_check_mode
+  ansible.builtin.debug:
+    msg: >-
+      Chrony and fstrim activation are deferred because check mode does not
+      install packages. The real apply enables and starts both services.
 
 - name: Check whether a reboot is required
   ansible.builtin.stat:

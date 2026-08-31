@@ -75,10 +75,11 @@ is installed, but alerting and SMART scrape integration remain future work.
 ## Operator shell prompt
 
 Titan enables the role's small Bash login prompt and identifies itself as
-`[HOME | titan]`. This is an operational guardrail, not user-shell ownership:
-Ansible manages one `/etc/profile.d` file and leaves `.bashrc`, aliases, Git
-integration and personal prompt frameworks alone. Set
-`homelab_base_shell_prompt_enabled: false` to remove the managed file.
+`[user@titan]`. This is an operational guardrail, not user-shell ownership:
+Ansible manages one `/etc/profile.d` file and one marked source block in the
+administrator's `.bashrc`; aliases, Git integration and all other personal
+shell configuration remain untouched. Set
+`homelab_base_shell_prompt_enabled: false` to remove both managed pieces.
 
 ## Firewall boundary
 

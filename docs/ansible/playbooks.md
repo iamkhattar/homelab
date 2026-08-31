@@ -81,8 +81,10 @@ checks. Using the cluster playbook before installation would fail its K3s test.
 ## Diagnostic playbooks
 
 `diagnose-node.yml` gathers hostname, failed services, SSH validation,
-filesystem usage and time state. `diagnose-cluster.yml` gathers K3s service
-state, version, snapshots, nodes, pods, events and recent logs.
+filesystem usage, the EFI mount, active swap, Chrony and trim state, timezone,
+system locale, interface addresses, the default route and DNS resolution.
+`diagnose-cluster.yml` gathers K3s service state, version, snapshots, nodes,
+pods, events and recent logs.
 
 ```bash
 homelabctl node diagnose --limit titan --ask-become-pass

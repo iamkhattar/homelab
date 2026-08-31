@@ -1,0 +1,55 @@
+---
+- name: Verify that swap removal preserves filesystem mounts
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../roles/homelab_base/defaults/main.yml
+  vars:
+    ansible_remote_tmp: /tmp
+    fstab_before: |
+      UUID=root / ext4 errors=remount-ro 0 1
+      UUID=efi /boot/efi vfat umask=0077 0 1
+      UUID=swap-one none swap sw 0 0
+      /swapfile none swap sw 0 0
+    fstab_after: |
+      UUID=root / ext4 errors=remount-ro 0 1
+      UUID=efi /boot/efi vfat umask=0077 0 1
+      # UUID=swap-one none swap sw 0 0
+      # /swapfile none swap sw 0 0
+  tasks:
+    - name: Create temporary fstab fixture
+      ansible.builtin.tempfile:
+        state: file
+        suffix: .fstab
+      register: fstab_fixture
+
+    - name: Exercise the managed swap expression
+      block:
+        - name: Write the source fixture
+          ansible.builtin.copy:
+            content: "{{ fstab_before }}"
+            dest: "{{ fstab_fixture.path }}"
+            mode: "0600"
+
+        - name: Comment only swap entries
+          ansible.builtin.replace:
+            path: "{{ fstab_fixture.path }}"
+            regexp: "{{ homelab_base_swap_fstab_regexp }}"
+            replace: '# \1'
+
+        - name: Read the resulting fixture
+          ansible.builtin.slurp:
+            src: "{{ fstab_fixture.path }}"
+          register: fstab_result
+
+        - name: Require exact filesystem and swap output
+          ansible.builtin.assert:
+            that:
+              - (fstab_result.content | b64decode) == fstab_after
+            fail_msg: The swap expression changed a non-swap mount or missed a swap entry.
+      always:
+        - name: Remove temporary fstab fixture
+          ansible.builtin.file:
+            path: "{{ fstab_fixture.path }}"
+            state: absent

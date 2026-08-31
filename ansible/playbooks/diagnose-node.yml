@@ -12,7 +12,15 @@
         - systemctl --failed --no-pager
         - sshd -t
         - df -h
+        - findmnt --noheadings --output SOURCE,TARGET,FSTYPE,OPTIONS /boot/efi
+        - swapon --show --noheadings
+        - systemctl is-active chrony.service fstrim.timer
+        - systemctl is-enabled chrony.service fstrim.timer
         - timedatectl status
+        - localectl status
+        - ip -brief address
+        - ip route show default
+        - getent ahosts deb.debian.org
       register: homelab_node_diagnostics
       changed_when: false
       failed_when: false

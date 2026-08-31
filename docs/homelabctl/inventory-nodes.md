@@ -23,12 +23,11 @@ titan:
   homelab_base_manage_hostname: true
   homelab_base_hostname: titan
   homelab_base_shell_prompt_enabled: true
-  homelab_base_shell_prompt_environment: HOME
 ```
 
 Keep the inventory key and managed hostname as `titan`. Replace the address with
 the router reservation and the user with the normal Debian installer account.
-Prompt management is also host-scoped: Titan displays `[HOME | titan]`, while
+Prompt management is also host-scoped: Titan displays `[user@titan]`, while
 other nodes remain untouched unless they opt in. Do not store private keys,
 sudo passwords or the K3s token in this file.
 

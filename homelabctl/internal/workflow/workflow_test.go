@@ -185,6 +185,20 @@ func TestValidateDirectoryRejectsBrokenCIContracts(t *testing.T) {
 			wantInError: "release job must grant contents: write",
 		},
 		{
+			name: "release does not wait for image publication",
+			transform: func(input string) string {
+				return strings.Replace(input, "    needs: [check, publish]\n", "    needs: check\n", 1)
+			},
+			wantInError: "release job must wait for image publication",
+		},
+		{
+			name: "release does not create its immutable tag",
+			transform: func(input string) string {
+				return strings.Replace(input, `git push origin "$tag_ref"`, `echo "tag omitted"`, 1)
+			},
+			wantInError: "release job must create or verify an immutable tag",
+		},
+		{
 			name: "shared release uses a moving tag",
 			transform: func(input string) string {
 				return strings.Replace(input, "v0.1.${{ github.run_number }}", "latest", 1)
@@ -501,7 +515,7 @@ jobs:
           CI: "true"
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: check
+    needs: [check, publish]
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -510,6 +524,16 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - name: Create or verify immutable release tag
+        run: |
+          tag_ref="refs/tags/${RELEASE_VERSION}"
+          if git show-ref --verify --quiet "$tag_ref"; then
+            tagged_commit="$(git rev-list -n 1 "$tag_ref")"
+            test "$tagged_commit" = "$GITHUB_SHA"
+          else
+            git tag --annotate "$RELEASE_VERSION" "$GITHUB_SHA" --message "release"
+            git push origin "$tag_ref"
+          fi
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94
         with:
           version: v2.17.1

@@ -129,7 +129,7 @@ func TestCICheckDryRunCoversAnsibleAndTerraformCommands(t *testing.T) {
 		check string
 		want  []string
 	}{
-		{check: "ansible", want: []string{"ansible-lint --offline .", "playbooks/prepare.yml", "playbooks/recovery-export.yml"}},
+		{check: "ansible", want: []string{"ansible-lint --offline .", "playbooks/prepare.yml", "playbooks/recovery-export.yml", "tests/homelab-base-fstab.yml -i localhost,"}},
 		{check: "terraform", want: []string{"terraform fmt -check -recursive", "terraform init -backend=false -input=false", "terraform validate", "terraform test"}},
 	}
 	for _, test := range tests {

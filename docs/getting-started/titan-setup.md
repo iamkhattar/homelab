@@ -197,7 +197,6 @@ titan:
   homelab_base_manage_hostname: true
   homelab_base_hostname: titan
   homelab_base_shell_prompt_enabled: true
-  homelab_base_shell_prompt_environment: HOME
   homelab_ssh_hardening_enabled: false
   homelab_admin_authorized_keys:
     - "ssh-ed25519 AAAA... operator@workstation"
@@ -275,7 +274,9 @@ working DNS and no unexplained failed units.
 
 If Bash reports that it cannot change to `en_US.UTF-8`, the Mac is forwarding a
 locale that the minimal Debian installation has not generated. The baseline
-generates `en_GB.UTF-8` and `en_US.UTF-8` and selects the UK locale by default.
+generates both `en_US.UTF-8` and `en_GB.UTF-8` and selects the US locale by
+default. It normalises both `/etc/default/locale` and `/etc/locale.conf` so a
+stale installer `LANGUAGE=en_GB:en` value cannot override that choice.
 For access needed before the first baseline run, repair it interactively on
 Titan with:
 
@@ -283,8 +284,8 @@ Titan with:
 sudo dpkg-reconfigure locales
 ```
 
-Enable `en_US.UTF-8 UTF-8`, retain the desired local locale, and select
-`en_GB.UTF-8` as the default. Verify `locale -a` contains `en_US.utf8`, then
+Enable `en_US.UTF-8 UTF-8`, retain any other desired locale, and select
+`en_US.UTF-8` as the default. Verify `locale -a` contains `en_US.utf8`, then
 reconnect. Do not set `LC_ALL` globally in `.bashrc`.
 
 ## 12. Preview and apply the Debian baseline
@@ -318,8 +319,11 @@ manages the declared key set, disables swap and sleep, bounds persistent logs,
 enables automatic security updates without automatic reboot, and enables
 Chrony and SSD trimming.
 
-There must be no failed or unreachable tasks. The prompt appears in new Bash
-login sessions as `[HOME | titan]`; it does not modify personal `.bashrc` files.
+There must be no failed or unreachable tasks. Open a new
+`homelabctl node connect titan` session after the apply; its prompt should begin
+with `[iamkhattar@titan]`. The role adds only a marked prompt-loader block to the
+administrator's `.bashrc` and leaves all other personal shell configuration
+untouched.
 
 If a reboot is reported before K3s is installed:
 
@@ -385,6 +389,14 @@ Acceptance criteria:
 - bundled Traefik is absent by design;
 - embedded-etcd snapshot configuration is active.
 
+::: info Titan bootstrap verification — 2026-08-31
+The workstation observed Titan Ready on K3s `v1.36.4+k3s1` as the sole
+`control-plane,etcd` node. CoreDNS and local-path-provisioner were Running, the
+node carried the intended `homelab.io/location=home` and
+`homelab.io/hardware=mini-pc` labels, and bundled Traefik was absent. Recovery
+export and managed-reboot acceptance remain outstanding.
+:::
+
 Treat kubeconfig as an administrator credential.
 
 ## 15. Create the first off-node recovery set
@@ -422,6 +434,8 @@ Before disconnecting the console, confirm:
 - [ ] Debian 13 boots from the internal SSD without a desktop;
 - [ ] the hostname is `titan` and the router reservation survives reboot;
 - [ ] no router management port is forwarded to Titan;
+- [ ] the router IPv6 firewall blocks unsolicited inbound traffic and has no
+      rule or pinhole exposing Titan;
 - [ ] the normal operator has working key-only SSH and sudo;
 - [ ] a second session works after SSH hardening;
 - [ ] `node prepare` is idempotent and diagnostics have no unexplained failure;

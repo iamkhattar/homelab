@@ -30,10 +30,16 @@ commands below remain useful for inspection and recovery.
 ```bash
 homelabctl deploy apply --stage foundation
 kubectl get namespaces
+kubectl -n kube-system rollout status deployment/metrics-server
+kubectl get apiservice v1beta1.metrics.k8s.io
+kubectl top node titan
 ```
 
 This creates platform namespaces, per-application namespaces, Pod Security
-labels and foundational RBAC.
+labels and foundational RBAC, then installs the separately pinned metrics-server
+release that replaces the disabled K3s package. Do not continue until its
+deployment is available, the aggregated Metrics API reports `Available=True`
+and `kubectl top` returns Titan CPU and memory usage.
 
 ## 2. Networking prerequisites
 

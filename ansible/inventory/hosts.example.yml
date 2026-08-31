@@ -13,7 +13,6 @@ k3s_cluster:
           homelab_base_manage_hostname: true
           homelab_base_hostname: titan
           homelab_base_shell_prompt_enabled: true
-          homelab_base_shell_prompt_environment: HOME
 
           # Leave hardening disabled for the first connection. After adding at
           # least one public key below and confirming key login, set it to true.

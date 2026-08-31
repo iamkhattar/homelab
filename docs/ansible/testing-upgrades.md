@@ -27,6 +27,8 @@ The current check performs:
 - offline `ansible-lint` across local Ansible content;
 - syntax checks for every local playbook;
 - syntax checks against committed `hosts.example.yml`, never private inventory.
+- a local fstab regression playbook proving that all swap entries are commented
+  while root and EFI filesystem mounts remain byte-for-byte intact.
 
 Generated runtime directories and downloaded upstream collections are excluded
 from local lint. The repository skips only the role-prefix variable rule because
@@ -48,6 +50,12 @@ Read the complete diff and recap. Check mode cannot faithfully predict every
 APT operation, command or handler, and it does not make an unsafe SSH policy
 safe. Keep a physical console or established recovery session available for
 authentication and network changes.
+
+Package installation is simulated in check mode, so the base role reports but
+defers enabling Chrony and `fstrim.timer` until the real apply. A preview must
+still finish with `failed=0`. Reject any storage diff that changes a non-swap
+mount; the intended `/etc/fstab` diff comments only a line whose third field is
+`swap`.
 
 There is no generic K3s installation check mode in the supported interface.
 Test lifecycle changes against a disposable node or recovery rehearsal before
