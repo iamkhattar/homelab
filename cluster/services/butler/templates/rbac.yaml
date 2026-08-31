@@ -136,46 +136,29 @@ subjects:
   - kind: ServiceAccount
     name: {{ .Values.recovery.serviceAccount }}
     namespace: {{ .Release.Namespace }}
-{{- end }}
 ---
-# Butler publishes the homelab CA bundle as a ConfigMap in kube-system so any
-# pod cluster-wide can mount it. A scoped Role+RoleBinding in kube-system is
-# enough — no ClusterRole needed.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ .Release.Name }}-ca-publisher
-  namespace: kube-system
-  labels:
-    app.kubernetes.io/name: {{ .Release.Name }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+  name: {{ .Release.Name }}-certificate-reader
+  namespace: networking
 rules:
   - apiGroups: [""]
-    resources: ["configmaps"]
-    verbs: ["get", "list", "watch", "create", "update", "patch"]
-    resourceNames:
-      - homelab-ca-bundle
-  # Allow create of configmaps cluster-wide for the first publish; the
-  # resourceNames filter above only applies to verbs targeting an existing
-  # named resource. Create is namespace-scoped via this Role being in
-  # kube-system, so this is still least-privilege.
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    verbs: ["create"]
+    resources: ["secrets"]
+    resourceNames: ["homelab-wildcard-tls"]
+    verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ .Release.Name }}-ca-publisher
-  namespace: kube-system
-  labels:
-    app.kubernetes.io/name: {{ .Release.Name }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+  name: {{ .Release.Name }}-certificate-reader
+  namespace: networking
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ .Release.Name }}-ca-publisher
+  name: {{ .Release.Name }}-certificate-reader
 subjects:
   - kind: ServiceAccount
-    name: {{ .Values.serviceAccount.name }}
+    name: {{ .Values.recovery.serviceAccount }}
     namespace: {{ .Release.Namespace }}
+{{- end }}

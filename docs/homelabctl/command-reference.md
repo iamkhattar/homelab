@@ -148,6 +148,8 @@ directory. `--token` or `BUTLER_TOKEN` are non-persistent overrides.
 # One-time private bootstrap. The API key file is read locally and its value is
 # written directly to Vault; it is not stored in Git or a ConfigMap.
 homelabctl control recovery
+homelabctl control certificate status
+homelabctl control certificate verify-dns --confirm
 homelabctl control bootstrap --confirm \
   --pocket-id-api-key-file /secure/pocket-id-api-key
 homelabctl control recovery export \
@@ -169,18 +171,9 @@ homelabctl control applications put kitchenowl \
 homelabctl control logout
 ```
 
-## Platform trust
-
-| Command | Purpose | Safety boundary |
-| --- | --- | --- |
-| `trust export --output PATH` | Export the Vault PKI CA chain from `kube-system/homelab-ca-bundle` | Uses authenticated Kubernetes, validates every CA certificate, refuses repository/root destinations and never overwrites |
-
-```bash
-homelabctl trust export --output /secure/homelab-ca.pem
-```
-
-This deliberately uses Kubernetes as the initial trust root instead of
-accepting a CA merely because an unauthenticated HTTP endpoint returned it.
+`control certificate status` prints only the CNAME host/target and readiness;
+the acme-dns username and password never cross the recovery API. DNS acceptance
+requires `control certificate verify-dns --confirm` and an exact public match.
 
 ## Deployment and infrastructure
 

@@ -46,10 +46,8 @@ releases:
     chart: ./core/cert-manager
     historyMax: 5
     namespace: cert-manager
-    # The Vault ClusterIssuer template references the cert-manager SA
-    # (created by the cert-manager subchart) and butler's Vault PKI setup
-    # (created on butler's first reconcile). The issuer reports NotReady
-    # until both are present; cert-manager retries automatically.
+    # The production ACME issuer waits for VSO to project Butler's acme-dns
+    # registration from Vault; cert-manager retries automatically.
     needs: [kube-system/namespaces]
     labels: {stage: networking, domain: platform, criticality: core}
 

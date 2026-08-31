@@ -29,15 +29,13 @@ oauthClients: []
 #    redirectURIs:
 #      - http://localhost:8251/oidc/callback
 
-# Vault PKI knobs. Defaults map to the Phase 1A constants but everything is
-# overridable here so changing the domain doesn't require rebuilding butler.
-pki:
-  rootCN: "Homelab Root CA"
-  intCN: "Homelab Intermediate CA"
-  organization: homelab
-  allowedDomains:
-    - shivlab.com
-  roleMaxTTL: 720h
+certificates:
+  acmeDNSURL: https://auth.acme-dns.io
+  domain: 6940469.xyz
+  credentialPath: infrastructure/acme-dns
+  namespace: networking
+  certificateName: homelab-wildcard
+  tlsSecretName: homelab-wildcard-tls
 
 # Vault Kubernetes secrets engine — Vault as the universal credential broker
 # for K8s. enabled: false until Phase 1B lands the supporting SAs/policies.

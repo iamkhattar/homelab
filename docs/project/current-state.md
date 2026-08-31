@@ -25,11 +25,11 @@ machine. Do not interpret **Ready in repo** as **Deployed**.
 
 | Category | Remaining work |
 | --- | --- |
-| Required on Titan | Reconcile K3s with its newly pinned Ethernet IPv4 configuration, prove the API is Ready, run the full cluster diagnostic, create the first off-node K3s recovery export, verify another managed reboot, and rehearse a restore. |
+| Required on Titan | The pinned Ethernet IPv4 configuration and K3s API are verified Ready. Run the full cluster diagnostic, create the first off-node K3s recovery export, verify another managed reboot, and rehearse a restore. |
 | Required before important data | Choose encrypted off-node storage and prove that K3s, Vault, database and application backups can be restored from it. |
 | Required before relying on alerts | Choose an off-cluster Alertmanager receiver, deliver its credential through Vault and verify a test notification. |
-| Required during platform bootstrap | Define Vault recovery-share custody, complete the Pocket ID owner ceremony, initialize Vault through Butler, export recovery material and trust the private CA. |
-| Later design decisions | DNS-01 automation, internal resolver failover, ZHA versus Zigbee2MQTT, and the future Tailscale/Hetzner design. |
+| Required during platform bootstrap | Complete the one-time Butler-generated Namecheap CNAME ceremony, define Vault recovery-share custody, complete the Pocket ID owner ceremony, initialize Vault through Butler and export recovery material. |
+| Later design decisions | Self-hosting acme-dns, internal resolver failover, ZHA versus Zigbee2MQTT, and the future Tailscale/Hetzner design. |
 
 Repository enhancements such as controlled automatic security updates,
 SMART/NVMe telemetry and signed build provenance are useful follow-up work, but
@@ -44,7 +44,7 @@ they do not block the first recoverable Titan installation.
 | Wired networking | In progress | `eno1` is driven by in-tree `r8169`, receives the router-reserved address and carries successful SSH traffic. Static DHCP is configured on the Hyperoptic EX3301-T0 and Wi-Fi was disabled. Verify both facts across the first managed reboot. |
 | Ansible host baseline | In progress | The reviewed baseline applied without failures, installed the administration packages, retained US locale, selected UTC, disabled swap and sleep, configured bounded logs and automatic security updates, and confirmed Chrony and trimming. Expanded diagnostics found no failed services. Complete the post-K3s idempotence and managed-reboot checks. |
 | SSH hardening | Deployed | Titan's host fingerprint was verified, the dedicated operator key remains usable, and the private inventory enables the managed key-only SSH policy. Preserve physical-console access and recheck SSH after the first managed reboot. |
-| K3s server | Needs reconciliation | Titan was initially verified Ready as the sole `control-plane,etcd` node on K3s `v1.36.4+k3s1`. The latest reboot then exposed nondeterministic address selection: embedded etcd retained `192.168.1.163` while K3s selected Titan's global IPv6 address. Private inventory and the public example now pin `node-ip`, `advertise-address` and `flannel-iface`; rerun cluster bootstrap and verify readiness before continuing. |
+| K3s server | Deployed | Titan is verified Ready as the sole `control-plane,etcd` node on K3s `v1.36.4+k3s1` at the pinned Ethernet address `192.168.1.163`. CoreDNS and local-path-provisioner are Running and no workloads are in a failed or pending phase. Preserve this evidence across the next managed reboot. |
 | Cluster recovery | In progress | Embedded-etcd snapshot configuration is installed, but the first snapshot/token export has not yet been verified in encrypted off-node storage and no restore rehearsal has been completed. |
 | `homelabctl` | Ready in repo | The Go CLI is the documented operator interface for setup, inventory, SSH access, Debian/K3s lifecycle, diagnostics, snapshots, recovery export, Butler bootstrap/control, docs, deployments, builds and checks. Reporting mode generates JUnit/JSON tests, gosec and Trivy SARIF, and an SPDX SBOM for retained CI artifacts and GitHub code scanning. Successful main builds publish checksum-protected Linux/macOS releases with built-in update support. |
 | Documentation site | Ready in repo | Isolated VitePress project, intent-based handbook navigation, ordered section flows, unprivileged Nginx image and component engineering manuals are implemented. Internal cluster hosting waits on ingress and authentication. |
@@ -53,7 +53,7 @@ they do not block the first recoverable Titan installation.
 
 | Capability | Status | Prerequisite |
 | --- | --- | --- |
-| Ingress and private-address DNS | Partially deployed | Namecheap now publishes `*.6940469.xyz` and the apex to Titan's reserved `192.168.1.163`, with no AAAA record. `home.6940469.xyz` is the dashboard and application names are flat peers. LAN resolution and the matching chart, Butler and homelabctl defaults are complete; Traefik, client HTTPS trust, remote Tailscale routing and public DNS-01 automation remain deployment checkpoints. |
+| Ingress and private-address DNS | Ready in repo | Namecheap publishes `*.6940469.xyz` and the apex to Titan's reserved `192.168.1.163`, with no AAAA record. Butler-controlled acme-dns registration, Vault credential storage, VSO projection, cert-manager production Let's Encrypt renewal, the shared wildcard Certificate and Traefik default TLS store render successfully. Titan still requires the one-time generated CNAME ceremony and issuance verification. |
 | Persistent storage | Ready for testing | K3s local-path with bounded PVCs is the accepted single-node starting point. Select the encrypted off-node backup target and rehearse restores before storing important data. |
 | Prometheus, Grafana, Loki, Tempo and Alloy | Ready in repo | Pinned bounded charts, seven-day retention, kube-state-metrics, node-exporter, OTLP receivers, log collection, Butler metrics/logs/traces, Grafana correlation, reusable all-workload dashboards and workload/Job/PVC/OOM alerts render. Choose and test the final off-cluster Alertmanager receiver before relying on alerts. |
 | Pocket ID | Ready in repo | Pinned v2 deployment, Vault-provided encryption key, native OTLP, Butler-managed groups, users and OIDC clients, secret rotation into Vault, and Butler PKCE login exist; first owner/API key remain an interactive Titan checkpoint. |
@@ -82,9 +82,9 @@ they do not block the first recoverable Titan installation.
 - `homelabctl deploy platform` applies the supported Helmfile stage order and
   rejects data, observability, CI/CD and application deployment while Butler's
   bootstrap phase is not `operational`.
-- `homelabctl trust export` obtains the private PKI chain through authenticated
-  Kubernetes, validates every CA certificate and writes a non-overwriting public
-  bundle with displayed SHA-256 fingerprints.
+- `homelabctl control certificate` exposes non-secret acme-dns registration
+  metadata, verifies the exact public CNAME and reports production wildcard
+  certificate readiness without returning the credential.
 - Metrics Server, broader platform alerts, and Kubernetes/Vault/cert-manager
   dashboards are represented in Helmfile.
 - Real Vault, Pocket ID and Kubernetes integration tests exist behind the
@@ -92,10 +92,11 @@ they do not block the first recoverable Titan installation.
 
 ## Immediate next checkpoint
 
-The host baseline and SSH hardening are complete. Continue with:
+The host baseline, SSH hardening and K3s readiness check are complete. Continue
+with:
 
-1. Run `homelabctl cluster bootstrap --limit titan --ask-become-pass` to apply
-   the pinned Ethernet IPv4 configuration, then prove `cluster status` is healthy.
+1. Merge and publish the Butler/acme-dns certificate change, deploy through the
+   secrets stage, then create only the exact Namecheap CNAME Butler generates.
 2. Run `homelabctl cluster diagnose --ask-become-pass` and review the K3s
    service, journal, events and embedded-etcd snapshot configuration.
 3. Run `homelabctl cluster snapshot list --ask-become-pass`.

@@ -27,7 +27,7 @@ var configData []byte
 const DefaultConfigPath = "/etc/butler/config.yaml"
 
 // Config is the top-level Butler configuration. Externalized into a
-// chart-rendered ConfigMap as of Phase 1B so secrets/oidc/oauthClients/pki/
+// chart-rendered ConfigMap as of Phase 1B so secrets, identity, certificates,
 // k8sIssuance can be configured at deploy time without rebuilding the
 // container image.
 type Config struct {
@@ -39,7 +39,7 @@ type Config struct {
 	ManagedCredentials []ManagedCredentialSpec `yaml:"managedCredentials"`
 	PocketIDGroups     []PocketIDGroupSpec     `yaml:"pocketIdGroups"`
 	OAuthClients       []OAuthClientSpec       `yaml:"oauthClients"`
-	PKI                PKIConfig               `yaml:"pki"`
+	Certificates       CertificateConfig       `yaml:"certificates"`
 	K8sIssuance        K8sIssuanceConfig       `yaml:"k8sIssuance"`
 	Garage             GarageConfig            `yaml:"garage"`
 
@@ -155,16 +155,15 @@ type OAuthClientSpec struct {
 	RedirectURIs []string `yaml:"redirectURIs"`
 }
 
-// PKIConfig is the configuration knob for the Vault PKI engines butler
-// manages. The defaults (in butler.yaml) match the Phase 1A constants;
-// surfacing them here lets operators change the org/CN/domain at deploy
-// time without rebuilding the image.
-type PKIConfig struct {
-	RootCN         string   `yaml:"rootCN"`
-	IntCN          string   `yaml:"intCN"`
-	Organization   string   `yaml:"organization"`
-	AllowedDomains []string `yaml:"allowedDomains"`
-	RoleMaxTTL     string   `yaml:"roleMaxTTL"`
+// CertificateConfig controls the one-time acme-dns registration and the
+// wildcard TLS Secret Butler expects cert-manager to create.
+type CertificateConfig struct {
+	ACMEDNSURL      string `yaml:"acmeDNSURL"`
+	Domain          string `yaml:"domain"`
+	CredentialPath  string `yaml:"credentialPath"`
+	Namespace       string `yaml:"namespace"`
+	CertificateName string `yaml:"certificateName"`
+	TLSSecretName   string `yaml:"tlsSecretName"`
 }
 
 // K8sIssuanceConfig configures Vault's kubernetes/ secrets engine. Vault
@@ -233,6 +232,13 @@ var pocketIDNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,127}$`)
 // Validate rejects incomplete API-managed declarations before Butler starts a
 // reconciliation loop that can never converge.
 func (c *Config) Validate() error {
+	if c.Certificates.Domain == "" || c.Certificates.CredentialPath == "" || c.Certificates.Namespace == "" || c.Certificates.CertificateName == "" || c.Certificates.TLSSecretName == "" {
+		return fmt.Errorf("certificates domain, credentialPath, namespace, certificateName, and tlsSecretName are required")
+	}
+	certificateURL, err := absoluteHTTPURL(c.Certificates.ACMEDNSURL)
+	if err != nil || certificateURL.Scheme != "https" {
+		return fmt.Errorf("certificates.acmeDNSURL must be an absolute HTTPS URL")
+	}
 	if c.OIDC.Issuer != "" {
 		if c.OIDC.Audience == "" {
 			return fmt.Errorf("oidc.audience is required when oidc.issuer is configured")

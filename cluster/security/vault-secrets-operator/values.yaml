@@ -22,6 +22,7 @@ vaultAuth:
   role: vso
   serviceAccount: vault-secrets-operator
   allowedNamespaces:
+    - cert-manager
     - security
     - databases
     - storage
@@ -37,6 +38,8 @@ vaultAuth:
 # distinct Vault Kubernetes role. A compromised application cannot use VSO to
 # read another application's paths.
 applicationVaultAuths:
+  - namespace: cert-manager
+    role: vso-cert-manager
   - namespace: kitchenowl
     role: vso-kitchenowl
   - namespace: paperless-ngx

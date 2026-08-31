@@ -80,7 +80,7 @@ The service may own:
 - reconciliation status and bounded operation history;
 - Pocket ID client provisioning;
 - limited Vault policy and authentication configuration;
-- internal CA publication;
+- public certificate registration and readiness;
 - platform component and backup status;
 - carefully scoped application operations later.
 
@@ -99,7 +99,8 @@ GET  /api/v1/status
 GET  /api/v1/operations
 POST /api/v1/reconcile
 GET  /api/v1/events
-GET  /api/v1/pki/ca-chain
+GET  /api/v1/bootstrap/certificate
+POST /api/v1/bootstrap/certificate/verify-dns
 POST /api/v1/access/kubernetes-credentials
 POST /api/v1/bootstrap/identity-verification
 ```
