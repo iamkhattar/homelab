@@ -82,6 +82,7 @@ function mainSidebar() {
         { text: '1. Understand the journey', link: '/getting-started/overview' },
         { text: '2. Complete setup runbook', link: '/getting-started/titan-setup' },
         { text: 'Debian installation', link: '/getting-started/debian-install' },
+        { text: 'Move from Wi-Fi to Ethernet', link: '/getting-started/titan-networking' },
         { text: 'Control machine', link: '/getting-started/control-machine' },
       ],
     },

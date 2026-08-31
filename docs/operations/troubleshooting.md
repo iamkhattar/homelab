@@ -3,6 +3,17 @@
 Work from the lowest layer upward: network, SSH, sudo, Debian, K3s, then
 Kubernetes workloads.
 
+## Wired Ethernet is missing after installation
+
+An unsupported NIC revision does not appear in `ip -br link`, even with a good
+cable. Titan's RTL8125D reported `unknown chip XID 689` under the Debian 13
+installation kernel and requires the signed backports kernel documented in the
+[wired migration runbook](/getting-started/titan-networking#rtl8125d-on-the-debian-13-installation-kernel).
+
+If the Ethernet interface exists but reports `NO-CARRIER`, test the cable and
+router port. If it has carrier but no address, inspect the persistent DHCP
+stanza before changing drivers.
+
 ## Ansible cannot reach Titan
 
 Check the router reservation and local connectivity:
@@ -28,6 +39,8 @@ homelabctl node diagnose --limit titan --ask-become-pass
 
 Use `--ask-become-pass` when the account requires a sudo password. Confirm the
 account belongs to the `sudo` group on Debian.
+If no sudo-capable account exists, repair membership from the physical root
+console using the [administrator recovery procedure](/getting-started/titan-networking#recover-administrator-access-first).
 
 ## SSH hardening would lock out the operator
 

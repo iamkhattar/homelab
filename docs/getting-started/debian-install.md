@@ -40,6 +40,11 @@ network and must not collide with another reservation.
 
 Do not configure a public address or router port forwarding.
 
+Wi-Fi is acceptable for the installer and initial recovery only. Before K3s,
+follow the [wired migration runbook](/getting-started/titan-networking) to
+verify the NIC driver, configure wired DHCP, reserve the Ethernet address and
+remove the stored Wi-Fi credential.
+
 ## First-boot checks
 
 Log in at Titan's physical console. Confirm that the login screen identifies the

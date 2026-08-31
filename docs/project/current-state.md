@@ -14,16 +14,16 @@ known.
 
 <StatusLegend />
 
-## Pre-Titan handoff
+## Titan foundation handoff
 
-The repository is at the pre-Titan boundary: the supported host, cluster,
-platform and recovery workflows exist in Git and pass workstation validation.
-The remaining foundation work requires facts or evidence from the physical
-machine. Do not interpret **Ready in repo** as **Deployed**.
+Repository preparation is complete and physical deployment has started. The
+supported host, cluster, platform and recovery workflows exist in Git and pass
+workstation validation; only the Debian and initial network layer has been
+observed on Titan so far. Do not interpret **Ready in repo** as **Deployed**.
 
 | Category | Remaining work |
 | --- | --- |
-| Required on Titan | Finish Debian, reserve the LAN address, establish verified SSH access, apply the Ansible baseline, install K3s, export recovery material and rehearse a restore. |
+| Required on Titan | Finish the wired reservation and sudo checks, establish verified SSH access, apply the Ansible baseline, install K3s, export recovery material and rehearse a restore. |
 | Required before important data | Choose encrypted off-node storage and prove that K3s, Vault, database and application backups can be restored from it. |
 | Required before relying on alerts | Choose an off-cluster Alertmanager receiver, deliver its credential through Vault and verify a test notification. |
 | Required during platform bootstrap | Publish the private-address DNS records, define Vault recovery-share custody, complete the Pocket ID owner ceremony, initialize Vault through Butler, export recovery material and trust the private CA. |
@@ -37,8 +37,9 @@ they do not block the first recoverable Titan installation.
 
 | Area | Status | Evidence and next action |
 | --- | --- | --- |
-| Debian on Titan | In progress | Finish the Debian installation, create the operator account and verify local login. |
-| Hostname | Not deployed | Set `titan` only on the mini PC; the inventory does not force that name on other nodes. |
+| Debian on Titan | In progress | Debian 13 is installed and local login works. Titan booted the signed `7.1.8+deb13-amd64` backports kernel because Linux 6.12 rejected the RTL8125D XID 689. Finish sudo and post-reboot checks. |
+| Hostname | In progress | The installer and physical console identify this machine as `titan`; Ansible enforcement has not run. The inventory does not force that name on other nodes. |
+| Wired networking | In progress | `eno1` is driven by in-tree `r8169`, receives DHCP and has the preferred default route. Remove the temporary Wi-Fi configuration, reserve the wired address in the router and verify both across a reboot. |
 | Ansible host baseline | Ready in repo | Local role, private inventory pattern, optional Titan shell marker, pinned K3s collection, diagnostics/recovery playbooks, detailed contributor manual, syntax checks and lint exist. Run the preparation checkpoints against Titan next. |
 | SSH hardening | Ready in repo | Key-only policy is opt-in so password access is not disabled before the key is proven. |
 | K3s server | Not deployed | Installation and verification runbooks exist; run them only after the host baseline succeeds. |
@@ -91,8 +92,9 @@ they do not block the first recoverable Titan installation.
 
 The next safe sequence is deliberately small:
 
-1. Complete [the Debian installation](/getting-started/debian-install).
-2. Reserve Titan's LAN address in the router and verify time and DNS.
+1. Complete the [wired migration](/getting-started/titan-networking), reserve
+   Titan's LAN address in the router and verify the result after reboot.
+2. Verify sudo, time, DNS and SSH at the physical console.
 3. Run `homelabctl inventory init`, edit the private values, and do not commit
    the result.
 4. Prove ordinary SSH and SSH-key access with `homelabctl node connect titan`.

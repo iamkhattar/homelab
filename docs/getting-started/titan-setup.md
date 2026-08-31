@@ -122,6 +122,10 @@ At Titan's console, record:
 - the DNS servers;
 - the OpenSSH Ed25519 host-key fingerprint.
 
+If Debian was installed over Wi-Fi or the Ethernet device is absent, complete
+the [temporary Wi-Fi to wired migration](/getting-started/titan-networking)
+before reserving an address or installing K3s.
+
 Console commands are an unavoidable trust-bootstrap exception to the normal CLI
 contract. Use the installed system tools to inspect addresses, routes, SSH and
 the public host-key fingerprint; never display or copy a private host key.
