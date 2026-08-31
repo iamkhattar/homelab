@@ -42,7 +42,7 @@ they do not block the first recoverable Titan installation.
 | Debian on Titan | In progress | Debian 13 is installed, local and key-authenticated remote login work, and the shell accepts the generated UTF-8 locale. Read-only diagnostics confirmed the signed `7.1.8+deb13-amd64` backports kernel, synchronized NTP, valid SSH configuration, no failed units and ample disk space. Finish the managed baseline and post-reboot checks. |
 | Hostname | In progress | The physical console, remote SSH banner and Ansible diagnostics identify this machine as `titan`; Ansible enforcement has not run. The inventory does not force that name on other nodes. |
 | Wired networking | In progress | `eno1` is driven by in-tree `r8169`, receives the router-reserved address and carries successful SSH traffic. Static DHCP is configured on the Hyperoptic EX3301-T0 and Wi-Fi was disabled. Verify both facts across the first managed reboot. |
-| Ansible host baseline | In progress | Managed-key inventory ping and read-only diagnostics passed. The first preview was rejected and fixed before mutation. The final preview completed with `failed=0` and `unreachable=0`, preserved `/boot/efi` and `LANG=en_US.UTF-8`, selected only the swap entry, deferred package-dependent services, and kept SSH hardening disabled. Apply this reviewed intent next; no baseline changes have been applied yet. |
+| Ansible host baseline | In progress | The reviewed baseline applied with `ok=27`, `changed=13`, `unreachable=0` and `failed=0`. It preserved SSH access with hardening disabled, installed the administration packages, retained US locale, selected UTC, disabled swap and sleep, configured bounded logs and automatic security updates, and confirmed Chrony and trimming. No reboot was requested. Run expanded diagnostics and an idempotence pass before hardening. |
 | SSH hardening | In progress | Titan's host fingerprint was verified and the dedicated operator key now opens a clean session. Password login remains enabled intentionally until the first baseline succeeds; apply hardening in a separate pass and prove two new sessions. |
 | K3s server | Not deployed | Installation and verification runbooks exist; run them only after the host baseline succeeds. |
 | Cluster recovery | Not deployed | Embedded-etcd snapshots are configured, but an off-node export and restore test are still required. |
@@ -94,11 +94,10 @@ they do not block the first recoverable Titan installation.
 
 Inventory connectivity and read-only diagnostics are complete. Continue with:
 
-1. Keep SSH hardening disabled and apply the now-reviewed baseline, limited to
-   Titan and prompting for sudo. Run the diagnostics again immediately after.
-2. If required, run `node reboot --limit titan --ask-become-pass`; verify the
-   reserved wired address, disabled Wi-Fi and a mostly unchanged second
-   preparation run.
+1. Open a fresh managed SSH session, run the expanded node diagnostics and
+   verify EFI, swap, Chrony, trimming, locale, route, DNS and failed units.
+2. Run a second baseline preparation and investigate any unexpected repeated
+   changes; no reboot is currently requested.
 3. Enable SSH hardening in private inventory, prepare again, and prove two new
    key-only sessions before closing the recovery session.
 4. Run `homelabctl cluster bootstrap` and complete every verification in the
