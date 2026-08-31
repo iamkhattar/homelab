@@ -170,6 +170,32 @@ In the router, reserve the current wired address for that MAC and label it
 `titan`. Confirm that no port forward exposes Titan. Reboot once and verify that
 `eno1` receives the reservation before disabling Wi-Fi.
 
+### Hyperoptic Zyxel EX3301-T0
+
+The Hyperoptic-supplied EX3301-T0 exposes a LAN DHCP reservation as **Static
+DHCP**. In the router manager, open:
+
+**Network Setting → Home Networking → Static DHCP**
+
+Select **Static DHCP Configuration** or the add (`+`) control, then set:
+
+| Field | Value |
+| --- | --- |
+| Active | Enabled |
+| Group Name | `Default` |
+| IP Type | `IPv4` |
+| Select Device Info | The existing Titan client, or `Manual Input` |
+| MAC Address | The locally recorded `eno1` MAC |
+| IP Address | The current wired address selected for Titan |
+
+Save with **OK** and **Apply** when both controls are present. This menu path
+comes from the
+[Hyperoptic EX3301 detailed guide](https://www.hyperoptic.com/wp-content/uploads/documents/zyxel_ex_3301_manual.pdf).
+
+Do not change **WAN**, **Broadband**, **NAT**, **DMZ**, **Port Forwarding** or
+Hyperoptic's public static-IP options. Static DHCP here is a private LAN lease
+bound to the Ethernet MAC; it is not a public IP service.
+
 Do not commit the address or MAC to the public inventory example. Put the
 reserved address in the Git-ignored `ansible/inventory/hosts.yml` later.
 

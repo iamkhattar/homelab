@@ -39,7 +39,7 @@ they do not block the first recoverable Titan installation.
 | --- | --- | --- |
 | Debian on Titan | In progress | Debian 13 is installed and local login works. Titan booted the signed `7.1.8+deb13-amd64` backports kernel because Linux 6.12 rejected the RTL8125D XID 689. Finish sudo and post-reboot checks. |
 | Hostname | In progress | The installer and physical console identify this machine as `titan`; Ansible enforcement has not run. The inventory does not force that name on other nodes. |
-| Wired networking | In progress | `eno1` is driven by in-tree `r8169`, receives DHCP and has the preferred default route. Remove the temporary Wi-Fi configuration, reserve the wired address in the router and verify both across a reboot. |
+| Wired networking | In progress | `eno1` is driven by in-tree `r8169`, receives DHCP and has the preferred default route. Its address is reserved by MAC through Static DHCP on the Hyperoptic EX3301-T0. Verify the reservation and disabled Wi-Fi state across a reboot. |
 | Ansible host baseline | Ready in repo | Local role, private inventory pattern, optional Titan shell marker, pinned K3s collection, diagnostics/recovery playbooks, detailed contributor manual, syntax checks and lint exist. Run the preparation checkpoints against Titan next. |
 | SSH hardening | Ready in repo | Key-only policy is opt-in so password access is not disabled before the key is proven. |
 | K3s server | Not deployed | Installation and verification runbooks exist; run them only after the host baseline succeeds. |
@@ -92,8 +92,8 @@ they do not block the first recoverable Titan installation.
 
 The next safe sequence is deliberately small:
 
-1. Complete the [wired migration](/getting-started/titan-networking), reserve
-   Titan's LAN address in the router and verify the result after reboot.
+1. Complete the [wired migration](/getting-started/titan-networking) and verify
+   the router reservation and disabled Wi-Fi state after reboot.
 2. Verify sudo, time, DNS and SSH at the physical console.
 3. Run `homelabctl inventory init`, edit the private values, and do not commit
    the result.
