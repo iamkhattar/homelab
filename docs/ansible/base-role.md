@@ -15,7 +15,7 @@ host. It is applied by `homelabctl node prepare` and again at the start of
 | `homelab_base_manage_hostname` | `false` | Opts a host into hostname and `/etc/hosts` management |
 | `homelab_base_hostname` | inventory hostname | Desired hostname when management is enabled |
 | `homelab_base_timezone` | `Etc/UTC` | Configures the system timezone |
-| `homelab_base_default_locale` | `en_GB.UTF-8` | Default `LANG` written to `/etc/default/locale` |
+| `homelab_base_default_locale` | `en_US.UTF-8` | Default `LANG` written to `/etc/default/locale` |
 | `homelab_base_generated_locales` | `en_GB.UTF-8`, `en_US.UTF-8` | Locales generated for the host and SSH clients |
 | `homelab_base_journal_max_use` | `1G` | Bounds persistent systemd journal disk usage |
 | `homelab_base_journal_retention` | `14day` | Bounds journal retention time |
@@ -79,12 +79,11 @@ implemented first.
 
 ### 3. Locale, host identity and time
 
-The role generates `en_GB.UTF-8` for Titan's UK default and `en_US.UTF-8` for
-operator workstations that forward that locale through SSH. It writes only
-`LANG` to `/etc/default/locale`; it does not set a global `LC_ALL`, so users and
-individual processes can still select more specific locale categories. The
-default locale must be present in the generated list or the role stops before
-making changes.
+The role generates `en_US.UTF-8` as the managed default and retains
+`en_GB.UTF-8` as an available locale. It writes only `LANG` to
+`/etc/default/locale`; it does not set a global `LC_ALL`, so users and individual
+processes can still select more specific locale categories. The default locale
+must be present in the generated list or the role stops before making changes.
 
 When hostname management is enabled, systemd receives the desired hostname and
 the `127.0.1.1` entry in `/etc/hosts` is updated. The role then applies the

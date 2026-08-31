@@ -6,7 +6,7 @@ homelab_base_disable_sleep: true
 homelab_base_manage_hostname: false
 homelab_base_hostname: "{{ inventory_hostname }}"
 homelab_base_timezone: Etc/UTC
-homelab_base_default_locale: en_GB.UTF-8
+homelab_base_default_locale: en_US.UTF-8
 homelab_base_generated_locales:
   - en_GB.UTF-8
   - en_US.UTF-8

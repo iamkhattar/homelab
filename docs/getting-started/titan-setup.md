@@ -275,7 +275,8 @@ working DNS and no unexplained failed units.
 
 If Bash reports that it cannot change to `en_US.UTF-8`, the Mac is forwarding a
 locale that the minimal Debian installation has not generated. The baseline
-generates `en_GB.UTF-8` and `en_US.UTF-8` and selects the UK locale by default.
+generates both `en_US.UTF-8` and `en_GB.UTF-8` and selects the US locale by
+default.
 For access needed before the first baseline run, repair it interactively on
 Titan with:
 
@@ -283,8 +284,8 @@ Titan with:
 sudo dpkg-reconfigure locales
 ```
 
-Enable `en_US.UTF-8 UTF-8`, retain the desired local locale, and select
-`en_GB.UTF-8` as the default. Verify `locale -a` contains `en_US.utf8`, then
+Enable `en_US.UTF-8 UTF-8`, retain any other desired locale, and select
+`en_US.UTF-8` as the default. Verify `locale -a` contains `en_US.utf8`, then
 reconnect. Do not set `LC_ALL` globally in `.bashrc`.
 
 ## 12. Preview and apply the Debian baseline
