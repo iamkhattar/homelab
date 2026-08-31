@@ -170,13 +170,20 @@ credentials, remote state or whether the underlying tool accepts the operation.
 After Debian is installed and Titan has a router reservation:
 
 ```bash
-homelabctl setup
+homelabctl version
 homelabctl inventory init
 homelabctl inventory show
 homelabctl node connect titan
+homelabctl node authorize-key titan \
+  --public-key "$HOME/.ssh/homelab_titan_ed25519.pub"
+homelabctl node connect titan
+homelabctl setup ansible
 homelabctl inventory check
 homelabctl node prepare --check --ask-become-pass
 ```
 
-Stop at the first unexpected result. Continue with [inventory and node
-management](/homelabctl/inventory-nodes) before installing K3s.
+The first connection verifies Titan's console-recorded host-key fingerprint and
+may use the installer password. The second must use the installed public key;
+verify `sudo -v` inside it before `setup ansible`. Stop at the first unexpected
+result. Continue with [inventory and node management](/homelabctl/inventory-nodes)
+before installing K3s.

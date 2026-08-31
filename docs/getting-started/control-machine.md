@@ -5,22 +5,18 @@ documented workflow and invokes the repository's pinned Ansible environment.
 The workstation needs Go 1.27 or newer, Python 3, Node 24 or newer, and the
 tools reported by `homelabctl doctor`.
 
-## Install pinned dependencies
+## Bootstrap the operator CLI
 
-From the repository root:
+From the repository root, verify `homelabctl` first:
 
 ```bash
-homelabctl setup
-homelabctl doctor
+homelabctl version
+homelabctl update --check
 ```
 
-The Python requirements pin `ansible-core`, `ansible-lint` and `netaddr`. The
-collection requirements pin the official `k3s.orchestration` collection to an
-audited Git commit and pin all dependent collections. Upgrade these pins through
-a reviewed change, never implicitly during a production run.
-
-The CLI automatically selects `ansible/.venv` for Ansible-backed commands. Do
-not activate it or reproduce its commands in normal operation.
+OpenSSH and `ssh-copy-id` establish the first trust path. Ansible is installed
+only after the host fingerprint, operator public key and sudo path have been
+proved manually.
 
 ## Create the private inventory
 
@@ -64,6 +60,35 @@ homelabctl node authorize-key titan \
 Open a new `homelabctl node connect titan` session and prove it uses the key.
 The complete staged procedure is in the [Titan setup
 runbook](/getting-started/titan-setup#10-trust-titan-and-install-the-operator-key).
+
+Inside that key-authenticated session, verify the privilege boundary before
+installing Ansible:
+
+```bash
+id
+sudo -v
+sudo id
+```
+
+Exit and prove one more new key-authenticated session works.
+
+## Install pinned Ansible dependencies
+
+Only after SSH and sudo are verified, run from the repository root:
+
+```bash
+homelabctl setup ansible
+homelabctl ci check --only ansible
+homelabctl doctor
+```
+
+The Python requirements pin `ansible-core`, `ansible-lint` and `netaddr`. The
+collection requirements pin the official `k3s.orchestration` collection to an
+audited Git commit and pin all dependent collections. Upgrade these pins through
+a reviewed change, never implicitly during a production run.
+
+The CLI automatically selects `ansible/.venv` for Ansible-backed commands. Do
+not activate it or reproduce its commands in normal operation.
 
 ## Test Ansible
 

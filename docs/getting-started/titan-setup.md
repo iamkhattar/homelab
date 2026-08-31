@@ -156,18 +156,9 @@ homelabctl update --check
 Building from source with Go 1.27 remains a contributor fallback, not the
 normal Titan bootstrap path.
 
-Install the pinned Ansible environment and validate the automation:
-
-```bash
-homelabctl setup ansible
-homelabctl ci check --only ansible
-homelabctl doctor
-```
-
-`doctor` reports tooling for the whole repository, so missing Docker, Node,
-Terraform or Helm components do not block host preparation. This stage requires
-Git, Python, SSH, `ssh-copy-id` and the Ansible
-environment installed by `setup ansible`.
+Do not install or run Ansible yet. The first trust path needs only
+`homelabctl`, OpenSSH and `ssh-copy-id`; host identity, key access and sudo are
+proved before configuration automation is allowed to connect.
 
 ## 8. Prepare an operator SSH key
 
@@ -259,19 +250,36 @@ Ansible or enabling hardening.
 
 ## 11. Validate remote access and sudo
 
-From the new key-authenticated terminal:
+From the new key-authenticated `homelabctl node connect titan` session, run on
+Titan:
 
 ```bash
+id
+sudo -v
+sudo id
+```
+
+The first `id` must identify the normal operator. `sudo id` must identify
+`root`. Exit and open one more new key-authenticated session before proceeding.
+The account password may be used for sudo, but it is never placed in inventory.
+
+## 12. Preview and apply the Debian baseline
+
+Only now install the pinned Ansible environment and validate it locally:
+
+```bash
+homelabctl setup ansible
+homelabctl ci check --only ansible
+homelabctl doctor
 homelabctl inventory check --verbose
 homelabctl node diagnose --limit titan --ask-become-pass
 ```
 
-Expected results include successful Ansible ping, hostname `titan`, active SSH,
-a valid SSH configuration, working time synchronisation, a default route, free
-disk space and no unexplained failed services. The sudo password is prompted
-interactively and is never stored.
-
-## 12. Preview and apply the Debian baseline
+`doctor` reports tooling for the whole repository, so missing Docker, Node,
+Terraform or Helm components do not block host preparation. The diagnostic must
+confirm successful Ansible ping, hostname `titan`, active SSH, valid SSH
+configuration, working time synchronisation, a default route, free disk space
+and no unexplained failed services.
 
 Preview supported changes, then apply after reviewing the target and diff:
 
