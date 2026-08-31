@@ -344,11 +344,22 @@ func validateCI(path string, workflow definition) []error {
 		if !containsString(release.Needs, "check") {
 			problem("release job must depend on check")
 		}
+		if !containsString(release.Needs, "publish") {
+			problem("release job must wait for image publication")
+		}
 		if value(release.Permissions["contents"]) != "write" {
 			problem("release job must grant contents: write")
 		}
 		if !strings.Contains(release.If, "github.event_name == 'push'") || !strings.Contains(release.If, "github.ref == 'refs/heads/main'") {
 			problem("release job must run only for pushes to main")
+		}
+		if !hasRun(release.Steps,
+			`git show-ref --verify --quiet "$tag_ref"`,
+			`git rev-list -n 1 "$tag_ref"`,
+			`git tag --annotate "$RELEASE_VERSION" "$GITHUB_SHA"`,
+			`git push origin "$tag_ref"`,
+		) {
+			problem("release job must create or verify an immutable tag at the event commit")
 		}
 		releaseStep, found := findUses(release.Steps, "goreleaser/goreleaser-action@")
 		if !found {

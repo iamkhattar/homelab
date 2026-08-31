@@ -196,6 +196,14 @@ Do not change **WAN**, **Broadband**, **NAT**, **DMZ**, **Port Forwarding** or
 Hyperoptic's public static-IP options. Static DHCP here is a private LAN lease
 bound to the Ethernet MAC; it is not a public IP service.
 
+Titan may also receive a globally scoped IPv6 address from Hyperoptic. IPv6
+does not use the IPv4 port-forwarding table, so confirm that the router's IPv6
+firewall is enabled, permits established and related return traffic, and has no
+inbound rule or pinhole targeting Titan. A global IPv6 address is not itself
+evidence that a service is reachable from the internet, but the router firewall
+is the boundary that must prevent unsolicited inbound connections. Do not add
+an IPv6 exposure rule for SSH, Kubernetes, ingress or applications.
+
 Do not commit the address or MAC to the public inventory example. Put the
 reserved address in the Git-ignored `ansible/inventory/hosts.yml` later.
 

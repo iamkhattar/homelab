@@ -13,7 +13,6 @@ homelab_base_generated_locales:
 homelab_base_journal_max_use: 1G
 homelab_base_journal_retention: 14day
 homelab_base_shell_prompt_enabled: false
-homelab_base_shell_prompt_environment: HOMELAB
 
 homelab_base_packages:
   - acl

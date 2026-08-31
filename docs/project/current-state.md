@@ -16,16 +16,16 @@ known.
 
 ## Titan foundation handoff
 
-Repository preparation is complete and physical deployment has started. The
-supported host, cluster, platform and recovery workflows exist in Git and pass
-workstation validation. Debian, wired access, the reserved address, Titan's SSH
-host identity, the operator key and locale-clean remote login have now been
-observed on the physical machine. Do not interpret **Ready in repo** as
-**Deployed**.
+Repository preparation is complete and physical deployment has reached a
+working single-node K3s control plane. The supported host, cluster, platform and
+recovery workflows exist in Git and pass workstation validation. Debian, wired
+access, the reserved address, Titan's SSH host identity, the operator key, the
+managed baseline and the Kubernetes API have now been observed on the physical
+machine. Do not interpret **Ready in repo** as **Deployed**.
 
 | Category | Remaining work |
 | --- | --- |
-| Required on Titan | Finish the host-health and post-reboot checks, apply and harden the Ansible baseline, install K3s, export recovery material and rehearse a restore. |
+| Required on Titan | Run the full cluster diagnostic, create the first off-node K3s recovery export, verify the reserved address and cluster across a managed reboot, and rehearse a restore. |
 | Required before important data | Choose encrypted off-node storage and prove that K3s, Vault, database and application backups can be restored from it. |
 | Required before relying on alerts | Choose an off-cluster Alertmanager receiver, deliver its credential through Vault and verify a test notification. |
 | Required during platform bootstrap | Publish the private-address DNS records, define Vault recovery-share custody, complete the Pocket ID owner ceremony, initialize Vault through Butler, export recovery material and trust the private CA. |
@@ -40,12 +40,12 @@ they do not block the first recoverable Titan installation.
 | Area | Status | Evidence and next action |
 | --- | --- | --- |
 | Debian on Titan | In progress | Debian 13 is installed, local and key-authenticated remote login work, and the shell accepts the generated UTF-8 locale. Read-only diagnostics confirmed the signed `7.1.8+deb13-amd64` backports kernel, synchronized NTP, valid SSH configuration, no failed units and ample disk space. Finish the managed baseline and post-reboot checks. |
-| Hostname | In progress | The physical console, remote SSH banner and Ansible diagnostics identify this machine as `titan`; Ansible enforcement has not run. The inventory does not force that name on other nodes. |
+| Hostname | In progress | The physical console, remote SSH banner and Ansible diagnostics identify this machine as `titan`, and Ansible now enforces the host-scoped value. Verify it across the first managed reboot. The inventory does not force that name on other nodes. |
 | Wired networking | In progress | `eno1` is driven by in-tree `r8169`, receives the router-reserved address and carries successful SSH traffic. Static DHCP is configured on the Hyperoptic EX3301-T0 and Wi-Fi was disabled. Verify both facts across the first managed reboot. |
-| Ansible host baseline | In progress | The reviewed baseline applied with `ok=27`, `changed=13`, `unreachable=0` and `failed=0`. It preserved SSH access with hardening disabled, installed the administration packages, retained US locale, selected UTC, disabled swap and sleep, configured bounded logs and automatic security updates, and confirmed Chrony and trimming. No reboot was requested. Run expanded diagnostics and an idempotence pass before hardening. |
-| SSH hardening | In progress | Titan's host fingerprint was verified and the dedicated operator key now opens a clean session. Password login remains enabled intentionally until the first baseline succeeds; apply hardening in a separate pass and prove two new sessions. |
-| K3s server | Not deployed | Installation and verification runbooks exist; run them only after the host baseline succeeds. |
-| Cluster recovery | Not deployed | Embedded-etcd snapshots are configured, but an off-node export and restore test are still required. |
+| Ansible host baseline | In progress | The reviewed baseline applied without failures, installed the administration packages, retained US locale, selected UTC, disabled swap and sleep, configured bounded logs and automatic security updates, and confirmed Chrony and trimming. Expanded diagnostics found no failed services. Complete the post-K3s idempotence and managed-reboot checks. |
+| SSH hardening | Deployed | Titan's host fingerprint was verified, the dedicated operator key remains usable, and the private inventory enables the managed key-only SSH policy. Preserve physical-console access and recheck SSH after the first managed reboot. |
+| K3s server | Deployed | On 2026-08-31, workstation verification observed `titan` Ready as the sole `control-plane,etcd` node on K3s `v1.36.4+k3s1`, Debian 13 and containerd `2.3.4-k3s1.36`. CoreDNS and local-path-provisioner were Running, the home/mini-PC labels were present, and bundled Traefik was absent as designed. |
+| Cluster recovery | In progress | Embedded-etcd snapshot configuration is installed, but the first snapshot/token export has not yet been verified in encrypted off-node storage and no restore rehearsal has been completed. |
 | `homelabctl` | Ready in repo | The Go CLI is the documented operator interface for setup, inventory, SSH access, Debian/K3s lifecycle, diagnostics, snapshots, recovery export, Butler bootstrap/control, docs, deployments, builds and checks. Reporting mode generates JUnit/JSON tests, gosec and Trivy SARIF, and an SPDX SBOM for retained CI artifacts and GitHub code scanning. Successful main builds publish checksum-protected Linux/macOS releases with built-in update support. |
 | Documentation site | Ready in repo | Isolated VitePress project, intent-based handbook navigation, ordered section flows, unprivileged Nginx image and component engineering manuals are implemented. Internal cluster hosting waits on ingress and authentication. |
 
@@ -92,20 +92,20 @@ they do not block the first recoverable Titan installation.
 
 ## Immediate next checkpoint
 
-Inventory connectivity and read-only diagnostics are complete. Continue with:
+The host baseline, SSH hardening and K3s bootstrap are complete. Continue with:
 
-1. Open a fresh managed SSH session, run the expanded node diagnostics and
-   verify EFI, swap, Chrony, trimming, locale, route, DNS and failed units.
-2. Run a second baseline preparation and investigate any unexpected repeated
-   changes; no reboot is currently requested.
-3. Enable SSH hardening in private inventory, prepare again, and prove two new
-   key-only sessions before closing the recovery session.
-4. Run `homelabctl cluster bootstrap` and complete every verification in the
-   install runbook.
-5. Run `homelabctl cluster recovery export`, then encrypt and move the exported
-   K3s token and first etcd snapshot off the workstation.
+1. Run `homelabctl cluster diagnose --ask-become-pass` and review the K3s
+   service, journal, events and embedded-etcd snapshot configuration.
+2. Run `homelabctl cluster snapshot list --ask-become-pass`.
+3. Run `homelabctl cluster recovery export` into private staging space, encrypt
+   it, move it off Titan and the workstation, and verify the stored copy.
+4. Create a pre-reboot snapshot, perform a managed cluster reboot, then verify
+   SSH, the router-reserved address, node readiness and all core pods.
+5. Record the first-build evidence and resolve the DNS, recovery-custody and
+   off-cluster alert-receiver decisions before platform bootstrap.
 
-Do not start the application platform until step 8 is complete. The detailed
+Do not start the application platform until the recovery export and reboot
+checks are complete. The detailed
 acceptance criteria for later phases live in the [roadmap](/project/roadmap).
 After the foundation passes, continue with the
 [platform bootstrap runbook](/operations/platform-bootstrap): deploy only

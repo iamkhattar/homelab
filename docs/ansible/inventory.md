@@ -19,7 +19,6 @@ k3s_cluster:
           homelab_base_manage_hostname: true
           homelab_base_hostname: titan
           homelab_base_shell_prompt_enabled: true
-          homelab_base_shell_prompt_environment: HOME
 ```
 
 The inventory key `titan` is also the Kubernetes node name unless K3s is given

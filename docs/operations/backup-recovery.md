@@ -34,6 +34,11 @@ K3s scheduled snapshots run automatically. List them with:
 homelabctl cluster snapshot list --ask-become-pass
 ```
 
+K3s uses its default schedule of midnight and noon in Titan's UTC timezone.
+The configured retention of 14 applies to scheduled snapshots, so K3s removes
+the oldest scheduled snapshot after the fifteenth is created. This provides
+approximately seven days of local control-plane history.
+
 Create an on-demand snapshot before risky maintenance:
 
 ```bash
@@ -57,6 +62,34 @@ The destination is staging space, not the final backup. Encrypt it, move it
 off-device and remove the plaintext staging copy after verifying the encrypted
 copy. Every run creates a new UTC-timestamped subdirectory so an earlier export
 is never overwritten.
+
+## Retention and deletion policy
+
+The three backup classes have different retention behaviour:
+
+| Class | Location | Automatic deletion | Initial policy |
+| --- | --- | --- | --- |
+| Scheduled etcd snapshot | Titan | Yes, newest 14 | Let K3s maintain approximately seven days |
+| Named manual snapshot | Titan | No | Keep until its maintenance or rollback window has passed |
+| Recovery export | Operator-selected off-node storage | No | Keep the first install, latest seven daily, four weekly and six monthly recovery points |
+
+Always keep a pre-upgrade export until the upgraded cluster and its stateful
+workloads have passed verification. If the K3s server token is ever rotated,
+keep each older snapshot with the token that existed when it was created.
+
+Do not remove files directly from Titan's snapshot directory. K3s provides
+metadata-aware `delete` and `prune` operations, but `homelabctl` does not expose
+them yet. Scheduled snapshots need no manual cleanup. Until a guarded
+`homelabctl cluster snapshot delete/prune` interface is implemented and tested,
+leave named manual snapshots in place unless disk pressure creates an explicit
+maintenance need.
+
+Recovery exports are deliberately outside `homelabctl` deletion authority.
+Delete an old export only after listing the retained recovery points, confirming
+a newer encrypted off-device export is readable, and checking that the selected
+directory is the exact timestamped export—not its parent storage volume. Keep a
+small inventory containing creation date, K3s version, repository revision,
+checksum and storage location, but never the server token itself.
 
 ## Backup verification
 

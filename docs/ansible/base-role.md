@@ -20,7 +20,6 @@ host. It is applied by `homelabctl node prepare` and again at the start of
 | `homelab_base_journal_max_use` | `1G` | Bounds persistent systemd journal disk usage |
 | `homelab_base_journal_retention` | `14day` | Bounds journal retention time |
 | `homelab_base_shell_prompt_enabled` | `false` | Opts a host into the managed Bash login prompt |
-| `homelab_base_shell_prompt_environment` | `HOMELAB` | Environment label shown by the managed prompt |
 | `homelab_base_packages` | package list below | Complete package set managed present |
 | `homelab_admin_user` | `ansible_user` | Existing Debian account managed as administrator |
 | `homelab_admin_authorized_keys` | empty list | Exclusive key set when non-empty |
@@ -80,10 +79,12 @@ implemented first.
 ### 3. Locale, host identity and time
 
 The role generates `en_US.UTF-8` as the managed default and retains
-`en_GB.UTF-8` as an available locale. It writes only `LANG` to
-`/etc/default/locale`; it does not set a global `LC_ALL`, so users and individual
-processes can still select more specific locale categories. The default locale
-must be present in the generated list or the role stops before making changes.
+`en_GB.UTF-8` as an available locale. It writes only `LANG` to both
+`/etc/default/locale` and `/etc/locale.conf`, clearing stale installer values
+such as `LANGUAGE=en_GB:en`. It does not set a global `LC_ALL`, so users and
+individual processes can still select more specific locale categories. The
+default locale must be present in the generated list or the role stops before
+making changes.
 
 When hostname management is enabled, systemd receives the desired hostname and
 the `127.0.1.1` entry in `/etc/hosts` is updated. The role then applies the
@@ -92,15 +93,19 @@ configured timezone, defaulting to UTC.
 Titan also opts into a lightweight Bash login prompt:
 
 ```text
-[HOME | titan] operator:/current/path $
+[operator@titan] /current/path $
 ```
 
-The role installs `/etc/profile.d/20-homelab-prompt.sh`; it does not modify a
-user's `.bashrc` or install a prompt framework. Non-root sessions use green for
-the identity marker, root uses red, and terminals without colour support use
-plain text. The hostname is evaluated by Bash at login, so the prompt template
-is reusable: a future node can choose its own environment label without
-inheriting `titan`.
+The role installs `/etc/profile.d/20-homelab-prompt.sh` and adds one narrow,
+Ansible-marked source block at the end of the managed administrator's `.bashrc`.
+The block is needed because SSH normally starts interactive non-login Bash
+shells, which do not read `/etc/profile`. The role does not own any other
+`.bashrc` content or install a prompt framework, and disabling the feature
+removes only its block and profile script. Non-root sessions use green for the
+identity marker, root uses red, and terminals without colour support use plain
+text. The hostname is evaluated by Bash when the script is sourced, so the
+prompt template is reusable and does not embed a particular username or
+hostname.
 
 ### 4. Administrator and SSH keys
 
@@ -165,9 +170,11 @@ unreachable and changed counts.
 | `/etc/systemd/journald.conf.d/10-homelab.conf` | `journald.conf.j2` | Restart journald |
 | `/etc/apt/apt.conf.d/20auto-upgrades` | static file | None |
 | `/etc/apt/apt.conf.d/52homelab-unattended-upgrades` | static file | None |
+| `/etc/default/locale` and `/etc/locale.conf` | generated `LANG` setting | None |
 | `/etc/hosts` hostname entry | line management | None |
 | `/etc/fstab` swap entries | bounded regular-expression replacement | None |
 | `/etc/profile.d/20-homelab-prompt.sh` | `homelab-prompt.sh.j2` | None |
+| administrator's `.bashrc` | marked source block only | None |
 
 Do not edit managed files directly on Titan. Change inventory, defaults,
 templates or static role files and apply through `homelabctl`.

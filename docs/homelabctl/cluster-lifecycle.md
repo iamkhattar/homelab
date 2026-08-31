@@ -76,6 +76,14 @@ K3s appends node and timestamp information to the resulting filename.
 A snapshot left on Titan does not protect against SSD loss, theft or loss of the
 whole machine. Use recovery export for an off-node copy.
 
+Scheduled snapshots are created by K3s at midnight and noon UTC. Titan retains
+the newest 14 scheduled snapshots automatically. Named snapshots created by
+`snapshot save` have no automatic retention and are not currently deleted by
+`homelabctl`; do not remove their files directly. The supported CLI needs a
+guarded, exact-name delete/prune workflow before routine manual cleanup is
+enabled. See [backup and recovery](/operations/backup-recovery) for the complete
+retention policy.
+
 ## Export recovery material
 
 ```bash
@@ -107,6 +115,11 @@ The destination is staging space. Immediately encrypt the export, move it to
 storage outside Titan and the workstation, verify the copied checksum, and
 remove the plaintext staging copy. Every invocation gets a new directory and
 does not overwrite an older export.
+
+`homelabctl` never deletes recovery exports. Retain the first-install recovery
+point, then initially keep seven daily, four weekly and six monthly encrypted
+off-device exports. Remove an older timestamped export only after verifying a
+newer copy and resolving the exact directory outside the repository.
 
 ::: danger Sensitive output
 The `server-token` is sufficient to join privileged K3s nodes and is part of the
