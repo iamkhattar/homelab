@@ -70,6 +70,10 @@ server_config_yaml: |
 - `secrets-encryption` encrypts Kubernetes Secret data at rest.
 - snapshots are compressed and 14 scheduled snapshots are retained locally.
 - packaged Traefik is disabled because ingress will be installed declaratively.
+- packaged metrics-server is disabled because the Helmfile `foundation` stage
+  installs the pinned, resource-bounded replacement. Until that stage runs,
+  `kubectl top` and resource-metric HPAs are intentionally unavailable; K3s
+  health, recovery export and ordinary scheduling do not depend on them.
 - labels make workload placement rules readable.
 
 ## Cluster-wide variables
