@@ -20,10 +20,11 @@ an older release tag. The same value is the canonical version for the
 container image. Both images also receive the source SHA and `latest` tags, but
 those aliases do not define a second product version.
 
-The release job waits for those images to publish, then creates an annotated
-tag at the immutable push-event SHA. On a rerun it verifies that an existing tag
-resolves to that same SHA. It never force-moves a tag; any mismatch stops before
-GoReleaser, preserving the source-to-binary identity.
+The release job waits for those images to publish, then calls
+`homelabctl ci release-tag` to create an annotated tag at the immutable
+push-event SHA through `go-git`. On a rerun the command verifies that an existing
+tag resolves to that same SHA. It never force-moves a tag; any mismatch stops
+before GoReleaser, preserving the source-to-binary identity.
 
 GoReleaser builds static binaries with the same `v0.1.<run number>` version, full source commit
 and build date embedded at link time. Each release contains:

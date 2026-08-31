@@ -73,7 +73,7 @@ func (a *AuthMiddleware) clientsFor(ctx context.Context) (*oidc.IDTokenVerifier,
 	a.oauth = &oauth2.Config{
 		ClientID:    a.audience,
 		Endpoint:    provider.Endpoint(),
-		RedirectURL: "https://butler.home.6940469.xyz/auth/callback",
+		RedirectURL: "https://butler.6940469.xyz/auth/callback",
 		Scopes:      []string{oidc.ScopeOpenID, "profile", "email", "groups"},
 	}
 	return a.verifier, a.oauth, nil

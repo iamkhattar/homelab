@@ -452,11 +452,50 @@ then proceed through the project roadmap one recoverable layer at a time. Do
 not jump directly to Vault or Home Assistant before storage, ingress, DNS and
 backup decisions are complete.
 
-Before starting the platform bootstrap, record these deployment decisions:
+## Publish the homelab DNS records
+
+`6940469.xyz` is dedicated to the homelab. The naming convention is flat:
+
+```text
+home.6940469.xyz       Homepage dashboard
+auth.6940469.xyz       Pocket ID
+grafana.6940469.xyz    Grafana
+vault.6940469.xyz      Vault
+ha.6940469.xyz         Home Assistant
+```
+
+In Namecheap, open **Domain List**, select **Manage** for `6940469.xyz`, then
+open **Advanced DNS**. Remove the default `www` parking CNAME and apex URL
+redirect. Under **Host Records**, create:
+
+| Type | Host | Value | TTL |
+| --- | --- | --- | --- |
+| A Record | `*` | `192.168.1.163` | Automatic |
+| A Record | `@` | `192.168.1.163` | Automatic |
+
+Do not publish Titan's globally routed IPv6 address, the router's public IPv4
+address, or add router port forwards. The wildcard covers one-label names such
+as `auth.6940469.xyz`; it does not cover the apex, which is why `@` is separate.
+
+Verify the records through a public recursive resolver:
+
+```bash
+dig +short A home.6940469.xyz @1.1.1.1
+dig +short A auth.6940469.xyz @1.1.1.1
+dig +short A 6940469.xyz @1.1.1.1
+dig +short AAAA home.6940469.xyz @1.1.1.1
+```
+
+The first three commands must return `192.168.1.163`; the AAAA query must
+return nothing. This was verified on 2026-08-31. DNS resolution alone does not
+expose Titan or make an application available: Traefik, TLS and the application
+still have to be deployed, and the router must continue to have no ingress
+forwarding rules.
+
+Before starting the platform bootstrap, record these remaining deployment
+decisions:
 
 - the encrypted off-node backup destination and who can recover its key;
-- the private DNS records for `home.6940469.xyz` and
-  `*.home.6940469.xyz`, both resolving to Titan's reserved LAN address;
 - the off-cluster Alertmanager receiver to be tested before alerts are trusted;
 - the Vault recovery share count, threshold, encrypted recipients and custody
   locations.

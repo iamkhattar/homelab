@@ -11,8 +11,10 @@ import (
 	"time"
 
 	git "github.com/go-git/go-git/v5"
+	gitconfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
 type Service struct {
@@ -65,6 +67,83 @@ func HeadSHA(root string) (string, error) {
 		return "", fmt.Errorf("resolving Git HEAD: commit hash is empty")
 	}
 	return hash.String(), nil
+}
+
+// EnsureReleaseTag creates and pushes an annotated release tag at HEAD, or
+// verifies that an existing tag already resolves to the same commit. Tags are
+// never moved. token is used only for HTTPS push authentication and is never
+// persisted in repository configuration.
+func EnsureReleaseTag(root, name, commitSHA, token string) (bool, error) {
+	repository, err := open(root)
+	if err != nil {
+		return false, err
+	}
+	head, err := repository.Head()
+	if err != nil {
+		return false, fmt.Errorf("resolving Git HEAD: %w", err)
+	}
+	if head.Hash().String() != commitSHA {
+		return false, fmt.Errorf("release commit %s does not match checked-out HEAD %s", commitSHA, head.Hash())
+	}
+	if _, err := repository.CommitObject(head.Hash()); err != nil {
+		return false, fmt.Errorf("loading release commit %s: %w", commitSHA, err)
+	}
+
+	tagReference := plumbing.NewTagReferenceName(name)
+	existing, err := repository.Reference(tagReference, true)
+	if err == nil {
+		resolved, resolveErr := resolveTagCommit(repository, existing.Hash())
+		if resolveErr != nil {
+			return false, fmt.Errorf("resolving existing release tag %s: %w", name, resolveErr)
+		}
+		if resolved != head.Hash() {
+			return false, fmt.Errorf("release tag %s points to %s, expected %s", name, resolved, head.Hash())
+		}
+		return false, nil
+	}
+	if err != plumbing.ErrReferenceNotFound {
+		return false, fmt.Errorf("reading release tag %s: %w", name, err)
+	}
+
+	_, err = repository.CreateTag(name, head.Hash(), &git.CreateTagOptions{
+		Tagger: &object.Signature{
+			Name:  "github-actions[bot]",
+			Email: "41898282+github-actions[bot]@users.noreply.github.com",
+			When:  time.Now().UTC(),
+		},
+		Message: fmt.Sprintf("Homelab release %s", name),
+	})
+	if err != nil {
+		return false, fmt.Errorf("creating annotated release tag %s: %w", name, err)
+	}
+
+	pushOptions := &git.PushOptions{
+		RemoteName: "origin",
+		RefSpecs: []gitconfig.RefSpec{
+			gitconfig.RefSpec(tagReference.String() + ":" + tagReference.String()),
+		},
+	}
+	if token != "" {
+		pushOptions.Auth = &githttp.BasicAuth{Username: "x-access-token", Password: token}
+	}
+	if err := repository.Push(pushOptions); err != nil && err != git.NoErrAlreadyUpToDate {
+		return false, fmt.Errorf("pushing release tag %s: %w", name, err)
+	}
+	return true, nil
+}
+
+func resolveTagCommit(repository *git.Repository, hash plumbing.Hash) (plumbing.Hash, error) {
+	for range 8 {
+		if _, err := repository.CommitObject(hash); err == nil {
+			return hash, nil
+		}
+		tag, err := repository.TagObject(hash)
+		if err != nil {
+			return plumbing.ZeroHash, err
+		}
+		hash = tag.Target
+	}
+	return plumbing.ZeroHash, fmt.Errorf("tag indirection exceeds safety limit")
 }
 
 // HeadCommitDate returns the HEAD commit timestamp as deterministic RFC 3339

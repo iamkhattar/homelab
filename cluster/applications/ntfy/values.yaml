@@ -13,7 +13,7 @@ service:
   containerPort: 80
 
 env:
-  NTFY_BASE_URL: "https://ntfy.home.6940469.xyz"
+  NTFY_BASE_URL: "https://ntfy.6940469.xyz"
   NTFY_UPSTREAM_BASE_URL: "https://ntfy.sh"
   NTFY_BEHIND_PROXY: "true"
   NTFY_REQUIRE_LOGIN: "true"

@@ -149,6 +149,59 @@ func TestControlFlagsRejectInvalidCombinationsBeforeCommands(t *testing.T) {
 	}
 }
 
+func TestCIReleaseTagDryRunValidatesAndReportsIntent(t *testing.T) {
+	t.Setenv("CI", "true")
+	repo := testRepository(t)
+	commit, err := repository.HeadSHA(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	runner := command.NewRunner(strings.NewReader(""), &stdout, &bytes.Buffer{})
+	root := New(BuildInfo{}, runner)
+	root.SetArgs([]string{"--repo-root", repo, "--dry-run", "ci", "release-tag", "--tag", "v0.1.54", "--commit", commit})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	for _, fragment := range []string{"v0.1.54", commit} {
+		if !strings.Contains(stdout.String(), fragment) {
+			t.Errorf("output %q does not contain %q", stdout.String(), fragment)
+		}
+	}
+}
+
+func TestCIReleaseTagRejectsUnsafeInputsAndMissingCredentials(t *testing.T) {
+	repo := testRepository(t)
+	commit, err := repository.HeadSHA(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name string
+		ci   string
+		tag  string
+		sha  string
+		want string
+	}{
+		{name: "outside CI", tag: "v0.1.54", sha: commit, want: "only allowed when CI is set"},
+		{name: "invalid version", ci: "true", tag: "latest", sha: commit, want: "must start with v"},
+		{name: "short commit", ci: "true", tag: "v0.1.54", sha: "3b6ec87", want: "full 40-character"},
+		{name: "missing token", ci: "true", tag: "v0.1.54", sha: commit, want: "GITHUB_TOKEN is required"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("CI", test.ci)
+			t.Setenv("GITHUB_TOKEN", "")
+			runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+			root := New(BuildInfo{}, runner)
+			root.SetArgs([]string{"--repo-root", repo, "ci", "release-tag", "--tag", test.tag, "--commit", test.sha})
+			if err := root.Execute(); err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("Execute() error = %v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
 func TestCICheckGoTestRunsEveryDiscoveredModule(t *testing.T) {
 	repo := testRepository(t)
 	modules := []string{

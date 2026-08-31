@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/Masterminds/semver/v3"
 )
 
 var (
@@ -12,12 +14,30 @@ var (
 	releaseNamePattern    = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]*$`)
 	imageTagPattern       = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$`)
 	gitSHAImageTagPattern = regexp.MustCompile(`^[0-9a-f]{40,64}$`)
+	gitCommitPattern      = regexp.MustCompile(`^[0-9a-f]{40}$`)
 	apiIdentifierPattern  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
 )
 
 func validateAPIIdentifier(value, label string) error {
 	if !apiIdentifierPattern.MatchString(value) {
 		return fmt.Errorf("%s must be 1-128 characters using letters, numbers, dots, underscores, colons, or hyphens", label)
+	}
+	return nil
+}
+
+func validateReleaseTag(tag string) error {
+	if !strings.HasPrefix(tag, "v") {
+		return fmt.Errorf("release tag must start with v and contain a semantic version")
+	}
+	if _, err := semver.StrictNewVersion(strings.TrimPrefix(tag, "v")); err != nil {
+		return fmt.Errorf("release tag %q is not a valid semantic version", tag)
+	}
+	return nil
+}
+
+func validateGitCommit(commit string) error {
+	if !gitCommitPattern.MatchString(commit) {
+		return fmt.Errorf("release commit must be a full 40-character lowercase Git SHA")
 	}
 	return nil
 }

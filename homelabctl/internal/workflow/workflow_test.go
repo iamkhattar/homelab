@@ -194,9 +194,23 @@ func TestValidateDirectoryRejectsBrokenCIContracts(t *testing.T) {
 		{
 			name: "release does not create its immutable tag",
 			transform: func(input string) string {
-				return strings.Replace(input, `git push origin "$tag_ref"`, `echo "tag omitted"`, 1)
+				return strings.Replace(input, `bin/homelabctl ci release-tag`, `echo "tag omitted"`, 1)
 			},
 			wantInError: "release job must create or verify an immutable tag",
+		},
+		{
+			name: "release does not build homelabctl",
+			transform: func(input string) string {
+				return strings.Replace(input, `go build -trimpath -o "$GITHUB_WORKSPACE/bin/homelabctl" ./cmd/homelabctl`, `echo "build omitted"`, 1)
+			},
+			wantInError: "release job must build homelabctl",
+		},
+		{
+			name: "release tag creation lacks GitHub authentication",
+			transform: func(input string) string {
+				return strings.Replace(input, "          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n", "", 1)
+			},
+			wantInError: "release tag creation must use the CI guard and GITHUB_TOKEN",
 		},
 		{
 			name: "shared release uses a moving tag",
@@ -524,16 +538,15 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - run: go build -trimpath -o "$GITHUB_WORKSPACE/bin/homelabctl" ./cmd/homelabctl
       - name: Create or verify immutable release tag
         run: |
-          tag_ref="refs/tags/${RELEASE_VERSION}"
-          if git show-ref --verify --quiet "$tag_ref"; then
-            tagged_commit="$(git rev-list -n 1 "$tag_ref")"
-            test "$tagged_commit" = "$GITHUB_SHA"
-          else
-            git tag --annotate "$RELEASE_VERSION" "$GITHUB_SHA" --message "release"
-            git push origin "$tag_ref"
-          fi
+          bin/homelabctl ci release-tag \
+            --tag "${{ env.RELEASE_VERSION }}" \
+            --commit "${{ github.sha }}"
+        env:
+          CI: "true"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94
         with:
           version: v2.17.1

@@ -99,7 +99,52 @@ func newCICommand(s *state) *cobra.Command {
 	checkCmd.Flags().StringSliceVar(&skip, "skip", nil, "checks to skip; reporting mode also adds gosec,trivy,sbom")
 	checkCmd.Flags().StringSliceVar(&only, "only", nil, "run only selected checks; reporting mode also adds gosec,trivy,sbom")
 	checkCmd.Flags().BoolVar(&reports, "reports", false, "write JUnit, test JSON, SARIF and SPDX reports and run security scans")
-	cmd.AddCommand(checkCmd, newCIImageCommand(s, false), newCIImageCommand(s, true))
+	cmd.AddCommand(checkCmd, newCIImageCommand(s, false), newCIImageCommand(s, true), newCIReleaseTagCommand(s))
+	return cmd
+}
+
+func newCIReleaseTagCommand(s *state) *cobra.Command {
+	var tag string
+	var commit string
+	cmd := &cobra.Command{
+		Use:   "release-tag",
+		Short: "Create or verify the immutable tag for a CI release",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if os.Getenv("CI") == "" {
+				return fmt.Errorf("ci release-tag is only allowed when CI is set")
+			}
+			if err := validateReleaseTag(tag); err != nil {
+				return err
+			}
+			if err := validateGitCommit(commit); err != nil {
+				return err
+			}
+			if s.dryRun {
+				s.keyValue("Release tag", tag)
+				s.keyValue("Release commit", commit)
+				return nil
+			}
+			token := os.Getenv("GITHUB_TOKEN")
+			if token == "" {
+				return fmt.Errorf("GITHUB_TOKEN is required to push a release tag")
+			}
+			created, err := repository.EnsureReleaseTag(s.root, tag, commit, token)
+			if err != nil {
+				return err
+			}
+			if created {
+				s.success(fmt.Sprintf("created and pushed release tag %s at %s", tag, commit))
+			} else {
+				s.success(fmt.Sprintf("verified release tag %s at %s", tag, commit))
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&tag, "tag", "", "semantic release tag, including the v prefix")
+	cmd.Flags().StringVar(&commit, "commit", "", "full Git commit SHA that the tag must identify")
+	_ = cmd.MarkFlagRequired("tag")
+	_ = cmd.MarkFlagRequired("commit")
 	return cmd
 }
 

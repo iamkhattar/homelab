@@ -17,18 +17,18 @@ known.
 ## Titan foundation handoff
 
 Repository preparation is complete and physical deployment has reached a
-working single-node K3s control plane. The supported host, cluster, platform and
-recovery workflows exist in Git and pass workstation validation. Debian, wired
+installed single-node K3s control plane. The supported host, cluster, platform
+and recovery workflows exist in Git and pass workstation validation. Debian, wired
 access, the reserved address, Titan's SSH host identity, the operator key, the
 managed baseline and the Kubernetes API have now been observed on the physical
 machine. Do not interpret **Ready in repo** as **Deployed**.
 
 | Category | Remaining work |
 | --- | --- |
-| Required on Titan | Run the full cluster diagnostic, create the first off-node K3s recovery export, verify the reserved address and cluster across a managed reboot, and rehearse a restore. |
+| Required on Titan | Reconcile K3s with its newly pinned Ethernet IPv4 configuration, prove the API is Ready, run the full cluster diagnostic, create the first off-node K3s recovery export, verify another managed reboot, and rehearse a restore. |
 | Required before important data | Choose encrypted off-node storage and prove that K3s, Vault, database and application backups can be restored from it. |
 | Required before relying on alerts | Choose an off-cluster Alertmanager receiver, deliver its credential through Vault and verify a test notification. |
-| Required during platform bootstrap | Publish the private-address DNS records, define Vault recovery-share custody, complete the Pocket ID owner ceremony, initialize Vault through Butler, export recovery material and trust the private CA. |
+| Required during platform bootstrap | Define Vault recovery-share custody, complete the Pocket ID owner ceremony, initialize Vault through Butler, export recovery material and trust the private CA. |
 | Later design decisions | DNS-01 automation, internal resolver failover, ZHA versus Zigbee2MQTT, and the future Tailscale/Hetzner design. |
 
 Repository enhancements such as controlled automatic security updates,
@@ -44,7 +44,7 @@ they do not block the first recoverable Titan installation.
 | Wired networking | In progress | `eno1` is driven by in-tree `r8169`, receives the router-reserved address and carries successful SSH traffic. Static DHCP is configured on the Hyperoptic EX3301-T0 and Wi-Fi was disabled. Verify both facts across the first managed reboot. |
 | Ansible host baseline | In progress | The reviewed baseline applied without failures, installed the administration packages, retained US locale, selected UTC, disabled swap and sleep, configured bounded logs and automatic security updates, and confirmed Chrony and trimming. Expanded diagnostics found no failed services. Complete the post-K3s idempotence and managed-reboot checks. |
 | SSH hardening | Deployed | Titan's host fingerprint was verified, the dedicated operator key remains usable, and the private inventory enables the managed key-only SSH policy. Preserve physical-console access and recheck SSH after the first managed reboot. |
-| K3s server | Deployed | On 2026-08-31, workstation verification observed `titan` Ready as the sole `control-plane,etcd` node on K3s `v1.36.4+k3s1`, Debian 13 and containerd `2.3.4-k3s1.36`. CoreDNS and local-path-provisioner were Running, the home/mini-PC labels were present, and bundled Traefik was absent as designed. |
+| K3s server | Needs reconciliation | Titan was initially verified Ready as the sole `control-plane,etcd` node on K3s `v1.36.4+k3s1`. The latest reboot then exposed nondeterministic address selection: embedded etcd retained `192.168.1.163` while K3s selected Titan's global IPv6 address. Private inventory and the public example now pin `node-ip`, `advertise-address` and `flannel-iface`; rerun cluster bootstrap and verify readiness before continuing. |
 | Cluster recovery | In progress | Embedded-etcd snapshot configuration is installed, but the first snapshot/token export has not yet been verified in encrypted off-node storage and no restore rehearsal has been completed. |
 | `homelabctl` | Ready in repo | The Go CLI is the documented operator interface for setup, inventory, SSH access, Debian/K3s lifecycle, diagnostics, snapshots, recovery export, Butler bootstrap/control, docs, deployments, builds and checks. Reporting mode generates JUnit/JSON tests, gosec and Trivy SARIF, and an SPDX SBOM for retained CI artifacts and GitHub code scanning. Successful main builds publish checksum-protected Linux/macOS releases with built-in update support. |
 | Documentation site | Ready in repo | Isolated VitePress project, intent-based handbook navigation, ordered section flows, unprivileged Nginx image and component engineering manuals are implemented. Internal cluster hosting waits on ingress and authentication. |
@@ -53,7 +53,7 @@ they do not block the first recoverable Titan installation.
 
 | Capability | Status | Prerequisite |
 | --- | --- | --- |
-| Ingress and internal DNS | Ready in repo | Helmfile-managed Traefik, `home.6940469.xyz`, Vault private PKI and authenticated CA export are selected. Publishing the private-address Namecheap records and proving household DNS/trust remain deployment checkpoints; public DNS-01 automation is later work. |
+| Ingress and private-address DNS | Partially deployed | Namecheap now publishes `*.6940469.xyz` and the apex to Titan's reserved `192.168.1.163`, with no AAAA record. `home.6940469.xyz` is the dashboard and application names are flat peers. LAN resolution and the matching chart, Butler and homelabctl defaults are complete; Traefik, client HTTPS trust, remote Tailscale routing and public DNS-01 automation remain deployment checkpoints. |
 | Persistent storage | Ready for testing | K3s local-path with bounded PVCs is the accepted single-node starting point. Select the encrypted off-node backup target and rehearse restores before storing important data. |
 | Prometheus, Grafana, Loki, Tempo and Alloy | Ready in repo | Pinned bounded charts, seven-day retention, kube-state-metrics, node-exporter, OTLP receivers, log collection, Butler metrics/logs/traces, Grafana correlation, reusable all-workload dashboards and workload/Job/PVC/OOM alerts render. Choose and test the final off-cluster Alertmanager receiver before relying on alerts. |
 | Pocket ID | Ready in repo | Pinned v2 deployment, Vault-provided encryption key, native OTLP, Butler-managed groups, users and OIDC clients, secret rotation into Vault, and Butler PKCE login exist; first owner/API key remain an interactive Titan checkpoint. |
@@ -92,17 +92,19 @@ they do not block the first recoverable Titan installation.
 
 ## Immediate next checkpoint
 
-The host baseline, SSH hardening and K3s bootstrap are complete. Continue with:
+The host baseline and SSH hardening are complete. Continue with:
 
-1. Run `homelabctl cluster diagnose --ask-become-pass` and review the K3s
+1. Run `homelabctl cluster bootstrap --limit titan --ask-become-pass` to apply
+   the pinned Ethernet IPv4 configuration, then prove `cluster status` is healthy.
+2. Run `homelabctl cluster diagnose --ask-become-pass` and review the K3s
    service, journal, events and embedded-etcd snapshot configuration.
-2. Run `homelabctl cluster snapshot list --ask-become-pass`.
-3. Run `homelabctl cluster recovery export` into private staging space, encrypt
+3. Run `homelabctl cluster snapshot list --ask-become-pass`.
+4. Run `homelabctl cluster recovery export` into private staging space, encrypt
    it, move it off Titan and the workstation, and verify the stored copy.
-4. Create a pre-reboot snapshot, perform a managed cluster reboot, then verify
+5. Create a pre-reboot snapshot, perform a managed cluster reboot, then verify
    SSH, the router-reserved address, node readiness and all core pods.
-5. Record the first-build evidence and resolve the DNS, recovery-custody and
-   off-cluster alert-receiver decisions before platform bootstrap.
+6. Record the first-build evidence and resolve recovery custody and the
+   off-cluster alert receiver before platform bootstrap.
 
 Do not start the application platform until the recovery export and reboot
 checks are complete. The detailed

@@ -510,7 +510,7 @@ func firstDomain(in BootstrapInput) string {
 	if len(in.PKI.AllowedDomains) > 0 {
 		return in.PKI.AllowedDomains[0]
 	}
-	return "home.6940469.xyz"
+	return "6940469.xyz"
 }
 
 // BootstrapK8sEngine enables and configures Vault's kubernetes/ secrets

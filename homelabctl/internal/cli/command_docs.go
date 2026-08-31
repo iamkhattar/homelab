@@ -156,7 +156,7 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 	},
 	"homelabctl control applications put": {
 		long:    "Create or replace an ApplicationIntegration contract. Butler validates its namespace during reconciliation and never stores credential values in this resource.",
-		example: "  BUTLER_TOKEN=... homelabctl control applications put paperless --app-namespace paperless-ngx --authentication forward-auth --owner homelab-admin --host paperless.home.6940469.xyz --vault-path applications/paperless-ngx",
+		example: "  BUTLER_TOKEN=... homelabctl control applications put paperless --app-namespace paperless-ngx --authentication forward-auth --owner homelab-admin --host paperless.6940469.xyz --vault-path applications/paperless-ngx",
 	},
 	"homelabctl deploy": {long: "Preview or reconcile Helmfile desired state. Deployment remains separate from image publication and CI. The shared image tag defaults to the full committed Git SHA and must already exist in the registry."},
 	"homelabctl deploy diff": {
@@ -209,6 +209,10 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 	"homelabctl ci publish": {
 		long:    "Build and push service, homelabctl, and documentation images. This command requires CI and defaults to the current Git commit SHA when no tag is supplied.",
 		example: "  CI=true homelabctl ci publish --changed --base HEAD~1 --tag latest --tag revision",
+	},
+	"homelabctl ci release-tag": {
+		long:    "Create and push an annotated semantic release tag at the exact checked-out commit, or verify an existing tag resolves there. The command is CI-only, authenticates with GITHUB_TOKEN through go-git, and never moves a tag.",
+		example: "  CI=true GITHUB_TOKEN=... homelabctl ci release-tag \\\n    --tag v0.1.54 \\\n    --commit 3b6ec87a44312bfce2bb3e7aec2dfd2686255226",
 	},
 	"homelabctl version": {long: "Print the semantic version, source commit, and build date embedded in the binary.", example: "  homelabctl version"},
 	"homelabctl update": {

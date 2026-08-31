@@ -11,7 +11,7 @@ service:
   containerPort: 3000
 
 env:
-  HOMEPAGE_ALLOWED_HOSTS: "homepage.home.6940469.xyz"
+  HOMEPAGE_ALLOWED_HOSTS: "home.6940469.xyz"
 
 persistence:
   enabled: false

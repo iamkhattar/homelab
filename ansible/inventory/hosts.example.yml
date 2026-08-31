@@ -24,6 +24,11 @@ k3s_cluster:
 
           # Labels make placement explicit when remote agents are added later.
           server_config_yaml: |
+            # Pin K3s to the node's reserved Ethernet IPv4 address. Replace
+            # this example address and interface with values for the node.
+            node-ip: 192.168.1.50
+            advertise-address: 192.168.1.50
+            flannel-iface: eno1
             # Use embedded etcd even on the single server so K3s can create
             # scheduled snapshots and a later move to three servers is clean.
             cluster-init: true

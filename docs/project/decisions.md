@@ -20,7 +20,7 @@ runbooks so they do not become accidental or get repeatedly reopened.
 | Use `homelabctl` for normal runbooks | Accepted | Operators get one typed, auditable interface; native commands remain visible implementation details and break-glass tools. |
 | Remote nodes are labelled and tainted | Accepted | Hetzner capacity is opt-in for workloads and cannot silently receive home-only services. |
 | Start with K3s local-path storage | Accepted | One node gains nothing from replicated Longhorn scheduling. Stateful services use bounded local PVCs while the off-node backup target remains a separate required decision. |
-| Use `home.6940469.xyz` with private-address public DNS records | Accepted | LAN and future Tailscale clients use one name without exposing a service; the router has no public ingress forwards. |
+| Dedicate `6940469.xyz` to flat homelab names with private-address public DNS | Accepted | `home.6940469.xyz` is the dashboard and peers such as `auth.6940469.xyz` share one wildcard; LAN and future Tailscale clients use the same names without public ingress. |
 | Begin with Vault private PKI | Accepted transitional design | The authenticated Kubernetes CA export establishes trust now. Publicly trusted DNS-01 certificates replace it after DNS automation is selected. |
 | Use manual Vault unseal and an encrypted off-node recovery export | Accepted | The Kubernetes recovery Secret supports single-node repair but is not the only copy; `homelabctl` exports it directly to age ciphertext. |
 | Deliver workload secrets through Vault Secrets Operator | Accepted | Applications consume ordinary scoped Kubernetes Secrets while Vault remains the source of truth; workloads do not receive broad Vault credentials. |

@@ -231,25 +231,18 @@ jobs:
           cache: true
           cache-dependency-path: homelabctl/go.sum
 
-      - name: Create or verify immutable release tag
-        shell: bash
-        run: |
-          set -euo pipefail
-          tag_ref="refs/tags/${RELEASE_VERSION}"
+      - name: Build homelabctl
+        run: go build -trimpath -o "$GITHUB_WORKSPACE/bin/homelabctl" ./cmd/homelabctl
+        working-directory: homelabctl
 
-          if git show-ref --verify --quiet "$tag_ref"; then
-            tagged_commit="$(git rev-list -n 1 "$tag_ref")"
-            if [[ "$tagged_commit" != "$GITHUB_SHA" ]]; then
-              echo "::error::${RELEASE_VERSION} points to ${tagged_commit}, expected ${GITHUB_SHA}"
-              exit 1
-            fi
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git tag --annotate "$RELEASE_VERSION" "$GITHUB_SHA" \
-              --message "Homelab release ${RELEASE_VERSION}"
-            git push origin "$tag_ref"
-          fi
+      - name: Create or verify immutable release tag
+        run: |
+          bin/homelabctl ci release-tag \
+            --tag "${{ env.RELEASE_VERSION }}" \
+            --commit "${{ github.sha }}"
+        env:
+          CI: "true"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create immutable GitHub release
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3

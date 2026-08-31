@@ -353,13 +353,14 @@ func validateCI(path string, workflow definition) []error {
 		if !strings.Contains(release.If, "github.event_name == 'push'") || !strings.Contains(release.If, "github.ref == 'refs/heads/main'") {
 			problem("release job must run only for pushes to main")
 		}
-		if !hasRun(release.Steps,
-			`git show-ref --verify --quiet "$tag_ref"`,
-			`git rev-list -n 1 "$tag_ref"`,
-			`git tag --annotate "$RELEASE_VERSION" "$GITHUB_SHA"`,
-			`git push origin "$tag_ref"`,
-		) {
-			problem("release job must create or verify an immutable tag at the event commit")
+		if !hasRun(release.Steps, "go build", `bin/homelabctl`, "./cmd/homelabctl") {
+			problem("release job must build homelabctl before invoking release policy")
+		}
+		releaseTagStep, found := findRun(release.Steps, "bin/homelabctl ci release-tag")
+		if !found || !strings.Contains(releaseTagStep.Run, `--tag "${{ env.RELEASE_VERSION }}"`) || !strings.Contains(releaseTagStep.Run, `--commit "${{ github.sha }}"`) {
+			problem("release job must create or verify an immutable tag through homelabctl at the event commit")
+		} else if value(releaseTagStep.Env["CI"]) != "true" || value(releaseTagStep.Env["GITHUB_TOKEN"]) != "${{ secrets.GITHUB_TOKEN }}" {
+			problem("release tag creation must use the CI guard and GITHUB_TOKEN")
 		}
 		releaseStep, found := findUses(release.Steps, "goreleaser/goreleaser-action@")
 		if !found {
@@ -461,6 +462,15 @@ func hasRunWithEnv(steps []step, runFragment, key, expected string) bool {
 func findUses(steps []step, prefix string) (step, bool) {
 	for _, candidate := range steps {
 		if strings.HasPrefix(candidate.Uses, prefix) {
+			return candidate, true
+		}
+	}
+	return step{}, false
+}
+
+func findRun(steps []step, fragment string) (step, bool) {
+	for _, candidate := range steps {
+		if strings.Contains(candidate.Run, fragment) {
 			return candidate, true
 		}
 	}
