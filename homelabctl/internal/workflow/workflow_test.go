@@ -267,6 +267,56 @@ func TestValidateDirectoryRejectsInvalidYAML(t *testing.T) {
 	}
 }
 
+func TestValidateDirectoryRejectsBrokenAutoAssignContracts(t *testing.T) {
+	tests := []struct {
+		name          string
+		workflow      string
+		configuration string
+		wantInError   string
+	}{
+		{
+			name:          "pull request event has read-only fork token",
+			workflow:      strings.Replace(validAutoAssignWorkflow, "pull_request_target:", "pull_request:", 1),
+			configuration: validAutoAssignConfig,
+			wantInError:   "must use pull_request_target",
+		},
+		{
+			name:          "missing issues permission",
+			workflow:      strings.Replace(validAutoAssignWorkflow, "issues: write", "issues: read", 1),
+			configuration: validAutoAssignConfig,
+			wantInError:   "must grant issues: write",
+		},
+		{
+			name:          "assignment action uses moving tag",
+			workflow:      strings.Replace(validAutoAssignWorkflow, pinnedAutoAssignAction, "kentaro-m/auto-assign-action@v2.0.1", 1),
+			configuration: validAutoAssignConfig,
+			wantInError:   "must pin the auto-assign action",
+		},
+		{
+			name:          "author is filtered from normal assignee list",
+			workflow:      validAutoAssignWorkflow,
+			configuration: strings.Replace(validAutoAssignConfig, "addAssignees: author", "addAssignees: reviewers", 1),
+			wantInError:   "must assign the pull request author explicitly",
+		},
+		{
+			name:          "self review is requested",
+			workflow:      validAutoAssignWorkflow,
+			configuration: strings.Replace(validAutoAssignConfig, "addReviewers: false", "addReviewers: true", 1),
+			wantInError:   "must not request the pull request author",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := writeAutoAssignWorkflow(t, test.workflow, test.configuration)
+			err := ValidateDirectory(root)
+			if err == nil || !strings.Contains(err.Error(), test.wantInError) {
+				t.Fatalf("ValidateDirectory() error = %v, want error containing %q", err, test.wantInError)
+			}
+		})
+	}
+}
+
 func TestValidateDirectoryAcceptsImmutableActionPinsAndNeedsList(t *testing.T) {
 	workflow := strings.ReplaceAll(validCIWorkflow, "actions/checkout@v7", "actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	workflow = strings.Replace(workflow, "needs: check", "needs: [check]", 1)
@@ -294,6 +344,45 @@ func writeWorkflows(t *testing.T, ci string) string {
 	}
 	return root
 }
+
+func writeAutoAssignWorkflow(t *testing.T, workflow, configuration string) string {
+	t.Helper()
+	root := t.TempDir()
+	directory := filepath.Join(root, ".github", "workflows")
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "auto-assign.yml"), []byte(workflow), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".github", "auto_assign.yml"), []byte(configuration), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+const validAutoAssignWorkflow = `name: Assign PR Author
+on:
+  pull_request_target:
+    types: [opened]
+jobs:
+  assign-author:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: kentaro-m/auto-assign-action@a6d59add3a817df08cafa9b166367768d2c337f8
+        with:
+          configuration-path: .github/auto_assign.yml
+`
+
+const validAutoAssignConfig = `addReviewers: false
+addAssignees: author
+runOnDraft: true
+`
 
 const validCIWorkflow = `name: CI
 on:

@@ -74,13 +74,19 @@ func ValidateDirectory(root string) error {
 		if filepath.Base(path) == "ci.yml" || filepath.Base(path) == "ci.yaml" {
 			problems = append(problems, validateCI(path, workflow)...)
 		}
+		if filepath.Base(path) == "auto-assign.yml" || filepath.Base(path) == "auto-assign.yaml" {
+			problems = append(problems, validateAutoAssign(root, path, workflow)...)
+		}
 	}
 	return errors.Join(problems...)
 }
 
 var majorVersionPattern = regexp.MustCompile(`@v([0-9]+)(?:\.|$)`)
 
-const pinnedGoReleaserAction = "goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94"
+const (
+	pinnedAutoAssignAction = "kentaro-m/auto-assign-action@a6d59add3a817df08cafa9b166367768d2c337f8"
+	pinnedGoReleaserAction = "goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94"
+)
 
 var minimumActionMajors = map[string]int{
 	"actions/cache/restore":             6,
@@ -133,6 +139,65 @@ func validateGeneral(path string, workflow definition) []error {
 		}
 	}
 	return append(problems, forbiddenCommands(path, workflow)...)
+}
+
+type autoAssignConfig struct {
+	AddReviewers bool   `yaml:"addReviewers"`
+	AddAssignees string `yaml:"addAssignees"`
+	RunOnDraft   bool   `yaml:"runOnDraft"`
+}
+
+func validateAutoAssign(root, path string, workflow definition) []error {
+	var problems []error
+	problem := func(format string, args ...any) {
+		problems = append(problems, fmt.Errorf("%s: %s", path, fmt.Sprintf(format, args...)))
+	}
+
+	if !mappingKeys(workflow.On)["pull_request_target"] {
+		problem("must use pull_request_target so fork pull requests receive write-capable assignment")
+	}
+	assign, ok := workflow.Jobs["assign-author"]
+	if !ok {
+		problem("must define the assign-author job")
+	} else {
+		if value(assign.Permissions["issues"]) != "write" {
+			problem("assign-author job must grant issues: write")
+		}
+		action, found := findUses(assign.Steps, "kentaro-m/auto-assign-action@")
+		if !found || value(action.With["configuration-path"]) != ".github/auto_assign.yml" {
+			problem("assign-author job must use the reviewed auto-assign action and configuration")
+		} else if action.Uses != pinnedAutoAssignAction {
+			problem("assign-author job must pin the auto-assign action to the reviewed commit")
+		}
+		for _, candidate := range assign.Steps {
+			if strings.HasPrefix(candidate.Uses, "actions/checkout@") {
+				problem("assign-author job must not check out pull request code")
+			}
+		}
+	}
+
+	configPath := filepath.Join(root, ".github", "auto_assign.yml")
+	// #nosec G304 -- the path is fixed beneath the validated repository root.
+	contents, err := os.ReadFile(configPath)
+	if err != nil {
+		problem("reading assignment configuration: %v", err)
+		return problems
+	}
+	var config autoAssignConfig
+	if err := yaml.Unmarshal(contents, &config); err != nil {
+		problem("parsing assignment configuration: %v", err)
+		return problems
+	}
+	if config.AddReviewers {
+		problem("must not request the pull request author as their own reviewer")
+	}
+	if config.AddAssignees != "author" {
+		problem("must assign the pull request author explicitly")
+	}
+	if !config.RunOnDraft {
+		problem("must assign draft pull requests when they are opened")
+	}
+	return problems
 }
 
 func validateCI(path string, workflow definition) []error {
