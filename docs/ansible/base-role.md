@@ -10,6 +10,7 @@ host. It is applied by `homelabctl node prepare` and again at the start of
 | --- | --- | --- |
 | `homelab_base_apply_package_upgrades` | `true` | Performs a full APT distribution upgrade |
 | `homelab_base_disable_swap` | `true` | Disables active swap and comments persistent swap entries |
+| `homelab_base_swap_fstab_regexp` | bounded swap-field expression | Internal safety expression covered by the local fstab regression test |
 | `homelab_base_disable_sleep` | `true` | Masks sleep, suspend and hibernation targets |
 | `homelab_base_manage_hostname` | `false` | Opts a host into hostname and `/etc/hosts` management |
 | `homelab_base_hostname` | inventory hostname | Desired hostname when management is enabled |
@@ -127,9 +128,10 @@ lockout.
 
 ### 6. Kubernetes host prerequisites
 
-Active swap is disabled when present, and non-commented swap entries in
-`/etc/fstab` are commented so it stays disabled after reboot. Sleep, suspend,
-hibernate and hybrid-sleep systemd targets are masked.
+Active swap is disabled when present. A line-oriented rule comments only an
+uncommented `/etc/fstab` entry whose third field is exactly `swap`; filesystem
+mounts such as `/boot/efi` cannot be consumed by a multi-line expression.
+Sleep, suspend, hibernate and hybrid-sleep systemd targets are masked.
 
 ### 7. Logs and automatic maintenance
 
@@ -140,8 +142,10 @@ APT is configured to check package lists and run unattended upgrades daily.
 Unused dependencies may be removed, but automatic reboot is explicitly false
 because Titan is the only server.
 
-Chrony and `fstrim.timer` are enabled and started. Smartmontools is installed,
-but SMART monitoring and alert delivery are not configured yet.
+Chrony and `fstrim.timer` are enabled and started during a real apply. Their
+activation is explicitly deferred in check mode because package installation
+is only simulated and the Chrony unit may not exist yet. Smartmontools is
+installed, but SMART monitoring and alert delivery are not configured yet.
 
 ## Idempotency expectations
 
@@ -163,7 +167,7 @@ unreachable and changed counts.
 | `/etc/apt/apt.conf.d/20auto-upgrades` | static file | None |
 | `/etc/apt/apt.conf.d/52homelab-unattended-upgrades` | static file | None |
 | `/etc/hosts` hostname entry | line management | None |
-| `/etc/fstab` swap entries | regular-expression replacement | None |
+| `/etc/fstab` swap entries | bounded regular-expression replacement | None |
 | `/etc/profile.d/20-homelab-prompt.sh` | `homelab-prompt.sh.j2` | None |
 
 Do not edit managed files directly on Titan. Change inventory, defaults,

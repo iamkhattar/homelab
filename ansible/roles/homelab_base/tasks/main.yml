@@ -3,8 +3,8 @@
   ansible.builtin.assert:
     that:
       - ansible_version.full is version('2.15', '>=')
-      - ansible_distribution == 'Debian'
-      - ansible_distribution_major_version in ['12', '13']
+      - ansible_facts['distribution'] == 'Debian'
+      - ansible_facts['distribution_major_version'] in ['12', '13']
     fail_msg: >-
       The homelab base role supports Debian 12 and 13 and requires
       ansible-core 2.15 or newer.
@@ -145,7 +145,7 @@
 - name: Disable active swap
   when:
     - homelab_base_disable_swap | bool
-    - ansible_swaptotal_mb > 0
+    - ansible_facts['swaptotal_mb'] > 0
   ansible.builtin.command:
     cmd: swapoff --all
   changed_when: true
@@ -154,7 +154,7 @@
   when: homelab_base_disable_swap | bool
   ansible.builtin.replace:
     path: /etc/fstab
-    regexp: '^(\s*[^#\n]+\s+\S+\s+swap\s+.*)$'
+    regexp: "{{ homelab_base_swap_fstab_regexp }}"
     replace: '# \1'
 
 - name: Prevent sleep and hibernation
@@ -202,16 +202,25 @@
     mode: "0644"
 
 - name: Enable time synchronization
+  when: not ansible_check_mode
   ansible.builtin.systemd_service:
     name: chrony
     state: started
     enabled: true
 
 - name: Enable periodic SSD trimming
+  when: not ansible_check_mode
   ansible.builtin.systemd_service:
     name: fstrim.timer
     state: started
     enabled: true
+
+- name: Report services deferred by check mode
+  when: ansible_check_mode
+  ansible.builtin.debug:
+    msg: >-
+      Chrony and fstrim activation are deferred because check mode does not
+      install packages. The real apply enables and starts both services.
 
 - name: Check whether a reboot is required
   ansible.builtin.stat:

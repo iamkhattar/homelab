@@ -218,6 +218,9 @@ func checkAnsible(cmd *cobra.Command, s *state) error {
 			return err
 		}
 	}
+	if err := s.runEnv(cmd.Context(), ansibleDir, environment, playbookCommand, filepath.Join("tests", "homelab-base-fstab.yml"), "-i", "localhost,"); err != nil {
+		return err
+	}
 	return nil
 }
 
