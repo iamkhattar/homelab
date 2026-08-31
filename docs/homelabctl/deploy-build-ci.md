@@ -398,8 +398,9 @@ without pushing. The main branch invokes `homelabctl ci publish` with the
 shared semantic version,
 immutable revision and `latest` tags for services, homelabctl and docs, then
 pushes them after authentication. After image publication succeeds, a main-only
-release job creates or verifies an annotated tag for that version at the exact
-event commit, then uses the pinned GoReleaser action to publish static
+release job calls `homelabctl ci release-tag` to create or verify an annotated
+tag for that version at the exact event commit, then uses the pinned GoReleaser
+action to publish static
 `homelabctl` archives and `checksums.txt`. A rerun accepts the existing tag only
 when it resolves to the same commit; a mismatched tag fails before release.
 
@@ -418,6 +419,10 @@ homelabctl and saves the completed runtime immediately, before any test or scan
 can fail the job. Documentation and reporting setup still run every time: npm
 and the pre-check Go cache provide their package/build caches, while the
 commands continue to verify their locked dependency contracts.
+
+`release-tag` performs the Git operation natively through `go-git`, uses the
+ephemeral `GITHUB_TOKEN` only for the HTTPS push, requires the requested commit
+to equal checked-out `HEAD`, and never invokes the Git executable.
 
 `homelabctl ci check --only workflows` parses every workflow and enforces the
 local contract: read-only default permissions, concurrency cancellation,

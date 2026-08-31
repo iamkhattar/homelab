@@ -210,6 +210,10 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 		long:    "Build and push service, homelabctl, and documentation images. This command requires CI and defaults to the current Git commit SHA when no tag is supplied.",
 		example: "  CI=true homelabctl ci publish --changed --base HEAD~1 --tag latest --tag revision",
 	},
+	"homelabctl ci release-tag": {
+		long:    "Create and push an annotated semantic release tag at the exact checked-out commit, or verify an existing tag resolves there. The command is CI-only, authenticates with GITHUB_TOKEN through go-git, and never moves a tag.",
+		example: "  CI=true GITHUB_TOKEN=... homelabctl ci release-tag \\\n    --tag v0.1.54 \\\n    --commit 3b6ec87a44312bfce2bb3e7aec2dfd2686255226",
+	},
 	"homelabctl version": {long: "Print the semantic version, source commit, and build date embedded in the binary.", example: "  homelabctl version"},
 	"homelabctl update": {
 		long:    "Resolve a compatible immutable release from GitHub, require its checksums.txt asset, verify the downloaded archive, and atomically replace the running executable. This command does not require a repository checkout.",

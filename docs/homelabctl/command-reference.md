@@ -238,6 +238,7 @@ homelabctl docs serve --image iamkhattar/homelab-docs:dev --port 8080
 | `ci check` | Aggregate checks and optionally generate CI reports | `--reports` writes test/SARIF/SBOM evidence and adds gosec, Trivy and SBOM checks |
 | `ci build` | Build all service, homelabctl and docs images without pushing | Uses the same tag, registry, image and Git-base validation as direct builds |
 | `ci publish` | Build and push the complete image set | Requires `CI`; defaults to the current Git SHA when tags are omitted |
+| `ci release-tag` | Create or verify the annotated tag used by GoReleaser | Requires `CI`, `GITHUB_TOKEN`, a semantic `--tag` and the full checked-out `--commit`; never moves a tag |
 
 ```bash
 homelabctl ci check --only go-format,go-test
@@ -252,6 +253,9 @@ CI=true homelabctl ci publish \
   --tag v0.1.42 \
   --tag latest \
   --tag revision
+CI=true GITHUB_TOKEN=... homelabctl ci release-tag \
+  --tag v0.1.42 \
+  --commit 0123456789abcdef0123456789abcdef01234567
 ```
 
 Publication is not deployment. CI never gains an implicit path to mutate Titan;

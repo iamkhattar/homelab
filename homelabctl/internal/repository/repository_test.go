@@ -10,6 +10,7 @@ import (
 	"time"
 
 	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
@@ -83,6 +84,82 @@ func TestHeadSHARejectsUnbornRepository(t *testing.T) {
 	}
 	if _, err := HeadSHA(root); err == nil || !strings.Contains(err.Error(), "resolving Git HEAD") {
 		t.Fatalf("HeadSHA() error = %v, want unborn HEAD failure", err)
+	}
+}
+
+func TestEnsureReleaseTagCreatesPushesAndVerifiesAnnotatedTag(t *testing.T) {
+	root, head := initGitRepository(t)
+	remoteRoot := t.TempDir()
+	if _, err := git.PlainInit(remoteRoot, true); err != nil {
+		t.Fatal(err)
+	}
+	repository, err := git.PlainOpen(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.CreateRemote(&config.RemoteConfig{Name: "origin", URLs: []string{remoteRoot}}); err != nil {
+		t.Fatal(err)
+	}
+
+	created, err := EnsureReleaseTag(root, "v0.1.54", head.String(), "")
+	if err != nil {
+		t.Fatalf("EnsureReleaseTag() error = %v", err)
+	}
+	if !created {
+		t.Fatal("EnsureReleaseTag() did not report a newly created tag")
+	}
+	remote, err := git.PlainOpen(remoteRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reference, err := remote.Reference(plumbing.NewTagReferenceName("v0.1.54"), true)
+	if err != nil {
+		t.Fatalf("reading pushed tag: %v", err)
+	}
+	resolved, err := resolveTagCommit(remote, reference.Hash())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved != head {
+		t.Fatalf("pushed tag resolves to %s, want %s", resolved, head)
+	}
+	if _, err := remote.TagObject(reference.Hash()); err != nil {
+		t.Fatalf("release tag is not annotated: %v", err)
+	}
+
+	created, err = EnsureReleaseTag(root, "v0.1.54", head.String(), "")
+	if err != nil {
+		t.Fatalf("idempotent EnsureReleaseTag() error = %v", err)
+	}
+	if created {
+		t.Fatal("idempotent EnsureReleaseTag() reported a new tag")
+	}
+}
+
+func TestEnsureReleaseTagRejectsMovedTagAndNonHeadCommit(t *testing.T) {
+	root, initial := initGitRepository(t)
+	remoteRoot := t.TempDir()
+	if _, err := git.PlainInit(remoteRoot, true); err != nil {
+		t.Fatal(err)
+	}
+	repository, err := git.PlainOpen(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.CreateRemote(&config.RemoteConfig{Name: "origin", URLs: []string{remoteRoot}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := EnsureReleaseTag(root, "v0.1.54", initial.String(), ""); err != nil {
+		t.Fatal(err)
+	}
+
+	writeFile(t, filepath.Join(root, "next"))
+	next := commitPaths(t, repository, "next commit", "next")
+	if _, err := EnsureReleaseTag(root, "v0.1.54", next.String(), ""); err == nil || !strings.Contains(err.Error(), "points to") {
+		t.Fatalf("moved-tag error = %v", err)
+	}
+	if _, err := EnsureReleaseTag(root, "v0.1.55", initial.String(), ""); err == nil || !strings.Contains(err.Error(), "does not match checked-out HEAD") {
+		t.Fatalf("non-HEAD error = %v", err)
 	}
 }
 
