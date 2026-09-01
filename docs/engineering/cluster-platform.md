@@ -123,6 +123,11 @@ the application's callback/logout behaviour pass an end-to-end test.
 
 ## Network boundaries
 
+- Pocket ID disables its version check and analytics heartbeat and has no
+  arbitrary internet egress. Its pod NetworkPolicy permits only cluster DNS
+  and OTLP/HTTP to Alloy; image pulls, Let's Encrypt and acme-dns remain
+  node/controller responsibilities, so this is workload isolation rather than
+  a claim that the whole cluster is physically air-gapped.
 - PostgreSQL and Redis accept only their named per-application namespace
   clients, not a broad shared application namespace.
 - Garage's admin port accepts the security namespace only. S3 access is opened

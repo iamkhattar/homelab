@@ -31,6 +31,12 @@ ingress:
   tls:
     enabled: true
 
+networkPolicy:
+  enabled: true
+  # Pocket ID has no required internet egress. DNS stays in-cluster and OTLP
+  # is sent only to Alloy once the observability stage exists.
+  alloyNamespace: monitoring
+
 persistence:
   enabled: true
   size: 1Gi
