@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -96,6 +97,7 @@ func (s *RecoveryServer) protected(next http.Handler) http.Handler {
 		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		actor, err := s.auth.Authorize(r.Context(), token)
 		if err != nil {
+			slog.Warn("recovery authentication failed", "error", err)
 			http.Error(w, "recovery authentication unavailable", http.StatusServiceUnavailable)
 			return
 		}

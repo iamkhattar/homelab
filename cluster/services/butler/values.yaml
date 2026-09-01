@@ -68,6 +68,13 @@ networkPolicy:
   enabled: true
   vaultNamespace: security
   pocketIdNamespace: security
+  kubernetesAPI:
+    # K3s' kubernetes.default Service IP plus Titan's sole API endpoint. Both
+    # are required because NetworkPolicy enforcement may observe traffic
+    # before or after Service DNAT. Override these in a future cluster profile.
+    cidrs:
+      - 10.43.0.1/32
+      - 192.168.1.163/32
 
 # Butler's runtime configuration. Rendered into a ConfigMap and mounted at
 # /etc/butler/config.yaml inside the container. This replaces the embedded

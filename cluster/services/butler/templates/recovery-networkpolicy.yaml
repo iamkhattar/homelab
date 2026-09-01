@@ -17,13 +17,13 @@ spec:
         - protocol: TCP
           port: {{ .Values.recovery.service.port }}
   egress:
+    # Kubernetes API virtual IP and Titan host endpoint. Keep these /32s
+    # bounded because this runtime can initialize and recover Vault.
     - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: default
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
+        {{- range .Values.networkPolicy.kubernetesAPI.cidrs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
       ports:
         - {protocol: TCP, port: 443}
         - {protocol: TCP, port: 6443}

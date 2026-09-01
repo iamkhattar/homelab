@@ -168,6 +168,13 @@ kubectl -n security rollout status deployment/butler-recovery
 homelabctl control recovery
 ```
 
+The recovery command creates a ten-minute audience-bound token, opens a
+loopback-only port-forward and asks recovery Butler to validate that token with
+the Kubernetes TokenReview API. Its NetworkPolicy permits only the reviewed
+K3s API Service and Titan endpoint `/32`s on ports 443/6443. A `503 recovery
+authentication unavailable` response means that lower-layer API path is not
+working; do not initialize Vault until it is fixed.
+
 Normal Butler cannot initialize Vault and cannot read the recovery Secret.
 Advance the no-Ingress recovery service explicitly:
 
