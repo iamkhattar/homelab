@@ -25,6 +25,21 @@ The foundation stage passed its live acceptance checkpoint on 1 September
 The recorded usage values are evidence that the metrics pipeline works, not
 capacity thresholds; they will naturally change between checks.
 
+The networking stage passed its pre-secrets checkpoint on 1 September 2026:
+
+- `cert-manager`, `public-certificates` and `traefik` are deployed as separate
+  healthy Helm releases;
+- all three cert-manager pods are `Running` without restarts;
+- Traefik rolled out and its LoadBalancer address is Titan's reserved
+  `192.168.1.163` on ports 80 and 443;
+- the production issuer is `False` only because `cert-manager/acme-dns` does
+  not exist yet; and
+- the wildcard Certificate created its request and temporary private key and
+  is waiting for that issuer.
+
+The next action is **3. Vault, recovery Butler and VSO**. Do not alter or delete
+the pending issuer, CertificateRequest or temporary private-key Secret.
+
 Do not repeat that checkpoint merely to advance this runbook. Continue to use
 `homelabctl cluster status` as a quick safety check before each apply.
 
@@ -115,12 +130,37 @@ cert-manager pod is `Running`. Do not wait for the ClusterIssuer or Certificate
 to become ready at this point: Butler creates their missing acme-dns credential
 in the next stage.
 
+**Titan checkpoint:** complete on 1 September 2026. The observed issuer message
+was exactly `failed to get secret "acme-dns"`, which is the intended handoff to
+the secrets stage.
+
 If the original combined first-install transaction failed with `no matches for
 kind Certificate` or `no matches for kind ClusterIssuer`, no uninstall is
 required: that failed Helm install did not create a cert-manager release.
 Update to the split-release revision and rerun the networking stage.
 
 ## 3. Vault, recovery Butler and VSO
+
+This is the first stage that consumes the repository-built Butler image. CI
+builds pull-request images for validation but pushes immutable SHA tags only
+after a successful `main` build. Before applying secrets, merge the reviewed
+revision, wait for the `main` image-publication job, check out that exact clean
+`main` commit and confirm its full SHA. Do not apply this stage from a feature
+branch merely because foundation and networking succeeded; those stages do not
+consume Butler.
+
+```bash
+git switch main
+git pull --ff-only
+git status --short
+git rev-parse HEAD
+homelabctl update
+homelabctl deploy diff --stage secrets
+```
+
+`git status --short` must print nothing. The diff's Butler image tag must equal
+the full `git rev-parse HEAD` value, and the matching image-publish job on
+`main` must have succeeded.
 
 ```bash
 homelabctl deploy apply --stage secrets
