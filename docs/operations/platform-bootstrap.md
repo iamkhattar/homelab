@@ -196,6 +196,15 @@ from `auth/jwt/config` while Pocket ID is absent indicates an older Butler
 image; deploy the current `main` image and repeat this resumable command. Do
 not reset Vault or delete its PVC or recovery Secret.
 
+After the certificate becomes ready, recovery Butler checks whether the
+Pocket ID management key exists before advancing to
+`awaiting-pocket-id-api-key`. Its bounded Vault policy permits `create`,
+`read` and `update` only on that exact KV path; `read` is required to
+distinguish an absent key from an authorization failure. A 403 while checking
+`pocket-id/admin` indicates an older Butler policy. Deploy the current `main`
+image and repeat bootstrap; the policy update and state transition are
+idempotent.
+
 Display the non-secret registration metadata:
 
 ```bash

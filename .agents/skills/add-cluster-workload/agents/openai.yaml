@@ -1,0 +1,4 @@
+interface:
+  display_name: "Add Cluster Workload"
+  short_description: "Integrate a workload into the homelab platform"
+  default_prompt: "Use $add-cluster-workload to add a new workload to the homelab cluster safely."

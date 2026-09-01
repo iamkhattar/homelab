@@ -1,0 +1,4 @@
+interface:
+  display_name: "Change Butler Control Plane"
+  short_description: "Safely evolve Butler APIs and reconciliation"
+  default_prompt: "Use $change-butler-control-plane to implement a Butler control-plane change."

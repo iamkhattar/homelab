@@ -77,3 +77,10 @@ func TestEnsureJWTAuthDoesNotContactVaultBeforePocketIDClientExists(t *testing.T
 		t.Fatalf("Vault received %d requests before the Pocket ID client existed", got)
 	}
 }
+
+func TestRecoveryPolicyCanCheckAndImportPocketIDAPIKey(t *testing.T) {
+	want := `path "secret/data/pocket-id/admin" { capabilities = ["create", "read", "update"] }`
+	if !strings.Contains(butlerRecoveryPolicy, want) {
+		t.Fatalf("recovery policy must read the Pocket ID API key path so SecretExists can distinguish an absent key from an authorization failure")
+	}
+}
