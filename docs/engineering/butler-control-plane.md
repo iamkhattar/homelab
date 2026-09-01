@@ -59,16 +59,21 @@ The recovery API reports one of these phases:
 1. `initialize-vault`;
 2. `unseal-vault`;
 3. `configure-vault`;
-4. `awaiting-pocket-id-api-key`;
-5. `configure-identity`;
-6. `awaiting-identity-verification`;
-7. `operational`.
+4. `awaiting-dns-delegation`;
+5. `awaiting-certificate`;
+6. `awaiting-pocket-id-api-key`;
+7. `configure-identity`;
+8. `awaiting-identity-verification`;
+9. `operational`.
 
 Every Vault operation is idempotent. An initialized Vault without the selected
 `butler-vault-init` recovery Secret is treated as unsafe and Butler refuses to
 continue. Successful completion is recorded in the non-secret
 `butler-bootstrap-state` ConfigMap. Vault configuration never skips the human
 identity acceptance gate. Repeating bootstrap after `operational` is a no-op.
+The foundation pass does not contact Pocket ID. Vault's JWT/OIDC method and
+group roles are configured atomically only after Butler has created Vault's
+confidential Pocket ID client and stored its complete credential.
 
 The initialization root token and unseal key live in the named recovery Secret
 because that is the chosen single-node recovery model. Normal Butler cannot
