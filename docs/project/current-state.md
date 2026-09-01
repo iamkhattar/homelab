@@ -28,7 +28,7 @@ machine. Do not interpret **Ready in repo** as **Deployed**.
 | Required on Titan | The pinned Ethernet IPv4 configuration and K3s API are verified Ready. Run the full cluster diagnostic, create the first off-node K3s recovery export, verify another managed reboot, and rehearse a restore. |
 | Required before important data | Choose encrypted off-node storage and prove that K3s, Vault, database and application backups can be restored from it. |
 | Required before relying on alerts | Choose an off-cluster Alertmanager receiver, deliver its credential through Vault and verify a test notification. |
-| Required during platform bootstrap | Complete the one-time Butler-generated Namecheap CNAME ceremony, define Vault recovery-share custody, complete the Pocket ID owner ceremony, initialize Vault through Butler and export recovery material. |
+| Required during platform bootstrap | Complete Vault's human Pocket ID login proof, export the Vault recovery material to verified encrypted off-device storage, then deploy and validate each later platform stage. |
 | Later design decisions | Self-hosting acme-dns, internal resolver failover, component-specific smart-home metrics, and the future Tailscale/Hetzner design. |
 
 Repository enhancements such as controlled automatic security updates,
@@ -53,11 +53,11 @@ they do not block the first recoverable Titan installation.
 
 | Capability | Status | Prerequisite |
 | --- | --- | --- |
-| Ingress and private-address DNS | Deployment in progress | Namecheap publishes `*.6940469.xyz` and the apex to Titan's reserved `192.168.1.163`, with no AAAA record. The split `cert-manager`, `public-certificates` and `traefik` releases are deployed; all cert-manager pods are Running and Traefik owns `192.168.1.163:80/443`. The issuer is waiting only for the expected `cert-manager/acme-dns` Secret. Deploy Vault, Butler and VSO next, then complete the one-time generated CNAME ceremony and issuance verification. |
+| Ingress and private-address DNS | Verified | Namecheap publishes `*.6940469.xyz` and the apex to Titan's reserved `192.168.1.163`, with no AAAA record or router port-forward. The permanent acme-dns CNAME is verified, the production wildcard certificate is Ready, and an authenticated Butler request succeeds through Traefik at `https://butler.6940469.xyz`. |
 | Persistent storage | Ready for testing | K3s local-path with bounded PVCs is the accepted single-node starting point. Select the encrypted off-node backup target and rehearse restores before storing important data. |
 | Prometheus, Grafana, Loki, Tempo and Alloy | Ready in repo | Pinned bounded charts, seven-day retention, kube-state-metrics, node-exporter, OTLP receivers, log collection, Butler metrics/logs/traces, Grafana correlation, reusable all-workload dashboards and workload/Job/PVC/OOM alerts render. Choose and test the final off-cluster Alertmanager receiver before relying on alerts. |
-| Pocket ID | Ready in repo | Pinned v2 deployment, Vault-provided encryption and static machine credentials, JSON logs without query arguments, disabled version/analytics calls, restricted proxy trust and insecure callbacks, retained rate limiting, egress restricted to cluster DNS and Alloy, native OTLP, Butler-managed groups, users and OIDC clients, secret rotation into Vault, and Butler PKCE login exist. Only first human owner and passkey enrollment remain an interactive Titan checkpoint. |
-| Vault and Butler | Ready in repo | Top-level Butler has separate normal and private recovery runtimes. Recovery performs confirmed, resumable initialization and now remains identity-pending until real Pocket ID logins to Butler and Vault pass. Normal reconciliation uses projected Kubernetes auth. VSO remains the application secret-delivery path. Export the recovery Secret to an age-encrypted off-cluster bundle and restore-test on Titan. |
+| Pocket ID | Verified | The first human owner and passkey are enrolled, the owner belongs to `homelab-admin`, Butler-managed groups and clients report Ready, and `homelabctl control login` succeeds against the public issuer. |
+| Vault and Butler | Deployment in progress | Vault is initialized and unsealed, normal Butler reconciliation reports success through its authenticated HTTPS ingress, and recovery is paused at `awaiting-identity-verification`. Complete Vault's browser OIDC proof with `control verify-identity`, confirm `operational`, export the recovery Secret to an age-encrypted off-cluster bundle and restore-test it. |
 | Shared PostgreSQL, Redis and Garage | Ready in repo | PostgreSQL 18.6 (chart 18.8.13), Redis 8.10 (chart 28.0.12), least-privilege consumer projections, persistence, NetworkPolicies and Garage v2 API reconciliation render successfully. Mutable Bitnami community tags are pinned by multi-architecture digest; deploy and restore-test on Titan. |
 | Actions Runner Controller | Ready in repo | Controller and one scale-to-zero runner set render successfully; create/import a least-privilege GitHub App and prove a read-only job before deployment authority |
 | Homepage, KitchenOwl, ntfy, Vaultwarden and Paperless-ngx | Ready in repo | Each app has its own namespace, pinned images, resources, persistence, scoped Vault credentials and initial NetworkPolicies. Homepage 2.1.2 and Vaultwarden 1.37.2 use Butler-managed Pocket ID clients; ntfy is pinned to 2.28.0. Keep the others internal until their TLS/auth/backup checks pass. |
@@ -102,23 +102,31 @@ they do not block the first recoverable Titan installation.
   dashboards are represented in Helmfile.
 - Real Vault, Pocket ID and Kubernetes integration tests exist behind the
   explicit `integration` build tag and `BUTLER_INTEGRATION=1` guard.
+- Butler's normal embedded UI is an exceptional-operations console rather than
+  a duplicate dashboard. A separate `control recovery ui` command provides a
+  random loopback-only break-glass session while keeping its Kubernetes token
+  out of browser state.
 
 ## Immediate next checkpoint
 
 The host baseline, SSH hardening and K3s readiness check are complete. Continue
 with:
 
-1. Publish the audited chart update, pull the resulting immutable Butler image
-   SHA, deploy through the secrets stage, then create only the exact Namecheap
-   CNAME Butler generates.
-2. Run `homelabctl cluster diagnose --ask-become-pass` and review the K3s
+1. Publish and apply the narrow Butler-to-Traefik NetworkPolicy update, then
+   confirm the normal CLI works without an address override.
+2. Run `homelabctl control verify-identity --confirm`, then require
+   `homelabctl control recovery` to report `operational`.
+3. Export `butler-vault-init` through `homelabctl control recovery export`,
+   store the age-encrypted artifact away from Titan and the workstation, and
+   verify that the intended age identity can decrypt a disposable copy.
+4. Run `homelabctl cluster diagnose --ask-become-pass` and review the K3s
    service, journal, events and embedded-etcd snapshot configuration.
-3. Run `homelabctl cluster snapshot list --ask-become-pass`.
-4. Run `homelabctl cluster recovery export` into private staging space, encrypt
+5. Run `homelabctl cluster snapshot list --ask-become-pass`.
+6. Run `homelabctl cluster recovery export` into private staging space, encrypt
    it, move it off Titan and the workstation, and verify the stored copy.
-5. Create a pre-reboot snapshot, perform a managed cluster reboot, then verify
+7. Create a pre-reboot snapshot, perform a managed cluster reboot, then verify
    SSH, the router-reserved address, node readiness and all core pods.
-6. Record the first-build evidence and resolve recovery custody and the
+8. Record the first-build evidence and resolve recovery custody and the
    off-cluster alert receiver before platform bootstrap.
 
 Do not start the application platform until the recovery export and reboot

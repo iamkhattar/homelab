@@ -37,8 +37,12 @@ The networking stage passed its pre-secrets checkpoint on 1 September 2026:
 - the wildcard Certificate created its request and temporary private key and
   is waiting for that issuer.
 
-The next action is **3. Vault, recovery Butler and VSO**. Do not alter or delete
-the pending issuer, CertificateRequest or temporary private-key Secret.
+Vault, recovery Butler, VSO, Pocket ID and the public certificate ceremony have
+since converged. The first owner has enrolled a passkey, belongs to
+`homelab-admin`, Butler-managed identity resources report Ready, Pocket ID PKCE
+login succeeds, and the normal Butler status API succeeds through
+`https://butler.6940469.xyz`. The next action is the human Vault OIDC proof at
+the end of **4. Pocket ID and management handoff**.
 
 Do not repeat that checkpoint merely to advance this runbook. Continue to use
 `homelabctl cluster status` as a quick safety check before each apply.
@@ -167,6 +171,13 @@ homelabctl deploy apply --stage secrets
 kubectl -n security rollout status deployment/butler-recovery
 homelabctl control recovery
 ```
+
+For interactive break-glass inspection, use
+`homelabctl control recovery ui`. It opens the same non-ingressed recovery API
+through a loopback-only proxy and keeps the Kubernetes token in CLI memory.
+Close it with Ctrl-C. Prefer the ordinary command output during routine
+bootstrap; the browser surface exists for deliberate recovery work, not as a
+second daily dashboard.
 
 The recovery command creates a ten-minute audience-bound token, opens a
 loopback-only port-forward and asks recovery Butler to validate that token with
@@ -336,6 +347,14 @@ homelabctl control status
 homelabctl control verify-identity --confirm
 homelabctl control recovery
 ```
+
+Vault's browser flow and OIDC API use the private
+`https://vault.6940469.xyz` Traefik ingress. A plain `404 page not found` while
+requesting Vault's OIDC authorization URL means Traefik has no matching Vault
+Ingress; it is not evidence that `auth/jwt` or the `homelab-admin` role is
+missing. Deploy the current Vault chart and confirm its HTTPS health endpoint
+before repeating the identity proof. Do not reset Vault, recreate its PVC, or
+reconfigure the auth mount for this routing failure.
 
 Pocket ID's discovery document must advertise the public
 `https://auth.6940469.xyz` origin for its authorization, token and JWKS

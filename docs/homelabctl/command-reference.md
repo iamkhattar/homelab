@@ -126,16 +126,20 @@ homelabctl cluster recovery export \
 
 ## Butler control plane
 
-All control-plane commands use Butler's versioned JSON API. By default the CLI
-opens a loopback-only `kubectl port-forward`; `--address` is available for an
-already-private endpoint. `control login` obtains a short-lived Pocket ID ID
-token with Authorization Code and PKCE and stores it in the private user config
-directory. `--token` or `BUTLER_TOKEN` are non-persistent overrides.
+All control-plane commands use Butler's versioned JSON API. Normal commands
+default to the private `https://butler.6940469.xyz` ingress and its publicly
+trusted certificate. `--address` overrides that target and `--port-forward`
+selects an authenticated, loopback-only Kubernetes tunnel for diagnostics.
+Recovery remains non-ingressed and uses its tunnel by default. `control login`
+obtains a short-lived Pocket ID ID token with Authorization Code and PKCE and
+stores it in the private user config directory. `--token` or `BUTLER_TOKEN` are
+non-persistent overrides.
 
 | Command | Purpose | Safety boundary |
 | --- | --- | --- |
 | `control login`, `logout` | Create or remove the local Pocket ID session | Fixed loopback callback, PKCE, issuer/audience/state/nonce validation and private file permissions |
 | `control recovery` | Read bootstrap and Vault lifecycle status | Uses a 10-minute, audience-bound Kubernetes TokenRequest and the non-ingressed recovery service |
+| `control recovery ui` | Open the break-glass browser console | Random loopback-only session; CLI injects the recovery token and the browser never receives it |
 | `control bootstrap --confirm` | Advance the resumable Vault bootstrap | Explicit confirmation is mandatory; secrets are never returned |
 | `control verify-identity --confirm` | Prove Pocket ID access to Butler and Vault before accepting bootstrap | Requires Butler admin; the temporary Vault token is verified, revoked and never sent to Butler |
 | `control recovery export` | Write the recovery Secret directly to an age-encrypted off-repository file | Refuses repository and filesystem-root destinations and existing output files |
@@ -144,13 +148,13 @@ directory. `--token` or `BUTLER_TOKEN` are non-persistent overrides.
 | `control credentials issue` | Issue an approved short-lived Kubernetes token | Admin-only; role, namespace and maximum TTL are server-side; default output is an `ExecCredential` |
 
 ```bash
-# One-time private bootstrap. The API key file is read locally and its value is
-# written directly to Vault; it is not stored in Git or a ConfigMap.
+# One-time private bootstrap. Butler generates Pocket ID's machine credential
+# directly in Vault; no API key is passed on the command line.
 homelabctl control recovery
+homelabctl control recovery ui
 homelabctl control certificate status
 homelabctl control certificate verify-dns --confirm
-homelabctl control bootstrap --confirm \
-  --pocket-id-api-key-file /secure/pocket-id-api-key
+homelabctl control bootstrap --confirm
 homelabctl control recovery export \
   --output /secure/butler-vault-init.age \
   --age-recipient age1example...

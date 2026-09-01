@@ -74,6 +74,35 @@ func TestReadyz_NoToken(t *testing.T) {
 	}
 }
 
+func TestOperatorConsoleAssetsAndRecoveryBoundary(t *testing.T) {
+	srv := newTestServer(t, "tok")
+
+	page := httptest.NewRecorder()
+	srv.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/", nil))
+	if page.Code != http.StatusOK {
+		t.Fatalf("page status = %d", page.Code)
+	}
+	for _, expected := range []string{"Butler operator console", "Exceptional actions", "homelabctl control recovery ui"} {
+		if !bytes.Contains(page.Body.Bytes(), []byte(expected)) {
+			t.Fatalf("operator console omitted %q", expected)
+		}
+	}
+	for _, forbidden := range []string{"/api/v1/bootstrap/advance", "pocket-id-api-key"} {
+		if bytes.Contains(page.Body.Bytes(), []byte(forbidden)) {
+			t.Fatalf("normal console contains recovery action %q", forbidden)
+		}
+	}
+	if page.Header().Get("Content-Security-Policy") == "" {
+		t.Fatal("operator console omitted Content-Security-Policy")
+	}
+
+	asset := httptest.NewRecorder()
+	srv.ServeHTTP(asset, httptest.NewRequest(http.MethodGet, "/assets/butler.js", nil))
+	if asset.Code != http.StatusOK || asset.Header().Get("Content-Type") != "text/javascript; charset=utf-8" {
+		t.Fatalf("asset status = %d, content type = %q", asset.Code, asset.Header().Get("Content-Type"))
+	}
+}
+
 func TestStatus_ReturnsJSON(t *testing.T) {
 	srv := newTestServer(t, "tok")
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)

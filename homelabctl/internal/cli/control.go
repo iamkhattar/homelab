@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 
 type controlOptions struct {
 	address         string
+	portForward     bool
 	recoveryAddress string
 	namespace       string
 	token           string
@@ -26,10 +28,13 @@ type controlOptions struct {
 	session         string
 }
 
+const defaultButlerAddress = "https://butler.6940469.xyz"
+
 func newControlCommand(s *state) *cobra.Command {
 	options := &controlOptions{}
 	cmd := &cobra.Command{Use: "control", Short: "Operate Butler through its versioned API"}
-	cmd.PersistentFlags().StringVar(&options.address, "address", "", "existing Butler base URL; otherwise create a private kubectl port-forward")
+	cmd.PersistentFlags().StringVar(&options.address, "address", defaultButlerAddress, "normal Butler HTTPS base URL")
+	cmd.PersistentFlags().BoolVar(&options.portForward, "port-forward", false, "reach normal Butler through a private kubectl port-forward instead of HTTPS")
 	cmd.PersistentFlags().StringVar(&options.recoveryAddress, "recovery-address", "", "existing Butler recovery URL; otherwise create a private kubectl port-forward")
 	cmd.PersistentFlags().StringVar(&options.namespace, "namespace", "security", "namespace containing Butler")
 	cmd.PersistentFlags().StringVar(&options.token, "token", "", "Pocket ID ID token override (or BUTLER_TOKEN)")
@@ -382,7 +387,55 @@ func newControlRecoveryCommand(s *state, options *controlOptions) *cobra.Command
 	_ = export.MarkFlagRequired("output")
 	_ = export.MarkFlagRequired("age-recipient")
 	cmd.AddCommand(export)
+	cmd.AddCommand(newControlRecoveryUICommand(s, options))
 	return cmd
+}
+
+func newControlRecoveryUICommand(s *state, options *controlOptions) *cobra.Command {
+	return &cobra.Command{
+		Use:     "ui",
+		Short:   "Open the loopback-only break-glass recovery console",
+		Long:    "Mint a ten-minute audience-bound Kubernetes token, keep it in CLI memory, and inject it through a random loopback-only browser session to the non-ingressed recovery service.",
+		Example: "  homelabctl control recovery ui",
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if s.dryRun {
+				if err := s.run(cmd.Context(), s.root, "kubectl", "--context", s.kubeContext, "--namespace", options.namespace, "create", "token", "butler-recovery-client", "--audience=butler-recovery", "--duration=10m"); err != nil {
+					return err
+				}
+				s.info("would open a random loopback-only recovery console without exposing the token to the browser")
+				return nil
+			}
+			token, err := s.output(cmd.Context(), s.root, "kubectl", "--context", s.kubeContext, "--namespace", options.namespace, "create", "token", "butler-recovery-client", "--audience=butler-recovery", "--duration=10m")
+			if err != nil {
+				return err
+			}
+			upstream := options.recoveryAddress
+			var tunnel *controlapi.Tunnel
+			if upstream == "" {
+				tunnel, err = controlapi.StartTunnel(cmd.Context(), s.runner.Stderr, s.kubeContext, options.namespace, "butler-recovery", 8081)
+				if err != nil {
+					return err
+				}
+				defer func() { _ = tunnel.Close() }()
+				upstream = tunnel.URL
+			}
+			console, err := controlapi.StartRecoveryConsole(upstream, strings.TrimSpace(token))
+			if err != nil {
+				return err
+			}
+			defer console.Close()
+			s.info("Break-glass console is available for ten minutes. Press Ctrl-C to close it.")
+			if err := browser.OpenURL(console.URL); err != nil {
+				s.info("If the browser does not open, visit: " + console.URL)
+			}
+			interruptContext, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
+			defer stop()
+			sessionContext, cancel := context.WithTimeout(interruptContext, 10*time.Minute)
+			defer cancel()
+			return console.Wait(sessionContext)
+		},
+	}
 }
 
 func newControlGetCommand(s *state, options *controlOptions, use, short, path string) *cobra.Command {
@@ -488,7 +541,13 @@ func withNormalClient(ctx context.Context, s *state, options *controlOptions, fn
 	if strings.TrimSpace(token) == "" {
 		return fmt.Errorf("Pocket ID login is required")
 	}
-	return withControlClient(ctx, s, options, "butler", 8080, token, fn)
+	if options.portForward {
+		return withPortForwardClient(ctx, s, options, "butler", 8080, token, fn)
+	}
+	if strings.TrimSpace(options.address) == "" {
+		return fmt.Errorf("Butler address cannot be blank; use --port-forward for the private Kubernetes tunnel")
+	}
+	return fn(controlapi.NewClient(options.address, token))
 }
 
 func withRecoveryClient(ctx context.Context, s *state, options *controlOptions, fn func(*controlapi.Client) error) error {
@@ -502,14 +561,10 @@ func withRecoveryClient(ctx context.Context, s *state, options *controlOptions, 
 	if options.recoveryAddress != "" {
 		return fn(controlapi.NewClient(options.recoveryAddress, token))
 	}
-	return withControlClient(ctx, s, options, "butler-recovery", 8081, token, fn)
+	return withPortForwardClient(ctx, s, options, "butler-recovery", 8081, token, fn)
 }
 
-func withControlClient(ctx context.Context, s *state, options *controlOptions, service string, port int, token string, fn func(*controlapi.Client) error) error {
-	address := options.address
-	if address != "" {
-		return fn(controlapi.NewClient(address, token))
-	}
+func withPortForwardClient(ctx context.Context, s *state, options *controlOptions, service string, port int, token string, fn func(*controlapi.Client) error) error {
 	if s.dryRun {
 		return s.run(ctx, s.root, "kubectl", "--context", s.kubeContext, "--namespace", options.namespace, "port-forward", "service/"+service, fmt.Sprintf("%d:%d", port, port), "--address", "127.0.0.1")
 	}

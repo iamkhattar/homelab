@@ -18,6 +18,12 @@ callback, validates issuer, audience, state and nonce, then saves the short-live
 ID token in the private user config directory. `--token` and `BUTLER_TOKEN` are
 explicit overrides and take precedence over the cached session.
 
+Normal commands call `https://butler.6940469.xyz` through Traefik and the
+publicly trusted wildcard certificate. Use `--port-forward` only as a
+diagnostic fallback when the normal ingress path is unavailable. Recovery and
+bootstrap continue to use the separate, non-ingressed recovery Service through
+an authenticated Kubernetes tunnel.
+
 ## Short-lived Kubernetes access
 
 ```sh
@@ -45,13 +51,27 @@ datastore or redeploy the service itself.
 ```text
 homelabctl control
 ├── login|logout
-├── bootstrap|verify-identity|recovery
+├── bootstrap|verify-identity|recovery [ui|export]
 ├── status|operations|events
 ├── users|groups|clients
 └── credentials issue
 ```
 
 Use `homelabctl control --help` for the executable reference.
+
+### Browser surfaces
+
+`https://butler.6940469.xyz` is a Pocket ID-authenticated operator console for
+control posture, reconciler drift repair, confidential OIDC client rotation,
+and audit-safe activity. It links to the applications that own routine work;
+it does not duplicate Grafana, Pocket ID, Vault, or Homepage.
+
+`homelabctl control recovery ui` is the separate break-glass surface. The CLI
+mints and retains the Kubernetes recovery token, opens the private recovery
+Service through a port-forward, and injects authentication through a random
+loopback-only proxy. The browser never handles the token. The command ends on
+Ctrl-C or after ten minutes. Recovery export and any operation that transports
+secret material remain CLI-only.
 
 ## Context model
 
@@ -63,8 +83,8 @@ contexts:
   home:
     repository: /path/to/homelab
     kube-context: homelab
-    control-url: https://control.home.arpa
-    oidc-issuer: https://id.home.arpa
+    control-url: https://butler.6940469.xyz
+    oidc-issuer: https://auth.6940469.xyz
 ```
 
 Tokens do not belong in this future context file. The current Pocket ID session
@@ -141,8 +161,10 @@ and submits only non-secret acceptance evidence through the recovery API.
 ## Current boundary
 
 The typed client, Pocket ID browser login, role-aware API, Kubernetes-persisted
-operation history, declarative provider resources, bounded credential issuance and recovery
-workflow are implemented. Titan deployment, first-owner enrollment, real
-integration execution and restore rehearsal remain operational checkpoints,
-not repository claims. See [current state](/project/current-state) and the
+operation history, declarative provider resources, bounded credential issuance
+and recovery workflow are implemented. Titan has verified first-owner
+enrollment, Pocket ID login, and authenticated access to normal Butler through
+its HTTPS ingress. Vault's human OIDC proof, real integration execution and
+restore rehearsal remain operational checkpoints. See
+[current state](/project/current-state) and the
 [platform bootstrap runbook](/operations/platform-bootstrap).

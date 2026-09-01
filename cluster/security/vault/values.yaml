@@ -38,3 +38,11 @@ vault:
     enabled: false
   csi:
     enabled: false
+
+# Vault's UI and OIDC API share one private, TLS-terminated Traefik route.
+# No Secret is named here: Traefik serves the networking namespace's default
+# publicly trusted wildcard certificate from its TLSStore.
+ingress:
+  enabled: true
+  className: traefik
+  host: vault.6940469.xyz

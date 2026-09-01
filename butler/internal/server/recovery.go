@@ -110,8 +110,10 @@ func (s *RecoveryServer) protected(next http.Handler) http.Handler {
 }
 
 func (s *RecoveryServer) handleUI(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	_, _ = w.Write(recoveryUI)
 }
 
