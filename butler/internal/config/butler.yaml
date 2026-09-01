@@ -5,7 +5,7 @@ server:
   port: "8080"
 
 reconcile:
-  interval: 5m
+  interval: 1m
 
 # OIDC issuer (Pocket ID). Wired to Vault's auth/jwt mount and used to
 # validate tokens hitting Butler's normal API.

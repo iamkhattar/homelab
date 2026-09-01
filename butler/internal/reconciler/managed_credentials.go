@@ -13,12 +13,21 @@ import (
 // ManagedCredentials reconciles application-owned generation and projection
 // policies into Vault. Kubernetes resources contain policy only, never values.
 type ManagedCredentials struct {
-	vault     *vault.Client
-	resources platform.Resources
+	vault      *vault.Client
+	resources  platform.Resources
+	namespace  string
+	credential string
 }
 
 func NewManagedCredentials(vc *vault.Client, resources platform.Resources) *ManagedCredentials {
 	return &ManagedCredentials{vault: vc, resources: resources}
+}
+
+// NewManagedCredentialBootstrap scopes recovery bootstrap to one credential.
+// Recovery Butler has intentionally narrow Vault policy and must never attempt
+// to reconcile unrelated application credentials.
+func NewManagedCredentialBootstrap(vc *vault.Client, resources platform.Resources, namespace, credential string) *ManagedCredentials {
+	return &ManagedCredentials{vault: vc, resources: resources, namespace: namespace, credential: credential}
 }
 
 func (r *ManagedCredentials) Name() string { return "managed-credentials" }
@@ -28,6 +37,7 @@ func (r *ManagedCredentials) Reconcile(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("listing ManagedCredentials: %w", err)
 	}
+	items = selectManagedCredentials(items, r.namespace, r.credential)
 	var failures []error
 	pathCounts, err := platform.VaultPathOwners(ctx, r.resources)
 	if err != nil {
@@ -60,6 +70,19 @@ func (r *ManagedCredentials) Reconcile(ctx context.Context) error {
 		}
 	}
 	return errors.Join(failures...)
+}
+
+func selectManagedCredentials(items []platform.ManagedCredential, namespace, name string) []platform.ManagedCredential {
+	if namespace == "" && name == "" {
+		return items
+	}
+	selected := make([]platform.ManagedCredential, 0, 1)
+	for i := range items {
+		if items[i].Namespace == namespace && items[i].Name == name {
+			selected = append(selected, items[i])
+		}
+	}
+	return selected
 }
 
 func (r *ManagedCredentials) reconcileOne(ctx context.Context, item *platform.ManagedCredential) error {

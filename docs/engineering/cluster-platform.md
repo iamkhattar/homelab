@@ -123,6 +123,11 @@ the application's callback/logout behaviour pass an end-to-end test.
 
 ## Network boundaries
 
+- Pocket ID disables its version check and analytics heartbeat and has no
+  arbitrary internet egress. Its pod NetworkPolicy permits only cluster DNS
+  and OTLP/HTTP to Alloy; image pulls, Let's Encrypt and acme-dns remain
+  node/controller responsibilities, so this is workload isolation rather than
+  a claim that the whole cluster is physically air-gapped.
 - PostgreSQL and Redis accept only their named per-application namespace
   clients, not a broad shared application namespace.
 - Garage's admin port accepts the security namespace only. S3 access is opened
@@ -180,8 +185,12 @@ client.
 This avoids duplicate metric collection: Alloy receives pushed OTLP metrics,
 while Prometheus owns pull-based cluster scraping. Retention is seven days for
 the initial single-node budget. None of Loki, Tempo or Prometheus has an
-Ingress. Pocket ID is configured to export native OTLP metrics and traces to
-Alloy; structured container logs from every pod are collected independently.
+Ingress. Pocket ID emits JSON stdout logs and exports native OTLP metrics and
+traces to Alloy. OTLP log export stays disabled because Alloy already collects
+container stdout; enabling both would duplicate every record in Loki. Query
+arguments remain excluded because they may contain credentials, tokens or
+personal data. Other workloads should use JSON stdout where their supported
+configuration exposes it, while Alloy remains the single log-shipping path.
 
 ## First bootstrap checkpoints
 
@@ -196,8 +205,8 @@ Then deploy and verify checkpoints rather than applying the whole graph blindly:
 1. apply `foundation`, then `networking`, then `secrets`;
 2. let Butler initialize/unseal Vault, verify its Kubernetes-auth handoff and
    export the `butler-vault-init` recovery Secret off Titan;
-3. apply `identity`, enroll the first Pocket ID owner, import one Pocket ID API
-   key through break-glass and verify Butler's OIDC login;
+3. apply `identity`, let Butler generate Pocket ID's Vault-backed machine
+   credential, enroll the first human owner and verify Butler's OIDC login;
 4. apply `data`; Butler then reconciles Garage through its API;
 5. apply `observability` and verify all three Grafana datasources;
 6. apply ARC and applications only after their credentials and backups exist.

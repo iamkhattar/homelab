@@ -303,15 +303,15 @@ func newControlBootstrapCommand(s *state, options *controlOptions) *cobra.Comman
 				if pocketIDKeyFile != "" {
 					raw, err := os.ReadFile(pocketIDKeyFile) // #nosec G304 -- explicit operator-provided secret file.
 					if err != nil {
-						return fmt.Errorf("reading Pocket ID API key file: %w", err)
+						return fmt.Errorf("reading Pocket ID machine credential file: %w", err)
 					}
 					if len(raw) > 8<<10 {
-						return fmt.Errorf("Pocket ID API key file is too large")
+						return fmt.Errorf("Pocket ID machine credential file is too large")
 					}
 					if err := client.Do(cmd.Context(), http.MethodPut, "/api/v1/bootstrap/pocket-id-api-key", map[string]string{"apiKey": strings.TrimSpace(string(raw))}, nil); err != nil {
 						return err
 					}
-					s.success("Pocket ID management API key stored directly in Vault")
+					s.success("Pocket ID machine credential replaced directly in Vault")
 					if err := client.Do(cmd.Context(), http.MethodPost, "/api/v1/bootstrap/advance", map[string]bool{"confirm": true}, &status); err != nil {
 						return err
 					}
@@ -321,7 +321,7 @@ func newControlBootstrapCommand(s *state, options *controlOptions) *cobra.Comman
 		},
 	}
 	cmd.Flags().BoolVar(&confirm, "confirm", false, "confirm the one-time privileged bootstrap step")
-	cmd.Flags().StringVar(&pocketIDKeyFile, "pocket-id-api-key-file", "", "read the Pocket ID API key from a local file and write it directly to Vault")
+	cmd.Flags().StringVar(&pocketIDKeyFile, "pocket-id-api-key-file", "", "break-glass: replace the generated Pocket ID machine credential from a local file")
 	return cmd
 }
 

@@ -11,6 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -119,6 +121,49 @@ type Resources interface {
 type Store struct{ dynamic dynamic.Interface }
 
 func NewStore(client dynamic.Interface) *Store { return &Store{dynamic: client} }
+
+// WatchChanges returns a coalescing signal for desired-state changes to
+// Butler-owned platform resources. Status-only updates preserve metadata.generation
+// and are deliberately ignored so Butler does not trigger itself after writing
+// a Ready condition. Add and delete events always trigger because they can
+// introduce or resolve cross-resource ownership conflicts.
+func (s *Store) WatchChanges(ctx context.Context) (<-chan struct{}, error) {
+	events := make(chan struct{}, 1)
+	factory := dynamicinformer.NewDynamicSharedInformerFactory(s.dynamic, 0)
+	for _, gvr := range []schema.GroupVersionResource{
+		PocketIDClientGVR,
+		PocketIDGroupGVR,
+		CredentialGVR,
+		GarageBucketGVR,
+	} {
+		informer := factory.ForResource(gvr)
+		if _, err := informer.Informer().AddEventHandler(newChangeHandler(events)); err != nil {
+			return nil, fmt.Errorf("registering informer for %s: %w", gvr.Resource, err)
+		}
+	}
+	factory.Start(ctx.Done())
+	return events, nil
+}
+
+func newChangeHandler(events chan<- struct{}) cache.ResourceEventHandler {
+	signal := func() {
+		select {
+		case events <- struct{}{}:
+		default:
+		}
+	}
+	return cache.ResourceEventHandlerFuncs{
+		AddFunc: func(any) { signal() },
+		UpdateFunc: func(oldObject, newObject any) {
+			oldMeta, oldOK := oldObject.(metav1.Object)
+			newMeta, newOK := newObject.(metav1.Object)
+			if !oldOK || !newOK || oldMeta.GetGeneration() != newMeta.GetGeneration() {
+				signal()
+			}
+		},
+		DeleteFunc: func(any) { signal() },
+	}
+}
 
 // VaultPathOwners returns the number of declarative resources targeting each
 // output path. A path may have many readers but exactly one writer.

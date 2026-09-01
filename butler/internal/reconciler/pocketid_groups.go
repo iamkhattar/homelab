@@ -30,10 +30,10 @@ func (r *PocketIDGroups) Reconcile(ctx context.Context) error {
 	if r.url == "" || len(items) == 0 {
 		return nil
 	}
-	data, err := r.vault.ReadSecret(ctx, adminAPIKeyVaultPath)
-	apiKey, _ := data[adminAPIKeyField].(string)
+	data, err := r.vault.ReadSecret(ctx, pocketid.ManagementCredentialVaultPath)
+	apiKey, _ := data[pocketid.ManagementCredentialField].(string)
 	if err != nil || apiKey == "" {
-		waiting := errors.New("Pocket ID API key is unavailable")
+		waiting := errors.New("Pocket ID machine credential is unavailable")
 		var failures []error
 		for i := range items {
 			if statusErr := convergeStatus(&items[i].Status, platform.Failed(items[i].Generation, "AwaitingAPIKey", waiting), func() error {

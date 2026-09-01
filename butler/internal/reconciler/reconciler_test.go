@@ -159,6 +159,40 @@ func TestScheduler_Start_CancelStops(t *testing.T) {
 	}
 }
 
+func TestSchedulerStartRunsImmediatelyWhenTriggered(t *testing.T) {
+	called := make(chan struct{}, 2)
+	r := ReconcilerFunc{"event-driven", func(context.Context) error {
+		called <- struct{}{}
+		return nil
+	}}
+	s := NewScheduler(time.Hour, r)
+	trigger := make(chan struct{}, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		s.Start(ctx, trigger)
+		close(done)
+	}()
+
+	select {
+	case <-called: // initial pass
+	case <-time.After(time.Second):
+		t.Fatal("initial reconciliation did not run")
+	}
+	trigger <- struct{}{}
+	select {
+	case <-called:
+	case <-time.After(time.Second):
+		t.Fatal("event-triggered reconciliation did not run")
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("scheduler did not stop after cancellation")
+	}
+}
+
 func TestNewScheduler_Empty(t *testing.T) {
 	s := NewScheduler(time.Minute)
 	if err := s.RunOnce(context.Background()); err != nil {

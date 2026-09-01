@@ -87,6 +87,63 @@ func TestVaultPathOwnersCountsAcrossResourceKinds(t *testing.T) {
 	}
 }
 
+func TestChangeHandlerTriggersOnlyForDesiredStateChanges(t *testing.T) {
+	t.Parallel()
+	events := make(chan struct{}, 1)
+	handler := newChangeHandler(events)
+	object := platformObject("ManagedCredential", "security", "pocket-id", map[string]interface{}{
+		"vaultPath": "security/pocket-id",
+		"fields":    map[string]interface{}{},
+	})
+	object.SetGeneration(1)
+
+	handler.OnAdd(object, false)
+	expectChangeSignal(t, events)
+
+	statusOnly := object.DeepCopy()
+	statusOnly.SetResourceVersion("2")
+	handler.OnUpdate(object, statusOnly)
+	expectNoChangeSignal(t, events)
+
+	specChange := statusOnly.DeepCopy()
+	specChange.SetGeneration(2)
+	handler.OnUpdate(statusOnly, specChange)
+	expectChangeSignal(t, events)
+
+	handler.OnDelete(specChange)
+	expectChangeSignal(t, events)
+}
+
+func TestChangeHandlerCoalescesBursts(t *testing.T) {
+	t.Parallel()
+	events := make(chan struct{}, 1)
+	handler := newChangeHandler(events)
+	object := platformObject("PocketIDGroup", "", "homelab-admin", map[string]interface{}{"friendlyName": "Administrators"})
+	handler.OnAdd(object, false)
+	handler.OnAdd(object, false)
+	if got := len(events); got != 1 {
+		t.Fatalf("queued signals = %d, want one coalesced signal", got)
+	}
+}
+
+func expectChangeSignal(t *testing.T, events <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-events:
+	default:
+		t.Fatal("expected desired-state change signal")
+	}
+}
+
+func expectNoChangeSignal(t *testing.T, events <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-events:
+		t.Fatal("status-only update triggered reconciliation")
+	default:
+	}
+}
+
 func platformObject(kind, namespace, name string, spec map[string]interface{}) *unstructured.Unstructured {
 	return &unstructured.Unstructured{Object: map[string]interface{}{
 		"apiVersion": Group + "/" + Version,

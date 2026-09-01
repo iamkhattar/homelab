@@ -84,7 +84,7 @@ func (s *RecoveryServer) handlePocketIDAPIKey(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if err := s.service.ImportPocketIDAPIKey(r.Context(), body.APIKey); err != nil {
-		http.Error(w, "Pocket ID API key import failed", http.StatusConflict)
+		http.Error(w, "Pocket ID machine credential replacement failed", http.StatusConflict)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "stored"})

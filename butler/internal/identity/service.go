@@ -13,8 +13,6 @@ import (
 	"github.com/iamkhattar/homelab/butler/internal/pocketid"
 )
 
-const adminSecretPath = "pocket-id/admin"
-
 type SecretStore interface {
 	ReadSecret(context.Context, string) (map[string]interface{}, error)
 	WriteSecret(context.Context, string, map[string]interface{}) error
@@ -35,11 +33,11 @@ func NewService(secrets SecretStore, baseURL string, clients ClientRegistry) *Se
 }
 
 func (s *Service) client(ctx context.Context) (*pocketid.Client, error) {
-	data, err := s.secrets.ReadSecret(ctx, adminSecretPath)
+	data, err := s.secrets.ReadSecret(ctx, pocketid.ManagementCredentialVaultPath)
 	if err != nil {
 		return nil, fmt.Errorf("loading Pocket ID management credential: %w", err)
 	}
-	key, _ := data["api-key"].(string)
+	key, _ := data[pocketid.ManagementCredentialField].(string)
 	if strings.TrimSpace(key) == "" {
 		return nil, pocketid.ErrAPIKeyMissing{}
 	}

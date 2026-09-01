@@ -161,6 +161,9 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parsing reconcile interval %q: %w", intervalStr, err)
 	}
+	if d <= 0 {
+		return nil, fmt.Errorf("reconcile interval must be positive")
+	}
 	cfg.ReconcileInterval = d
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("validating config from %s: %w", source, err)

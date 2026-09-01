@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/iamkhattar/homelab/butler/internal/certificates"
+	"github.com/iamkhattar/homelab/butler/internal/pocketid"
 	"github.com/iamkhattar/homelab/butler/internal/vault"
 )
 
@@ -22,15 +23,26 @@ type Bootstrapper interface {
 	Reconcile(context.Context) error
 }
 
+type Vault interface {
+	Status(context.Context) (vault.LifecycleStatus, error)
+	ReadSecretIfExists(context.Context, string) (map[string]interface{}, error)
+	WriteSecret(context.Context, string, map[string]interface{}) error
+}
+
 func (s *Service) ImportPocketIDAPIKey(ctx context.Context, apiKey string) error {
 	if strings.TrimSpace(apiKey) == "" {
-		return fmt.Errorf("Pocket ID API key is required")
+		return fmt.Errorf("Pocket ID machine credential is required")
 	}
 	if len(apiKey) > 4096 {
-		return fmt.Errorf("Pocket ID API key is too large")
+		return fmt.Errorf("Pocket ID machine credential is too large")
 	}
-	if err := s.vault.WriteSecret(ctx, "pocket-id/admin", map[string]interface{}{"api-key": apiKey}); err != nil {
-		return fmt.Errorf("storing Pocket ID API key: %w", err)
+	data, err := s.vault.ReadSecretIfExists(ctx, pocketid.ManagementCredentialVaultPath)
+	if err != nil {
+		return fmt.Errorf("reading Pocket ID runtime credential: %w", err)
+	}
+	data[pocketid.ManagementCredentialField] = strings.TrimSpace(apiKey)
+	if err := s.vault.WriteSecret(ctx, pocketid.ManagementCredentialVaultPath, data); err != nil {
+		return fmt.Errorf("storing Pocket ID machine credential: %w", err)
 	}
 	return nil
 }
@@ -50,22 +62,22 @@ type Status struct {
 }
 
 type Service struct {
-	vault                *vault.Client
-	k8s                  kubernetes.Interface
-	namespace            string
-	bootstrapper         Bootstrapper
-	identityBootstrapper Bootstrapper
-	certificates         *certificates.Manager
+	vault                  Vault
+	k8s                    kubernetes.Interface
+	namespace              string
+	bootstrapper           Bootstrapper
+	credentialBootstrapper Bootstrapper
+	identityBootstrapper   Bootstrapper
+	certificates           *certificates.Manager
 }
 
 func (s *Service) UseCertificates(manager *certificates.Manager) { s.certificates = manager }
 
-func NewService(vc *vault.Client, k8s kubernetes.Interface, namespace string, bootstrapper Bootstrapper, identity ...Bootstrapper) *Service {
-	service := &Service{vault: vc, k8s: k8s, namespace: namespace, bootstrapper: bootstrapper}
-	if len(identity) > 0 {
-		service.identityBootstrapper = identity[0]
+func NewService(vc Vault, k8s kubernetes.Interface, namespace string, bootstrapper, credentialBootstrapper, identityBootstrapper Bootstrapper) *Service {
+	return &Service{
+		vault: vc, k8s: k8s, namespace: namespace, bootstrapper: bootstrapper,
+		credentialBootstrapper: credentialBootstrapper, identityBootstrapper: identityBootstrapper,
 	}
-	return service
 }
 
 func (s *Service) Status(ctx context.Context) Status {
@@ -133,12 +145,19 @@ func (s *Service) Advance(ctx context.Context, confirmed bool) error {
 	if !s.certificateReady(ctx) {
 		return s.setPhase(ctx, "awaiting-certificate")
 	}
-	configured, err := s.vault.SecretExists(ctx, "pocket-id/admin")
+	if s.credentialBootstrapper == nil {
+		return fmt.Errorf("Pocket ID credential bootstrap is not configured")
+	}
+	if err := s.credentialBootstrapper.Reconcile(ctx); err != nil {
+		return fmt.Errorf("generating Pocket ID machine credential: %w", err)
+	}
+	credential, err := s.vault.ReadSecretIfExists(ctx, pocketid.ManagementCredentialVaultPath)
 	if err != nil {
 		return fmt.Errorf("checking Pocket ID identity handoff: %w", err)
 	}
-	if !configured {
-		return s.setPhase(ctx, "awaiting-pocket-id-api-key")
+	apiKey, _ := credential[pocketid.ManagementCredentialField].(string)
+	if strings.TrimSpace(apiKey) == "" {
+		return s.setPhase(ctx, "awaiting-pocket-id-credential")
 	}
 	if s.identityBootstrapper == nil {
 		return fmt.Errorf("Pocket ID identity bootstrap is not configured")

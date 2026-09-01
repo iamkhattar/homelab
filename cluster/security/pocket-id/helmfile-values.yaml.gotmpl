@@ -6,4 +6,4 @@ ingress:
 
 env:
   # Traefik serves the Let's Encrypt wildcard certificate for auth.<domain>.
-  PUBLIC_APP_URL: "https://auth.{{ .Environment.Values.domain }}"
+  APP_URL: "https://auth.{{ .Environment.Values.domain }}"

@@ -95,8 +95,8 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 	},
 	"homelabctl control": {long: "Use Butler's versioned API through a private Kubernetes port-forward. Normal commands require a Pocket ID token; bootstrap and recovery use a short-lived, audience-bound Kubernetes service-account token."},
 	"homelabctl control bootstrap": {
-		long:    "Advance Butler's idempotent Vault bootstrap state machine through the isolated recovery service. The operation requires explicit confirmation and can optionally import a Pocket ID management API key from a local file directly into Vault.",
-		example: "  homelabctl control bootstrap --confirm\n  homelabctl control bootstrap --confirm --pocket-id-api-key-file /secure/pocket-id-api-key",
+		long:    "Advance Butler's idempotent bootstrap state machine through the isolated recovery service. Butler generates Pocket ID's machine credential directly in Vault; the optional file flag is only a break-glass replacement path.",
+		example: "  homelabctl control bootstrap --confirm",
 	},
 	"homelabctl control recovery": {
 		long:    "Inspect the no-ingress recovery service using a freshly issued, ten-minute Kubernetes token. This path remains available when Pocket ID, VSO, normal Butler, or Vault authentication is unavailable.",

@@ -121,6 +121,25 @@ homelabctl cluster diagnose --ask-become-pass
 Look for disk pressure, networking failures, certificate/time errors and pods
 that cannot mount required storage.
 
+## Pocket ID rejects passkey enrollment for the domain
+
+Pocket ID derives its WebAuthn relying-party identity and public OIDC issuer
+from `APP_URL`. The repository sets it to `https://auth.6940469.xyz`; do not
+replace it with the internal Service URL, an IP address or the obsolete
+`PUBLIC_APP_URL` name.
+
+Check the public discovery document without exposing credentials:
+
+```bash
+curl -fsS https://auth.6940469.xyz/.well-known/openid-configuration | jq .issuer
+```
+
+The result must be `https://auth.6940469.xyz`. An issuer such as
+`http://localhost:1411` means Pocket ID did not receive `APP_URL`; deploy the
+corrected identity release, wait for its rollout, reload the setup page at the
+public HTTPS URL and retry the passkey. Pocket ID's PVC retains the owner and
+setup state across the rollout.
+
 ## Upgrade fails
 
 Stop and preserve evidence. Do not repeatedly reset or reinstall K3s. Record:

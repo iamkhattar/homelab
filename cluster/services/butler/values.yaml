@@ -140,7 +140,9 @@ config:
   server:
     port: "8080"
   reconcile:
-    interval: 5m
+    # Platform CR changes trigger an immediate, coalesced reconciliation. This
+    # interval remains the bounded drift-repair resync if an event is missed.
+    interval: 1m
   oidc:
     # Set to https://auth.<domain> once Pocket-ID is reachable; empty disables
     # OIDC bootstrap of Vault auth/jwt and butler API authz.
