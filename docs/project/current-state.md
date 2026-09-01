@@ -56,7 +56,7 @@ they do not block the first recoverable Titan installation.
 | Ingress and private-address DNS | Deployment in progress | Namecheap publishes `*.6940469.xyz` and the apex to Titan's reserved `192.168.1.163`, with no AAAA record. The split `cert-manager`, `public-certificates` and `traefik` releases are deployed; all cert-manager pods are Running and Traefik owns `192.168.1.163:80/443`. The issuer is waiting only for the expected `cert-manager/acme-dns` Secret. Deploy Vault, Butler and VSO next, then complete the one-time generated CNAME ceremony and issuance verification. |
 | Persistent storage | Ready for testing | K3s local-path with bounded PVCs is the accepted single-node starting point. Select the encrypted off-node backup target and rehearse restores before storing important data. |
 | Prometheus, Grafana, Loki, Tempo and Alloy | Ready in repo | Pinned bounded charts, seven-day retention, kube-state-metrics, node-exporter, OTLP receivers, log collection, Butler metrics/logs/traces, Grafana correlation, reusable all-workload dashboards and workload/Job/PVC/OOM alerts render. Choose and test the final off-cluster Alertmanager receiver before relying on alerts. |
-| Pocket ID | Ready in repo | Pinned v2 deployment, Vault-provided encryption key, native OTLP, Butler-managed groups, users and OIDC clients, secret rotation into Vault, and Butler PKCE login exist; first owner/API key remain an interactive Titan checkpoint. |
+| Pocket ID | Ready in repo | Pinned v2 deployment, Vault-provided encryption and static machine credentials, JSON logs without query arguments, disabled version/analytics calls, restricted proxy trust and insecure callbacks, retained rate limiting, egress restricted to cluster DNS and Alloy, native OTLP, Butler-managed groups, users and OIDC clients, secret rotation into Vault, and Butler PKCE login exist. Only first human owner and passkey enrollment remain an interactive Titan checkpoint. |
 | Vault and Butler | Ready in repo | Top-level Butler has separate normal and private recovery runtimes. Recovery performs confirmed, resumable initialization and now remains identity-pending until real Pocket ID logins to Butler and Vault pass. Normal reconciliation uses projected Kubernetes auth. VSO remains the application secret-delivery path. Export the recovery Secret to an age-encrypted off-cluster bundle and restore-test on Titan. |
 | Shared PostgreSQL, Redis and Garage | Ready in repo | PostgreSQL 18.6 (chart 18.8.13), Redis 8.10 (chart 28.0.12), least-privilege consumer projections, persistence, NetworkPolicies and Garage v2 API reconciliation render successfully. Mutable Bitnami community tags are pinned by multi-architecture digest; deploy and restore-test on Titan. |
 | Actions Runner Controller | Ready in repo | Controller and one scale-to-zero runner set render successfully; create/import a least-privilege GitHub App and prove a read-only job before deployment authority |
@@ -87,9 +87,10 @@ they do not block the first recoverable Titan installation.
   `GarageBucket` declarations. Shared Pocket ID groups live with Butler, while
   the removed `ApplicationIntegration` ConfigMap no longer duplicates chart
   metadata.
-- Bootstrap pauses for the Pocket ID management credential, reconciles groups
-  and OIDC clients, then requires real Butler and Vault Pocket ID login proofs
-  before becoming operational. The temporary Vault token remains on the
+- Recovery bootstrap generates only the scoped Pocket ID machine credential,
+  then reconciles groups and OIDC clients before requiring real Butler and
+  Vault Pocket ID login proofs. Its narrow Vault role never touches unrelated
+  application credentials. The temporary Vault token remains on the
   workstation and is revoked after policy verification.
 - `homelabctl deploy platform` applies the supported Helmfile stage order and
   rejects data, observability, CI/CD and application deployment while Butler's
