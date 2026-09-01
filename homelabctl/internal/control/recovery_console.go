@@ -74,7 +74,7 @@ func StartRecoveryConsole(upstreamAddress, token string) (*RecoveryConsole, erro
 				HttpOnly: true,
 				SameSite: http.SameSiteStrictMode,
 				MaxAge:   600,
-			})
+			}) // #nosec G124 -- this session is intentionally loopback-only over plain HTTP.
 			http.Redirect(w, request, "/", http.StatusFound)
 			return
 		}
