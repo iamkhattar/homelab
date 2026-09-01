@@ -94,9 +94,17 @@ merely to continue the initial installation.
 homelabctl deploy apply --stage networking
 kubectl --context homelab -n networking rollout status deployment/traefik
 kubectl --context homelab -n cert-manager get pods
+helm --kube-context homelab list --all --namespace cert-manager
+helm --kube-context homelab list --all --namespace networking
 kubectl --context homelab get clusterissuer letsencrypt-production
 kubectl --context homelab -n networking get certificate homelab-wildcard
 ```
+
+The stage deliberately uses separate `cert-manager` and
+`public-certificates` Helm releases. A fresh Kubernetes API cannot validate a
+`Certificate` or `ClusterIssuer` during the same Helm transaction that first
+installs their CRDs. Helmfile therefore waits for cert-manager to finish, then
+submits the issuer and wildcard certificate in the dependent release.
 
 `letsencrypt-production` and `homelab-wildcard` initially remain unready because
 the acme-dns credential does not exist yet. This is expected; cert-manager
@@ -106,6 +114,11 @@ Continue to the secrets stage only when Traefik has rolled out and every
 cert-manager pod is `Running`. Do not wait for the ClusterIssuer or Certificate
 to become ready at this point: Butler creates their missing acme-dns credential
 in the next stage.
+
+If the original combined first-install transaction failed with `no matches for
+kind Certificate` or `no matches for kind ClusterIssuer`, no uninstall is
+required: that failed Helm install did not create a cert-manager release.
+Update to the split-release revision and rerun the networking stage.
 
 ## 3. Vault, recovery Butler and VSO
 

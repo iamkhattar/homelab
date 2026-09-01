@@ -1,0 +1,3 @@
+The production issuer and shared wildcard Certificate have been submitted.
+They remain unready until Butler registers acme-dns and Vault Secrets Operator
+projects the bounded account into cert-manager/acme-dns.

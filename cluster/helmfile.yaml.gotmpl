@@ -56,12 +56,19 @@ releases:
     chart: ./core/cert-manager
     historyMax: 5
     namespace: cert-manager
-    # The production ACME issuer waits for VSO to project Butler's acme-dns
-    # registration from Vault; cert-manager retries automatically.
     needs: [kube-system/namespaces]
     labels: {stage: networking, domain: platform, criticality: core}
 
 ###  NETWORKING  ###
+  - name: public-certificates
+    chart: ./networking/certificates
+    historyMax: 5
+    namespace: networking
+    # Keep custom resources out of cert-manager's first install transaction.
+    # Helm can discover these kinds only after that release installs its CRDs.
+    # The issuer then waits for VSO to project Butler's acme-dns registration.
+    needs: [cert-manager/cert-manager]
+    labels: {stage: networking, domain: platform, criticality: core}
   - name: traefik
     chart: ./networking/traefik
     historyMax: 5

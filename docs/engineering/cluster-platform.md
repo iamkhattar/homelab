@@ -38,6 +38,13 @@ Helmfile detects a new release; diffs for installed releases retain Kubernetes
 API validation. Helm lint, the complete Helmfile render and repository security
 checks remain mandatory before deployment.
 
+cert-manager has an additional apply-time boundary: its controller and CRDs
+are installed by the `cert-manager` release, while `ClusterIssuer` and
+`Certificate` objects belong to the dependent `public-certificates` release.
+Helm cannot submit those custom resources in the transaction that first makes
+their kinds discoverable. Keeping the policy objects in a second release makes
+both a clean installation and later idempotent reconciliation valid.
+
 Fluent Bit is not part of the target design because Grafana Alloy will own the
 Kubernetes log and OTLP collection path. CrowdSec has no useful blocking path
 without public ingress. Gatekeeper is unnecessary before there are concrete
@@ -50,7 +57,9 @@ Helmfile encodes the dependency graph. The important path is:
 ```text
 namespaces + RBAC
       /       \
-networking   Vault
+cert-manager Vault
+      |
+public certificates
       \       /
        Butler -- registers acme-dns into Vault
         |
