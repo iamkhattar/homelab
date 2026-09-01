@@ -1,0 +1,4 @@
+interface:
+  display_name: "Upgrade Homelab Component"
+  short_description: "Upgrade pinned platform components safely"
+  default_prompt: "Use $upgrade-homelab-component to prepare and validate this homelab component upgrade."

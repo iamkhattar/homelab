@@ -1,0 +1,4 @@
+interface:
+  display_name: "Operate Homelab Safely"
+  short_description: "Plan and perform bounded homelab operations"
+  default_prompt: "Use $operate-homelab-safely to plan and carry out this homelab operation."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Change Node Automation"
+  short_description: "Safely evolve Ansible node automation"
+  default_prompt: "Use $change-node-automation to implement this node or K3s automation change."
