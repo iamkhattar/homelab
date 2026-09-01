@@ -4,9 +4,9 @@
 // users, and groups. Butler uses this client to provision the OIDC clients
 // declared by PocketIDClient resources.
 //
-// Authentication is via an admin API key minted in the Pocket-ID UI by a
-// human operator and persisted in Vault at secret/pocket-id/admin.
-// The reconciler fetches it from Vault and passes it here on construction.
+// Authentication is via a declaratively generated static machine credential.
+// Butler stores it in Vault, VSO projects it to Pocket ID, and reconcilers read
+// the same value directly from Vault. It is never returned through an API.
 package pocketid
 
 import (
@@ -23,13 +23,17 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
-// ErrAPIKeyMissing signals to callers that no admin API key is available
-// yet, so they can degrade gracefully (e.g. fall back to staging-Secret
-// ingestion mode).
+const (
+	ManagementCredentialVaultPath = "security/pocket-id"
+	ManagementCredentialField     = "static-api-key"
+)
+
+// ErrAPIKeyMissing signals to callers that the Vault-backed machine credential
+// has not converged yet, so reconciliation can report a waiting condition.
 type ErrAPIKeyMissing struct{}
 
 func (ErrAPIKeyMissing) Error() string {
-	return "pocket-id admin api key not found; provision one in the Pocket ID UI and import it to secret/pocket-id/admin through recovery bootstrap"
+	return "Pocket ID machine credential is not available in Vault"
 }
 
 // Client is a tiny HTTP client for Pocket-ID's admin API.

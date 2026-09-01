@@ -205,8 +205,8 @@ Then deploy and verify checkpoints rather than applying the whole graph blindly:
 1. apply `foundation`, then `networking`, then `secrets`;
 2. let Butler initialize/unseal Vault, verify its Kubernetes-auth handoff and
    export the `butler-vault-init` recovery Secret off Titan;
-3. apply `identity`, enroll the first Pocket ID owner, import one Pocket ID API
-   key through break-glass and verify Butler's OIDC login;
+3. apply `identity`, let Butler generate Pocket ID's Vault-backed machine
+   credential, enroll the first human owner and verify Butler's OIDC login;
 4. apply `data`; Butler then reconciles Garage through its API;
 5. apply `observability` and verify all three Grafana datasources;
 6. apply ARC and applications only after their credentials and backups exist.

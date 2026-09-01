@@ -106,12 +106,12 @@ func main() {
 			slog.Error("configuring certificate bootstrap", "error", err)
 			os.Exit(1)
 		}
+		credentialBootstrap := reconciler.NewManagedCredentialBootstrap(vc, platformResources, cfg.Namespace, "pocket-id-runtime")
 		identityBootstrap := recovery.Sequence{Steps: []recovery.Bootstrapper{
-			reconciler.NewManagedCredentials(vc, platformResources),
 			reconciler.NewPocketIDGroups(vc, platformResources, cfg.OIDC.AdminURL),
 			reconciler.NewPocketIDClients(vc, platformResources, cfg.OIDC.AdminURL),
 		}}
-		serveRecovery(ctx, cfg, vc, k8s, reconciler.NewVaultBootstrap(vc, k8s, cfg.Namespace, cfg), identityBootstrap, certificateManager)
+		serveRecovery(ctx, cfg, vc, k8s, reconciler.NewVaultBootstrap(vc, k8s, cfg.Namespace, cfg), credentialBootstrap, identityBootstrap, certificateManager)
 		return
 	}
 	if mode != "normal" {
@@ -189,7 +189,7 @@ func main() {
 	}
 }
 
-func serveRecovery(ctx context.Context, cfg *config.Config, vc *vault.Client, k8s kubernetes.Interface, bootstrapper, identityBootstrapper recovery.Bootstrapper, certificateManager *certificates.Manager) {
+func serveRecovery(ctx context.Context, cfg *config.Config, vc *vault.Client, k8s kubernetes.Interface, bootstrapper, credentialBootstrapper, identityBootstrapper recovery.Bootstrapper, certificateManager *certificates.Manager) {
 	// This succeeds after the one-time bootstrap has created the narrow
 	// recovery role. It is intentionally best-effort for the pristine-cluster
 	// case, where that role cannot exist yet. Re-authenticating here also makes
@@ -198,7 +198,7 @@ func serveRecovery(ctx context.Context, cfg *config.Config, vc *vault.Client, k8
 		slog.Info("recovery Vault role is not available yet", "error", err)
 	}
 	auth := recovery.NewTokenReviewer(k8s, cfg.Namespace, "butler-recovery-client")
-	recoveryService := recovery.NewService(vc, k8s, cfg.Namespace, bootstrapper, identityBootstrapper)
+	recoveryService := recovery.NewService(vc, k8s, cfg.Namespace, bootstrapper, credentialBootstrapper, identityBootstrapper)
 	recoveryService.UseCertificates(certificateManager)
 	srv := server.NewRecovery(auth, recoveryService)
 	httpSrv := &http.Server{Addr: ":" + cfg.Server.Port, Handler: otelhttp.NewHandler(server.RequestLogger(srv), "butler.recovery.http"), ReadHeaderTimeout: 10 * time.Second}

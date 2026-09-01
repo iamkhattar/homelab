@@ -36,6 +36,11 @@ spec:
                 secretKeyRef:
                   name: pocket-id-credentials
                   key: encryption-key
+            - name: STATIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pocket-id-credentials
+                  key: static-api-key
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- if .Values.persistence.enabled }}

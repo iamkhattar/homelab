@@ -37,7 +37,8 @@ For a platform installation or upgrade, use the dependency-ordered workflow:
 ```bash
 homelabctl deploy platform --through identity --confirm
 homelabctl control bootstrap --confirm
-# Complete Pocket ID owner enrollment and import its management API key.
+# Complete Pocket ID owner and passkey enrollment; Butler generates its machine credential.
+homelabctl control bootstrap --confirm
 homelabctl control login
 homelabctl control verify-identity --confirm
 homelabctl deploy platform --through applications --confirm

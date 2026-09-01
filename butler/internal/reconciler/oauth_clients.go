@@ -11,11 +11,6 @@ import (
 	"github.com/iamkhattar/homelab/butler/internal/vault"
 )
 
-const (
-	adminAPIKeyVaultPath = "pocket-id/admin"
-	adminAPIKeyField     = "api-key"
-)
-
 // PocketIDClients reconciles namespaced PocketIDClient resources. Provider
 // secrets go directly to Vault and are never written to resource status.
 type PocketIDClients struct {
@@ -41,7 +36,7 @@ func (r *PocketIDClients) Reconcile(ctx context.Context) error {
 
 	apiKey, err := r.readAPIKey(ctx)
 	if err != nil {
-		slog.Warn("pocket-id admin api key not configured; client provisioning is waiting", "path", "secret/"+adminAPIKeyVaultPath)
+		slog.Warn("Pocket ID machine credential is not configured; client provisioning is waiting", "path", "secret/"+pocketid.ManagementCredentialVaultPath)
 		var failures []error
 		for i := range items {
 			if statusErr := convergeStatus(&items[i].Status, platform.Failed(items[i].Generation, "AwaitingAPIKey", err), func() error {
@@ -191,13 +186,13 @@ func (r *PocketIDClients) reconcileOne(ctx context.Context, pid *pocketid.Client
 }
 
 func (r *PocketIDClients) readAPIKey(ctx context.Context) (string, error) {
-	data, err := r.vault.ReadSecret(ctx, adminAPIKeyVaultPath)
+	data, err := r.vault.ReadSecret(ctx, pocketid.ManagementCredentialVaultPath)
 	if err != nil {
 		return "", err
 	}
-	key, _ := data[adminAPIKeyField].(string)
+	key, _ := data[pocketid.ManagementCredentialField].(string)
 	if key == "" {
-		return "", errors.New("Pocket ID API key is unavailable")
+		return "", errors.New("Pocket ID machine credential is unavailable")
 	}
 	return key, nil
 }

@@ -61,7 +61,7 @@ The recovery API reports one of these phases:
 3. `configure-vault`;
 4. `awaiting-dns-delegation`;
 5. `awaiting-certificate`;
-6. `awaiting-pocket-id-api-key`;
+6. `awaiting-pocket-id-credential`;
 7. `configure-identity`;
 8. `awaiting-identity-verification`;
 9. `operational`.
@@ -111,16 +111,24 @@ rotate confidential OIDC clients. Butler
 rejects Pocket ID administrator creation or promotion; first-owner and account
 recovery remain deliberate Pocket ID procedures.
 
-The first Pocket ID management API key is read from a local file and written
-directly to Vault through the recovery API:
+Butler generates Pocket ID's machine credential as part of the existing
+`pocket-id-runtime` `ManagedCredential`. It writes the 48-character value
+directly to `secret/security/pocket-id`; VSO projects the same document to the
+`pocket-id-credentials` Kubernetes Secret, and Pocket ID consumes the
+`static-api-key` field through `STATIC_API_KEY`. The synthetic static API user
+is deliberately separate from the first human owner, so owner creation and
+passkey enrollment remain available.
+
+The normal bootstrap therefore needs no credential file:
 
 ```bash
-homelabctl control bootstrap --confirm \
-  --pocket-id-api-key-file /secure/pocket-id-api-key
+homelabctl control bootstrap --confirm
 ```
 
-It is never passed as a command-line value, returned by Butler, or stored in an
-operation event.
+The generated value is never returned by Butler or stored in an operation
+event. `--pocket-id-api-key-file` remains only as a break-glass replacement
+mechanism. It preserves the Pocket ID encryption key already stored in the
+same Vault document and must not be used during routine bootstrap.
 
 After reconciliation, the operator must prove both authentication paths:
 

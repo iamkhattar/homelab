@@ -196,14 +196,14 @@ from `auth/jwt/config` while Pocket ID is absent indicates an older Butler
 image; deploy the current `main` image and repeat this resumable command. Do
 not reset Vault or delete its PVC or recovery Secret.
 
-After the certificate becomes ready, recovery Butler checks whether the
-Pocket ID management key exists before advancing to
-`awaiting-pocket-id-api-key`. Its bounded Vault policy permits `create`,
-`read` and `update` only on that exact KV path; `read` is required to
-distinguish an absent key from an authorization failure. A 403 while checking
-`pocket-id/admin` indicates an older Butler policy. Deploy the current `main`
-image and repeat bootstrap; the policy update and state transition are
-idempotent.
+After the certificate becomes ready, recovery Butler reconciles the
+`pocket-id-runtime` `ManagedCredential`. It generates the Pocket ID encryption
+key and a 48-character static machine credential directly at
+`secret/security/pocket-id`, preserving either field when it already exists.
+Its bounded Vault policy permits `create`, `read` and `update` only on that
+exact KV path. If generation cannot yet converge, bootstrap reports
+`awaiting-pocket-id-credential`; deploy the current `main` image, inspect the
+`ManagedCredential`, and repeat the idempotent command.
 
 Display the non-secret registration metadata:
 
@@ -238,8 +238,9 @@ homelabctl control certificate status
 homelabctl control bootstrap --confirm
 ```
 
-Continue only when `certificateReady` is true and the bootstrap phase is
-`awaiting-pocket-id-api-key`. cert-manager renews with the same account and
+Continue only when `certificateReady` is true. The next bootstrap pass
+generates the Pocket ID runtime credential and advances identity configuration.
+cert-manager renews with the same account and
 CNAME; there is no later Namecheap ceremony.
 
 Export the root token and unseal key directly into a new encrypted file:
@@ -285,25 +286,28 @@ kubectl -n security rollout status deployment/pocket-id
 ```
 
 Creating the `ManagedCredential` immediately triggers Butler's coalesced
-Kubernetes event watcher. Butler writes the generated encryption key to Vault,
-VSO projects `pocket-id-credentials`, and only then can the Pocket ID container
-start. Butler retains a one-minute drift-repair resync if an event is missed.
+Kubernetes event watcher. Butler writes both the generated encryption key and
+Pocket ID static machine credential to Vault, VSO projects
+`pocket-id-credentials`, and only then can the Pocket ID container start.
+Butler retains a one-minute drift-repair resync if an event is missed.
 Do not manually create the destination Secret or restart VSO while this chain
 is converging.
 
-Open `https://auth.6940469.xyz`, create the first owner, enroll a passkey,
-and create one management API key. Pocket ID does not expose an unattended
-first-owner operation.
+Open `https://auth.6940469.xyz`, create the first human owner and enroll a
+passkey. Pocket ID excludes its synthetic static API user from the initial
+owner check, so the Butler credential does not consume or bypass this human
+ceremony. Pocket ID does not expose an unattended first-owner operation.
 
-Place the one-time key in a private staging file, import it directly into Vault
-through recovery Butler, then remove the file:
+Advance bootstrap after owner enrollment:
 
 ```bash
-chmod 600 /secure/pocket-id-api-key
-homelabctl control bootstrap --confirm \
-  --pocket-id-api-key-file /secure/pocket-id-api-key
-rm /secure/pocket-id-api-key
+homelabctl control bootstrap --confirm
 ```
+
+The `--pocket-id-api-key-file` flag is retained only for break-glass rotation
+of the generated machine credential. It replaces `static-api-key` in the same
+Vault document without changing `encryption-key`; it is not part of normal
+installation.
 
 Butler reconciles `homelab-admin`, `homelab-operator` and `homelab-viewer`, plus
 stable OIDC clients for Butler, Vault, Grafana, Homepage and Vaultwarden. Assign the first

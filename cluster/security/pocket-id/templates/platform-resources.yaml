@@ -8,3 +8,5 @@ spec:
   fields:
     encryption-key:
       generate: {type: password, length: 32}
+    static-api-key:
+      generate: {type: password, length: 48}
