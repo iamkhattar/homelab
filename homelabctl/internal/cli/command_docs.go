@@ -150,16 +150,16 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 	},
 	"homelabctl deploy": {long: "Preview or reconcile Helmfile desired state. Deployment remains separate from image publication and CI. The shared image tag defaults to the full committed Git SHA and must already exist in the registry."},
 	"homelabctl deploy diff": {
-		long:    "Run Helmfile diff from cluster/ without applying releases.",
-		example: "  homelabctl deploy diff",
+		long:    "Run Helmfile diff from cluster/ without applying releases. Select either one validated release name or one dependency stage for a bounded preview.",
+		example: "  homelabctl deploy diff\n  homelabctl deploy diff cert-manager\n  homelabctl deploy diff --stage secrets",
 	},
 	"homelabctl deploy apply": {
 		long:    "Apply changed Helmfile releases, optionally selecting one validated release name or one dependency stage. A release and --stage are mutually exclusive.",
 		example: "  homelabctl deploy apply\n  homelabctl deploy apply cert-manager\n  homelabctl deploy apply --stage data",
 	},
 	"homelabctl deploy sync": {
-		long:    "Force every declared Helmfile release to desired state without diff gating. Prefer diff followed by apply for routine changes.",
-		example: "  homelabctl deploy sync",
+		long:    "Force declared Helmfile releases to desired state without diff gating. Select either one validated release name or one dependency stage to bound reconciliation. Prefer diff followed by apply for routine changes.",
+		example: "  homelabctl deploy sync\n  homelabctl deploy sync traefik\n  homelabctl deploy sync --stage networking",
 	},
 	"homelabctl infra":          {long: "Expose read-only Terraform checks and planning for the optional Hetzner layer. Apply and destroy remain intentionally unavailable."},
 	"homelabctl infra fmt":      {long: "Check Terraform formatting recursively without rewriting source files.", example: "  homelabctl infra fmt"},

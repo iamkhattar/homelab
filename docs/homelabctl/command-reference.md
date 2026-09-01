@@ -174,8 +174,9 @@ requires `control certificate verify-dns --confirm` and an exact public match.
 
 | Command | Purpose | Validation and mutation |
 | --- | --- | --- |
-| `deploy diff [--image-tag tag]` | Preview Helmfile changes | Read-only; image tag defaults to the committed Git SHA |
+| `deploy diff [release] [--stage stage] [--image-tag tag]` | Preview all changes, one release or one stage | Read-only; release/stage are exclusive and the image tag defaults to the committed Git SHA |
 | `deploy apply [release] [--stage stage] [--image-tag tag]` | Apply all changes, one release or one stage | Release/stage are exclusive; selected releases include declared Helmfile dependencies |
+| `deploy sync [release] [--stage stage] [--image-tag tag]` | Force reconciliation of all releases, one release or one stage without diff gating | Release/stage are exclusive; selected releases include declared Helmfile dependencies |
 | `deploy sync [--image-tag tag]` | Reconcile every release without diff gating | Mutating; intentionally explicit; image tag must already be published |
 | `deploy platform --through stage --confirm` | Apply stages in the supported dependency order | Defaults through identity and refuses later stages until Butler bootstrap is `operational` |
 | `infra fmt` | Check Terraform formatting | Does not rewrite files |

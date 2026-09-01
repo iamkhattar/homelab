@@ -7,6 +7,8 @@ mutation separate. GitHub Actions consumes the same primitives used locally.
 
 ```bash
 homelabctl deploy diff
+homelabctl deploy diff --stage secrets
+homelabctl deploy diff cert-manager
 ```
 
 This runs Helmfile's diff workflow from `cluster/` and does not apply releases.
@@ -60,9 +62,10 @@ Select one release by its exact Helmfile release name:
 homelabctl deploy apply cert-manager
 ```
 
-Apply one dependency stage:
+Preview or apply one dependency stage:
 
 ```bash
+homelabctl deploy diff --stage data
 homelabctl deploy apply --stage data
 ```
 
@@ -70,7 +73,8 @@ The current stage labels are `foundation`, `networking`, `secrets`, `identity`,
 `data`, `observability`, `cicd`, `applications` and `smart-home`. Smart-home
 releases remain disabled by desired-state switches until their hardware and
 backup checkpoints are complete. A release argument and
-`--stage` cannot be combined. Selected deploys pass Helmfile's
+For `diff`, `apply` and `sync`, a release argument and `--stage` cannot be
+combined. Selected deploys pass Helmfile's
 `--include-needs`, so declared dependencies are included; the operator must
 still stop at the documented readiness checkpoints because a Helm dependency
 edge does not prove that an API or generated Secret is ready.
@@ -79,11 +83,12 @@ The optional argument becomes a `name=<release>` Helmfile selector and
 `--stage` becomes `stage=<stage>`. Neither selects a namespace, chart directory
 or individual Kubernetes resource.
 
-`deploy sync` forces every declared release to the desired state without diff
-gating:
+`deploy sync` forces declared releases to the desired state without diff
+gating. It supports the same release and stage selectors:
 
 ```bash
 homelabctl deploy sync
+homelabctl deploy sync --stage networking
 ```
 
 Use sync only when intentionally reconciling the complete environment. Normal

@@ -19,8 +19,12 @@ func TestOperationalCommandsConstructExpectedDryRuns(t *testing.T) {
 		want []string
 	}{
 		{name: "deploy diff", args: []string{"deploy", "diff"}, want: []string{"helmfile diff --skip-diff-validation-on-install", "/cluster"}},
+		{name: "deploy selected diff release", args: []string{"deploy", "diff", "cert-manager"}, want: []string{"helmfile diff --selector name=cert-manager --include-needs --skip-diff-validation-on-install"}},
+		{name: "deploy selected diff stage", args: []string{"deploy", "diff", "--stage", "secrets"}, want: []string{"helmfile diff --selector stage=secrets --include-needs --skip-diff-validation-on-install"}},
 		{name: "deploy selected release", args: []string{"deploy", "apply", "cert-manager"}, want: []string{"helmfile apply --selector name=cert-manager --include-needs --skip-diff-validation-on-install"}},
 		{name: "deploy selected stage", args: []string{"deploy", "apply", "--stage", "data"}, want: []string{"helmfile apply --selector stage=data --include-needs --skip-diff-validation-on-install"}},
+		{name: "deploy selected sync release", args: []string{"deploy", "sync", "traefik"}, want: []string{"helmfile sync --selector name=traefik --include-needs"}},
+		{name: "deploy selected sync stage", args: []string{"deploy", "sync", "--stage", "networking"}, want: []string{"helmfile sync --selector stage=networking --include-needs"}},
 		{name: "certificate status", args: []string{"control", "certificate", "status"}, want: []string{"create token butler-recovery-client"}},
 		{name: "verify certificate dns", args: []string{"control", "certificate", "verify-dns", "--confirm"}, want: []string{"create token butler-recovery-client"}},
 		{name: "deploy sync", args: []string{"deploy", "sync"}, want: []string{"helmfile sync"}},
@@ -130,7 +134,9 @@ func TestControlFlagsRejectInvalidCombinationsBeforeCommands(t *testing.T) {
 		{args: []string{"setup", "unknown"}, want: "unknown setup target"},
 		{args: []string{"build", "services", "api", "--changed", "--base", "main"}, want: "cannot be combined"},
 		{args: []string{"build", "services", "--changed"}, want: "--base is required"},
+		{args: []string{"deploy", "diff", "postgresql", "--stage", "data"}, want: "cannot be used together"},
 		{args: []string{"deploy", "apply", "postgresql", "--stage", "data"}, want: "cannot be used together"},
+		{args: []string{"deploy", "sync", "postgresql", "--stage", "data"}, want: "cannot be used together"},
 		{args: []string{"deploy", "platform", "--through", "unknown", "--confirm"}, want: "--through must be one of"},
 		{args: []string{"deploy", "platform"}, want: "--confirm is required"},
 		{args: []string{"control", "verify-identity"}, want: "--confirm is required"},
