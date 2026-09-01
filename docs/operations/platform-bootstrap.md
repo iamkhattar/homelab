@@ -14,6 +14,17 @@ Titan passed the cluster-readiness checkpoint on 31 August 2026:
 - CoreDNS and local-path-provisioner were both `Running`; and
 - no pods were outside the `Running` or `Succeeded` phases.
 
+The foundation stage passed its live acceptance checkpoint on 1 September
+2026:
+
+- the `v1beta1.metrics.k8s.io` APIService reported `Available=True`;
+- Metrics Server returned live usage for `titan` (`227m` CPU and `1022Mi`
+  memory at the checkpoint); and
+- the next action is **2. Networking and certificate prerequisites** below.
+
+The recorded usage values are evidence that the metrics pipeline works, not
+capacity thresholds; they will naturally change between checks.
+
 Do not repeat that checkpoint merely to advance this runbook. Continue to use
 `homelabctl cluster status` as a quick safety check before each apply.
 
@@ -61,29 +72,40 @@ commands below remain useful for inspection and recovery.
 
 ```bash
 homelabctl deploy apply --stage foundation
-kubectl get namespaces
-kubectl -n kube-system rollout status deployment/metrics-server
-kubectl get apiservice v1beta1.metrics.k8s.io
-kubectl top node titan
+kubectl --context homelab get namespaces
+kubectl --context homelab -n kube-system rollout status deployment/metrics-server
+kubectl --context homelab get apiservice v1beta1.metrics.k8s.io
+kubectl --context homelab top node titan
 ```
 
 This creates platform namespaces, per-application namespaces, Pod Security
-labels, foundational RBAC and the `platform.6940469.xyz` CRDs, then installs the separately pinned metrics-server
-release that replaces the disabled K3s package. Do not continue until its
-deployment is available, the aggregated Metrics API reports `Available=True`
-and `kubectl top` returns Titan CPU and memory usage.
+labels, foundational RBAC and the `platform.6940469.xyz` CRDs, then installs
+the separately pinned Metrics Server release that replaces the disabled K3s
+package. Do not continue until its deployment is available, the aggregated
+Metrics API reports `Available=True` and `kubectl top` returns Titan CPU and
+memory usage.
+
+**Titan checkpoint:** complete on 1 September 2026. Do not reapply foundation
+merely to continue the initial installation.
 
 ## 2. Networking and certificate prerequisites
 
 ```bash
 homelabctl deploy apply --stage networking
-kubectl -n networking rollout status deployment/traefik
-kubectl -n cert-manager get pods
+kubectl --context homelab -n networking rollout status deployment/traefik
+kubectl --context homelab -n cert-manager get pods
+kubectl --context homelab get clusterissuer letsencrypt-production
+kubectl --context homelab -n networking get certificate homelab-wildcard
 ```
 
 `letsencrypt-production` and `homelab-wildcard` initially remain unready because
 the acme-dns credential does not exist yet. This is expected; cert-manager
 retries after VSO creates the Secret.
+
+Continue to the secrets stage only when Traefik has rolled out and every
+cert-manager pod is `Running`. Do not wait for the ClusterIssuer or Certificate
+to become ready at this point: Butler creates their missing acme-dns credential
+in the next stage.
 
 ## 3. Vault, recovery Butler and VSO
 
