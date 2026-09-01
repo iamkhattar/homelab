@@ -39,6 +39,11 @@ service accounts, RBAC and HTTP surfaces.
 server submits it to Kubernetes TokenReview and accepts only the exact
 `system:serviceaccount:security:butler-recovery-client` username. A copied
 normal service-account token or Pocket ID token is therefore insufficient.
+The recovery and normal Butler NetworkPolicies allow TokenReview and other
+Kubernetes API calls only to the configured API Service and node endpoint
+`/32`s on ports 443/6443. Namespace selectors cannot represent a virtual
+Service IP or host-network API server; future nodes must update these values
+through their cluster profile rather than widening access to the LAN CIDR.
 
 ## Resumable bootstrap
 

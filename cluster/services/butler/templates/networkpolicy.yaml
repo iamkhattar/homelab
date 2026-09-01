@@ -24,14 +24,14 @@ spec:
         - protocol: TCP
           port: {{ .Values.service.containerPort }}
   egress:
-    # K8s API
+    # Kubernetes API. Namespace selectors do not match the virtual kubernetes
+    # Service IP or a host-network API endpoint, so allow only the reviewed
+    # service/node /32s and API ports.
     - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: default
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
+        {{- range .Values.networkPolicy.kubernetesAPI.cidrs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
       ports:
         - protocol: TCP
           port: 443
