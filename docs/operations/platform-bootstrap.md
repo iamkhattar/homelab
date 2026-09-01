@@ -337,6 +337,13 @@ homelabctl control verify-identity --confirm
 homelabctl control recovery
 ```
 
+Pocket ID's discovery document must advertise the public
+`https://auth.6940469.xyz` origin for its authorization, token and JWKS
+endpoints. Do not set Pocket ID's `INTERNAL_APP_URL`: it rewrites those
+client-facing URLs to Kubernetes-only DNS and breaks `homelabctl` on the Mac.
+Butler provider administration continues to use its separately configured
+internal Pocket ID API URL.
+
 `verify-identity` first proves the cached Pocket ID session reaches normal
 Butler as an administrator. It then opens Vault's Pocket ID OIDC flow on a
 loopback callback, verifies that the resulting short-lived token has exactly
