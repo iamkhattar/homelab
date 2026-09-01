@@ -36,6 +36,21 @@ spec:
               app.kubernetes.io/name: vault
       ports:
         - {protocol: TCP, port: 8200}
+    # Recovery bootstrap performs the one-time Pocket ID identity handoff
+    # before normal Butler authentication is available. Keep this permission
+    # scoped to the Pocket ID pods. Permit both the Service and container
+    # ports because policy enforcement can observe traffic before or after
+    # Kubernetes Service DNAT.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.pocketIdNamespace }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: pocket-id
+      ports:
+        - {protocol: TCP, port: 80}
+        - {protocol: TCP, port: 1411}
     - to:
         - namespaceSelector: {}
           podSelector:
