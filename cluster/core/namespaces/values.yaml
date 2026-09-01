@@ -72,7 +72,19 @@ namespaces:
   - name: smart-home
     labels:
       app.kubernetes.io/component: smart-home
-      6940469.xyz/category: applications
+      6940469.xyz/category: application
+      pod-security.kubernetes.io/enforce: baseline
+      pod-security.kubernetes.io/enforce-version: v1.36
+      pod-security.kubernetes.io/audit: restricted
+      pod-security.kubernetes.io/audit-version: v1.36
+      pod-security.kubernetes.io/warn: restricted
+      pod-security.kubernetes.io/warn-version: v1.36
+  # Keep the USB exception out of the namespace that runs Home Assistant and
+  # Mosquitto. Only Zigbee2MQTT is allowed to request a privileged container.
+  - name: zigbee
+    labels:
+      app.kubernetes.io/component: zigbee
+      6940469.xyz/category: hardware
       pod-security.kubernetes.io/enforce: privileged
       pod-security.kubernetes.io/enforce-version: v1.36
       pod-security.kubernetes.io/audit: restricted

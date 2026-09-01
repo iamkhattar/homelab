@@ -1,6 +1,6 @@
-Zigbee2MQTT has been deployed to the cluster.
+Zigbee2MQTT is available at https://{{ .Values.ingress.host }}.
 
-Frontend: zigbee2mqtt.smart-home.svc.cluster.local:{{ .Values.service.port }}
-
-NOTE: Ensure the Zigbee adapter is available at the configured serial port on the node.
+Coordinator: {{ .Values.coordinator.device }} ({{ .Values.coordinator.adapter }})
+The workload is pinned to the labelled Titan node and is the only process that
+may open this coordinator. Do not also configure Home Assistant ZHA.
 You may need to use a nodeSelector to pin this pod to the node with the USB adapter.

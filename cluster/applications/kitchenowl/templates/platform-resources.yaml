@@ -1,0 +1,23 @@
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: ManagedCredential
+metadata:
+  name: kitchenowl
+  namespace: {{ .Release.Namespace }}
+spec:
+  vaultPath: applications/kitchenowl
+  fields:
+    jwt-secret:
+      generate: {type: password, length: 48}
+---
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: ManagedCredential
+metadata:
+  name: kitchenowl-database
+  namespace: {{ .Release.Namespace }}
+spec:
+  vaultPath: applications/kitchenowl/database
+  fields:
+    username:
+      value: kitchenowl
+    password:
+      sourceRef: {path: databases/postgresql, key: kitchenowl-password}

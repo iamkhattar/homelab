@@ -12,6 +12,7 @@ boundary and ends with verification.
 | K3s is healthy and the platform is not installed | [Bootstrap the cluster platform](/operations/platform-bootstrap) |
 | Apply Debian updates, reboot or upgrade K3s | [Maintenance and upgrades](/operations/maintenance) |
 | Create, export or reason about recovery material | [Backup and recovery](/operations/backup-recovery) |
+| Deploy Home Assistant, MQTT or the Sonoff coordinator | [Home automation and Zigbee](/operations/smart-home) |
 | Record a deployment, upgrade or restore result | [Change and evidence record](/operations/change-evidence) |
 | Titan, SSH, K3s or workloads are unhealthy | [Troubleshooting](/operations/troubleshooting) |
 

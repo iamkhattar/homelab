@@ -16,7 +16,7 @@ func TestOperationLifecycleDoesNotRecordSensitiveInput(t *testing.T) {
 	for time.Now().Before(deadline) {
 		operations := store.Operations()
 		if len(operations) == 1 && operations[0].State == Failed {
-			if operations[0].ID != op.ID || operations[0].Error != "provider unavailable" {
+			if operations[0].ID != op.ID || operations[0].Error != safeOperationFailure {
 				t.Fatalf("unexpected operation: %#v", operations[0])
 			}
 			return

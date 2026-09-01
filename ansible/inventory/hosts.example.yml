@@ -41,6 +41,8 @@ k3s_cluster:
             node-label:
               - homelab.io/location=home
               - homelab.io/hardware=mini-pc
+              # Add only on the node physically carrying the coordinator.
+              - hardware.6940469.xyz/zigbee-coordinator=true
 
     # Keep the group present even when it has no hosts. Hetzner machines will be
     # added here as agents after private networking through Tailscale is ready.

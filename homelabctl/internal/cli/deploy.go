@@ -67,7 +67,7 @@ func newDeployCommand(s *state) *cobra.Command {
 	return cmd
 }
 
-var platformStages = []string{"foundation", "networking", "secrets", "identity", "data", "observability", "cicd", "applications"}
+var platformStages = []string{"foundation", "networking", "secrets", "identity", "data", "observability", "cicd", "applications", "smart-home"}
 
 func newDeployPlatformCommand(s *state, imageTag *string) *cobra.Command {
 	var through string
@@ -75,7 +75,7 @@ func newDeployPlatformCommand(s *state, imageTag *string) *cobra.Command {
 	command := &cobra.Command{
 		Use:     "platform",
 		Short:   "Apply the platform in its safe dependency order",
-		Long:    "Apply reviewed Helmfile stages in dependency order. The workflow stops before shared data, observability, CI/CD, or applications until Butler's bootstrap ConfigMap records successful Pocket ID logins to both Butler and Vault.",
+		Long:    "Apply reviewed Helmfile stages in dependency order. The workflow stops before shared data, observability, CI/CD, applications, or opt-in home automation until Butler's bootstrap ConfigMap records successful Pocket ID logins to both Butler and Vault.",
 		Example: "  homelabctl deploy platform --through identity --confirm\n  homelabctl control verify-identity --confirm\n  homelabctl deploy platform --through observability --confirm",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -141,6 +141,12 @@ func runHelmfileDeploy(ctx context.Context, s *state, imageTag string, args ...s
 	}
 	if err := validateTags([]string{imageTag}); err != nil {
 		return err
+	}
+	if len(args) > 0 && (args[0] == "diff" || args[0] == "apply") {
+		// New releases may contain custom resources whose CRDs are installed by
+		// an earlier release in the same dependency graph. Helmfile limits this
+		// bypass to installations; upgrades retain API discovery validation.
+		args = append(args, "--skip-diff-validation-on-install")
 	}
 	return s.runEnv(ctx, s.dir("cluster"), map[string]string{"HOMELAB_IMAGE_TAG": imageTag}, "helmfile", args...)
 }

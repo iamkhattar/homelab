@@ -7,27 +7,14 @@ server:
 reconcile:
   interval: 5m
 
-# OIDC issuer (Pocket-ID). Wired up to Vault's auth/jwt mount AND used to
-# validate tokens hitting butler's own API in Phase 2.
+# OIDC issuer (Pocket ID). Wired to Vault's auth/jwt mount and used to
+# validate tokens hitting Butler's normal API.
 oidc:
   issuer: ""        # e.g. https://auth.shivlab.com — set via chart values
   audience: butler
   allowedAudiences:
     - homelabctl
-
-# OAuth clients butler provisions in Pocket-ID. Disabled until issuer above
-# is set + the Pocket-ID OAuthClients reconciler ships in Phase 1B.
-oauthClients: []
-# Example shape (uncomment + edit via chart values):
-#  - name: vault
-#    kind: confidential
-#    redirectURIs:
-#      - http://localhost:8250/oidc/callback
-#      - https://vault.shivlab.com/ui/vault/auth/oidc/oidc/callback
-#  - name: butler
-#    kind: confidential
-#    redirectURIs:
-#      - http://localhost:8251/oidc/callback
+  adminURL: http://pocket-id.security.svc.cluster.local
 
 certificates:
   acmeDNSURL: https://auth.acme-dns.io
@@ -38,7 +25,7 @@ certificates:
   tlsSecretName: homelab-wildcard-tls
 
 # Vault Kubernetes secrets engine — Vault as the universal credential broker
-# for K8s. enabled: false until Phase 1B lands the supporting SAs/policies.
+# for K8s. The embedded local-development fallback leaves it disabled.
 k8sIssuance:
   enabled: false
   hostNamespace: kube-system
@@ -70,9 +57,3 @@ k8sIssuance:
       vaultPolicies:
         - vault-read
         - k8s-viewer
-
-secrets:
-  - path: security/pocket-id
-    keys:
-      encryption-key:
-        length: 32

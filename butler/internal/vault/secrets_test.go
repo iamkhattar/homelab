@@ -2,6 +2,7 @@ package vault
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -86,6 +87,37 @@ func TestGenerateSecretData_Template(t *testing.T) {
 	expected := "postgres://root:s3cret@localhost:5432/db"
 	if data["dsn"] != expected {
 		t.Errorf("expected %q, got %v", expected, data["dsn"])
+	}
+}
+
+func TestGenerateSecretDataResolvesTemplateDependencies(t *testing.T) {
+	data, err := GenerateSecretData(map[string]KeySpec{
+		"host":      {Static: "postgres.storage.svc"},
+		"dsn":       {Template: "postgres://{{authority}}/app"},
+		"authority": {Template: "user:pass@{{host}}"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data["dsn"] != "postgres://user:pass@postgres.storage.svc/app" {
+		t.Fatalf("unexpected dependent template: %v", data["dsn"])
+	}
+}
+
+func TestGenerateSecretDataRejectsUnknownTemplateReference(t *testing.T) {
+	_, err := GenerateSecretData(map[string]KeySpec{"dsn": {Template: "postgres://{{missing}}/app"}})
+	if err == nil || !strings.Contains(err.Error(), "unknown key") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestGenerateSecretDataRejectsTemplateCycle(t *testing.T) {
+	_, err := GenerateSecretData(map[string]KeySpec{
+		"first":  {Template: "{{second}}"},
+		"second": {Template: "{{first}}"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "cycle") {
+		t.Fatalf("error = %v", err)
 	}
 }
 

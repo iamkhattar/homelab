@@ -10,17 +10,18 @@ import (
 	"time"
 
 	"github.com/iamkhattar/homelab/butler/internal/access"
-	"github.com/iamkhattar/homelab/butler/internal/applications"
 	"github.com/iamkhattar/homelab/butler/internal/certificates"
 	"github.com/iamkhattar/homelab/butler/internal/config"
 	"github.com/iamkhattar/homelab/butler/internal/identity"
 	"github.com/iamkhattar/homelab/butler/internal/observability"
 	"github.com/iamkhattar/homelab/butler/internal/operations"
+	"github.com/iamkhattar/homelab/butler/internal/platform"
 	"github.com/iamkhattar/homelab/butler/internal/reconciler"
 	"github.com/iamkhattar/homelab/butler/internal/recovery"
 	"github.com/iamkhattar/homelab/butler/internal/server"
 	"github.com/iamkhattar/homelab/butler/internal/vault"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -67,6 +68,12 @@ func main() {
 		slog.Error("creating k8s client", "error", err)
 		os.Exit(1)
 	}
+	dynamicK8s, err := dynamic.NewForConfig(k8sCfg)
+	if err != nil {
+		slog.Error("creating dynamic k8s client", "error", err)
+		os.Exit(1)
+	}
+	platformResources := platform.NewStore(dynamicK8s)
 
 	// Vault client.
 	vc, err := vault.NewClient(cfg.Vault.Address)
@@ -100,8 +107,9 @@ func main() {
 			os.Exit(1)
 		}
 		identityBootstrap := recovery.Sequence{Steps: []recovery.Bootstrapper{
-			reconciler.NewPocketIDGroups(vc, cfg.OIDC.AdminURL, cfg.PocketIDGroups),
-			reconciler.NewOAuthClients(vc, cfg.OIDC.AdminURL, cfg.OAuthClients),
+			reconciler.NewManagedCredentials(vc, platformResources),
+			reconciler.NewPocketIDGroups(vc, platformResources, cfg.OIDC.AdminURL),
+			reconciler.NewPocketIDClients(vc, platformResources, cfg.OIDC.AdminURL),
 		}}
 		serveRecovery(ctx, cfg, vc, k8s, reconciler.NewVaultBootstrap(vc, k8s, cfg.Namespace, cfg), identityBootstrap, certificateManager)
 		return
@@ -117,31 +125,13 @@ func main() {
 
 	reconcilers := []reconciler.Reconciler{
 		vaultConfiguration,
-	}
-	if len(cfg.Secrets) > 0 {
-		reconcilers = append(reconcilers, reconciler.NewSecrets(vc, cfg.Secrets))
-	}
-	if len(cfg.ManagedCredentials) > 0 {
-		reconcilers = append(reconcilers, reconciler.NewManagedCredentials(vc, cfg.ManagedCredentials))
+		reconciler.NewManagedCredentials(vc, platformResources),
+		reconciler.NewPocketIDGroups(vc, platformResources, cfg.OIDC.AdminURL),
+		reconciler.NewPocketIDClients(vc, platformResources, cfg.OIDC.AdminURL),
 	}
 	if cfg.Garage.Enabled {
-		reconcilers = append(reconcilers, reconciler.NewGarage(vc, cfg.Garage))
+		reconcilers = append(reconcilers, reconciler.NewGarage(vc, cfg.Garage, platformResources))
 	}
-	if len(cfg.PocketIDGroups) > 0 {
-		reconcilers = append(reconcilers,
-			reconciler.NewPocketIDGroups(vc, cfg.OIDC.AdminURL, cfg.PocketIDGroups),
-		)
-	}
-	if len(cfg.OAuthClients) > 0 {
-		// Pocket-ID's admin API lives on the same host as the OIDC issuer
-		// (it's the same app). Derived from cfg.OIDC.Issuer so operators
-		// only configure one URL.
-		reconcilers = append(reconcilers,
-			reconciler.NewOAuthClients(vc, cfg.OIDC.AdminURL, cfg.OAuthClients),
-		)
-	}
-	applicationStore := applications.NewStore(k8s, cfg.Namespace)
-	reconcilers = append(reconcilers, applications.NewReconciler(applicationStore, k8s))
 
 	sched := reconciler.NewScheduler(cfg.ReconcileInterval, reconcilers...)
 
@@ -153,13 +143,9 @@ func main() {
 	auth.AllowAudiences(cfg.OIDC.AllowedAudiences...)
 
 	srv := server.New(sched, vc, auth)
-	operationsPath := os.Getenv("BUTLER_OPERATIONS_PATH")
-	if operationsPath == "" {
-		operationsPath = "/var/lib/butler/operations.json"
-	}
-	operationsStore, err := operations.NewPersistentStore(operationsPath, 500)
+	operationsStore, err := operations.NewKubernetesStore(ctx, dynamicK8s, cfg.Namespace, 500)
 	if err != nil {
-		slog.Error("opening durable operations store", "error", err)
+		slog.Error("opening Kubernetes operations store", "error", err)
 		os.Exit(1)
 	}
 	srv.UseOperationsStore(operationsStore)
@@ -168,7 +154,7 @@ func main() {
 		slog.Error("configuring Kubernetes credential issuance", "error", err)
 		os.Exit(1)
 	}
-	srv.ConfigureDomains(identity.NewService(vc, cfg.OIDC.AdminURL), applicationStore, credentialService)
+	srv.ConfigureControlPlane(identity.NewService(vc, cfg.OIDC.AdminURL, platformResources), credentialService)
 
 	// Start reconciliation loop in background.
 	go sched.Start(ctx)

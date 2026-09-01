@@ -59,11 +59,47 @@ func TestCreateConfidentialClientCreatesOneTimeSecret(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if created.Secret != "generated-secret" {
-		t.Fatalf("secret = %q", created.Secret)
+	if created.Secret != "generated-secret" || created.SecretID != "secret-id" {
+		t.Fatalf("created secret = %#v", created)
 	}
 	if len(requests) != 2 {
 		t.Fatalf("requests = %#v", requests)
+	}
+}
+
+func TestClientSecretLifecycleUsesPocketIDV214Contract(t *testing.T) {
+	t.Parallel()
+	var deleted string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/oidc/clients/grafana/secrets":
+			_ = json.NewEncoder(w).Encode([]OIDCClientSecret{{ID: "old", IsActive: true}})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/oidc/clients/grafana/secrets":
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(OIDCClientSecret{ID: "new", Secret: "one-time-value", IsActive: true})
+		case r.Method == http.MethodDelete && r.URL.Path == "/api/oidc/clients/grafana/secrets/old":
+			deleted = "old"
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key")
+	secrets, err := client.ListClientSecrets(context.Background(), "grafana")
+	if err != nil || len(secrets) != 1 || secrets[0].ID != "old" {
+		t.Fatalf("secrets=%#v err=%v", secrets, err)
+	}
+	created, err := client.CreateSecret(context.Background(), "grafana")
+	if err != nil || created.ID != "new" || created.Secret != "one-time-value" {
+		t.Fatalf("created=%#v err=%v", created, err)
+	}
+	if err := client.DeleteClientSecret(context.Background(), "grafana", "old"); err != nil {
+		t.Fatal(err)
+	}
+	if deleted != "old" {
+		t.Fatalf("deleted = %q", deleted)
 	}
 }
 

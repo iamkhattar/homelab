@@ -5,6 +5,10 @@ environments:
 
 ---
 
+{{- if and .Values.smartHome.zigbee2mqtt.enabled (not .Values.smartHome.mqtt.enabled) }}
+{{- fail "smartHome.mqtt.enabled must be true before enabling Zigbee2MQTT" }}
+{{- end }}
+
 repositories:
   - name: cert-manager
     url: https://charts.jetstack.io
@@ -36,6 +40,12 @@ releases:
     namespace: kube-system
     needs: [kube-system/namespaces]
     labels: {stage: foundation, domain: platform, criticality: core}
+  - name: butler-crds
+    chart: ./core/butler-crds
+    historyMax: 5
+    namespace: kube-system
+    needs: [kube-system/namespaces]
+    labels: {stage: foundation, domain: control-plane, criticality: core}
   - name: metrics-server
     chart: ./core/metrics-server
     historyMax: 5
@@ -70,7 +80,7 @@ releases:
     chart: ./services/butler
     historyMax: 5
     namespace: security
-    needs: [kube-system/namespaces, kube-system/rbac-policies, cert-manager/cert-manager, networking/traefik, security/vault]
+    needs: [kube-system/namespaces, kube-system/rbac-policies, kube-system/butler-crds, cert-manager/cert-manager, networking/traefik, security/vault]
     labels: {stage: secrets, domain: control-plane, criticality: essential}
     values:
       - ./services/butler/helmfile-values.yaml.gotmpl
@@ -78,7 +88,6 @@ releases:
     chart: ./security/vault-secrets-operator
     historyMax: 5
     namespace: security
-    disableValidation: true
     needs: [kube-system/namespaces, security/butler]
     labels: {stage: secrets, domain: platform, criticality: essential}
   - name: pocket-id
@@ -156,28 +165,38 @@ releases:
     labels: {stage: observability, domain: observability, criticality: core}
 
 ###  SMART HOME  ###
-  # - name: mosquitto
-  #   chart: ./smart-home/mosquitto
-  #   historyMax: 5
-  #   namespace: smart-home
-  #   needs: [kube-system/namespaces]
-  # - name: zigbee2mqtt
-  #   chart: ./smart-home/zigbee2mqtt
-  #   historyMax: 5
-  #   namespace: smart-home
-  #   needs: [kube-system/namespaces, smart-home/mosquitto]
-  # - name: home-assistant
-  #   chart: ./smart-home/home-assistant
-  #   historyMax: 5
-  #   namespace: smart-home
-  #   needs: [kube-system/namespaces, smart-home/mosquitto]
+  - name: home-assistant
+    chart: ./smart-home/home-assistant
+    installed: {{ .Values.smartHome.homeAssistant.enabled }}
+    historyMax: 5
+    namespace: smart-home
+    needs: [kube-system/namespaces]
+    labels: {stage: smart-home, domain: home-automation, component: home-assistant, criticality: important}
+  - name: mosquitto
+    chart: ./smart-home/mosquitto
+    installed: {{ .Values.smartHome.mqtt.enabled }}
+    historyMax: 5
+    namespace: smart-home
+    needs: [kube-system/namespaces, security/vault-secrets-operator]
+    labels: {stage: smart-home, domain: home-automation, component: mqtt, criticality: important}
+  - name: zigbee2mqtt
+    chart: ./smart-home/zigbee2mqtt
+    installed: {{ .Values.smartHome.zigbee2mqtt.enabled }}
+    historyMax: 5
+    namespace: zigbee
+    needs: [kube-system/namespaces, security/vault-secrets-operator, smart-home/mosquitto]
+    labels: {stage: smart-home, domain: home-automation, component: zigbee, criticality: important}
+    values:
+      - coordinator:
+          device: {{ .Values.smartHome.zigbee2mqtt.device | quote }}
+          adapter: {{ .Values.smartHome.zigbee2mqtt.adapter | quote }}
 
 ###  APPLICATIONS  ###
   - name: homepage
     chart: ./applications/homepage
     historyMax: 5
     namespace: homepage
-    needs: [kube-system/namespaces]
+    needs: [kube-system/namespaces, security/pocket-id, security/vault-secrets-operator]
     labels: {stage: applications, domain: applications, criticality: standard}
   - name: paperless-ngx
     chart: ./applications/paperless-ngx

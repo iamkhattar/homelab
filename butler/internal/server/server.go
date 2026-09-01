@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/iamkhattar/homelab/butler/internal/access"
-	"github.com/iamkhattar/homelab/butler/internal/applications"
 	"github.com/iamkhattar/homelab/butler/internal/identity"
 	"github.com/iamkhattar/homelab/butler/internal/operations"
 	"github.com/iamkhattar/homelab/butler/internal/pocketid"
@@ -26,7 +25,6 @@ type Server struct {
 	vault       *vault.Client
 	auth        *AuthMiddleware
 	identity    *identity.Service
-	apps        *applications.Store
 	operations  *operations.Store
 	credentials *access.CredentialService
 }
@@ -47,9 +45,9 @@ func New(scheduler *reconciler.Scheduler, vc *vault.Client, auth *AuthMiddleware
 	return s
 }
 
-func (s *Server) ConfigureDomains(identityService *identity.Service, applicationStore *applications.Store, credentialService *access.CredentialService) {
+// ConfigureControlPlane wires the normal-mode services exposed by /api/v1.
+func (s *Server) ConfigureControlPlane(identityService *identity.Service, credentialService *access.CredentialService) {
 	s.identity = identityService
-	s.apps = applicationStore
 	s.credentials = credentialService
 }
 
@@ -83,8 +81,6 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /api/v1/identity/groups", s.require(access.Viewer, http.HandlerFunc(s.handleGroups)))
 	s.mux.Handle("GET /api/v1/identity/clients", s.require(access.Viewer, http.HandlerFunc(s.handleClients)))
 	s.mux.Handle("POST /api/v1/identity/clients/{id}/rotate", s.require(access.Admin, http.HandlerFunc(s.handleRotateClient)))
-	s.mux.Handle("GET /api/v1/applications", s.require(access.Viewer, http.HandlerFunc(s.handleApplications)))
-	s.mux.Handle("PUT /api/v1/applications/{name}", s.require(access.Admin, http.HandlerFunc(s.handleApplication)))
 	s.mux.Handle("POST /api/v1/access/kubernetes-credentials", s.require(access.Admin, http.HandlerFunc(s.handleKubernetesCredential)))
 }
 
@@ -266,36 +262,6 @@ func (s *Server) handleRotateClient(w http.ResponseWriter, r *http.Request) {
 		s.operations.Record("identity.client.rotated", actorFrom(r), "Pocket ID client secret rotated and stored in Vault: "+r.PathValue("id"))
 	}
 	respond(w, map[string]string{"status": "rotated"}, err)
-}
-
-func (s *Server) handleApplications(w http.ResponseWriter, r *http.Request) {
-	if s.apps == nil {
-		http.Error(w, "applications domain unavailable", http.StatusServiceUnavailable)
-		return
-	}
-	items, err := s.apps.List(r.Context())
-	respond(w, items, err)
-}
-
-func (s *Server) handleApplication(w http.ResponseWriter, r *http.Request) {
-	if s.apps == nil {
-		http.Error(w, "applications domain unavailable", http.StatusServiceUnavailable)
-		return
-	}
-	var item applications.Integration
-	if !decodeJSON(w, r, &item) {
-		return
-	}
-	if item.Name != "" && item.Name != r.PathValue("name") {
-		http.Error(w, "application name must match the URL", http.StatusBadRequest)
-		return
-	}
-	item.Name = r.PathValue("name")
-	err := s.apps.Put(r.Context(), item)
-	if err == nil {
-		s.operations.Record("application.integration.updated", actorFrom(r), "Application integration updated: "+item.Name)
-	}
-	respond(w, item, err)
 }
 
 func writeJSON(w http.ResponseWriter, code int, v interface{}) {

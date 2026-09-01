@@ -16,7 +16,7 @@ The repo has five top-level layers:
 
 3. **`docs/`** — VitePress operations guide. Covers Debian installation, the Ansible design, K3s installation and maintenance, backup/recovery, troubleshooting, and the future Hetzner/Tailscale boundary.
 
-4. **`cluster/`** — Helmfile at `cluster/` root orchestrates releases with dependency ordering via `needs`. Charts are organized by platform domain: `core/`, `networking/`, `security/`, `databases/`, `storage/`, `monitoring/`, `cicd/`, `applications/`, `services/`, and deferred `smart-home/` workloads.
+4. **`cluster/`** — Helmfile at `cluster/` root orchestrates releases with dependency ordering via `needs`. Charts are organized by platform domain: `core/`, `networking/`, `security/`, `databases/`, `storage/`, `monitoring/`, `cicd/`, `applications/`, `services/`, and disabled-by-default `smart-home/` increments.
 
 5. **`homelabctl/` and `butler/`** — The Go operator/CI CLI and Butler control plane. Butler is a top-level, domain-packaged service with separate Pocket ID-authenticated normal and Kubernetes TokenReview-authenticated recovery runtimes.
 
@@ -55,7 +55,7 @@ homelabctl control recovery
 homelabctl control bootstrap --confirm
 homelabctl control status
 homelabctl control users list
-homelabctl control applications list
+kubectl get pocketidclients,managedcredentials,garagebuckets -A
 ```
 
 ### Deployments and optional infrastructure

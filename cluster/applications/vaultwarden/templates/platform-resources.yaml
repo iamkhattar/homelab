@@ -1,0 +1,32 @@
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: ManagedCredential
+metadata:
+  name: vaultwarden
+  namespace: {{ .Release.Namespace }}
+spec:
+  vaultPath: applications/vaultwarden
+  fields:
+    admin-token:
+      generate: {type: password, length: 48}
+---
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: ManagedCredential
+metadata:
+  name: vaultwarden-database
+  namespace: {{ .Release.Namespace }}
+spec:
+  vaultPath: applications/vaultwarden/database
+  fields:
+    database-url:
+      sourceRef: {path: databases/postgresql, key: vaultwarden-url}
+---
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: PocketIDClient
+metadata:
+  name: vaultwarden
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: confidential
+  redirectURIs:
+    - https://vaultwarden.6940469.xyz/identity/connect/oidc-signin
+  vaultPath: oauth/vaultwarden

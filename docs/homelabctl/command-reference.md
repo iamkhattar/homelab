@@ -141,7 +141,6 @@ directory. `--token` or `BUTLER_TOKEN` are non-persistent overrides.
 | `control recovery export` | Write the recovery Secret directly to an age-encrypted off-repository file | Refuses repository and filesystem-root destinations and existing output files |
 | `control status`, `operations`, `events` | Inspect reconciliation and audit-safe activity | Viewer access; no request bodies or secret values are recorded |
 | `control users ...`, `groups`, `clients ...` | Manage Pocket ID identities and rotate client secrets | Mutations require Butler admin; rotated secrets go directly to Vault |
-| `control applications ...` | Manage non-secret application integration metadata | Names and identifiers are validated before API calls |
 | `control credentials issue` | Issue an approved short-lived Kubernetes token | Admin-only; role, namespace and maximum TTL are server-side; default output is an `ExecCredential` |
 
 ```bash
@@ -164,10 +163,6 @@ homelabctl control users list
 homelabctl control users set-groups USER_ID --group GROUP_ID
 homelabctl control clients rotate CLIENT_ID
 homelabctl control credentials issue --role homelab-viewer --ttl 15m
-homelabctl control applications put kitchenowl \
-  --app-namespace kitchenowl \
-  --authentication native-oidc \
-  --host kitchenowl.6940469.xyz
 homelabctl control logout
 ```
 
@@ -191,7 +186,7 @@ Terraform apply and destroy are deliberately absent. The inherited cloud-init
 path remains unsafe until token delivery and Tailscale networking are replaced.
 
 The ordered stages are `foundation`, `networking`, `secrets`, `identity`,
-`data`, `observability`, `cicd` and `applications`. A first installation stops
+`data`, `observability`, `cicd`, `applications` and opt-in `smart-home`. A first installation stops
 after identity, runs `control bootstrap`, enrolls the Pocket ID owner, runs
 `control login` and `control verify-identity`, then continues through the
 remaining stages. `--recovery-address` can target an explicitly private

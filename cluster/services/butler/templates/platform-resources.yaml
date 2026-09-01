@@ -1,0 +1,44 @@
+{{- range $name, $friendlyName := dict "homelab-admin" "Homelab administrators" "homelab-operator" "Homelab operators" "homelab-viewer" "Homelab viewers" }}
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: PocketIDGroup
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/managed-by: {{ $.Release.Name }}
+spec:
+  friendlyName: {{ $friendlyName }}
+---
+{{- end }}
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: PocketIDClient
+metadata:
+  name: homelabctl
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: public
+  redirectURIs:
+    - http://127.0.0.1:17654/callback
+  vaultPath: oauth/homelabctl
+---
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: PocketIDClient
+metadata:
+  name: butler
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: public
+  redirectURIs:
+    - https://butler.6940469.xyz/auth/callback
+  vaultPath: oauth/butler
+---
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: PocketIDClient
+metadata:
+  name: vault
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: confidential
+  redirectURIs:
+    - http://localhost:8250/oidc/callback
+    - https://vault.6940469.xyz/ui/vault/auth/jwt/oidc/callback
+  vaultPath: oauth/vault

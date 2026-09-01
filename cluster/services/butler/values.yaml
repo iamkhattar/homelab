@@ -18,12 +18,12 @@ ingress:
   className: traefik
 
 # Environment variables passed to the butler container. Tiny set — anything
-# substantive lives in the config ConfigMap below. These are kept here as
+# runtime policy lives in the config ConfigMap below and provider intent lives
+# in typed Kubernetes resources. These are kept here as
 # escape hatches for log level + alt config path overrides.
 env:
   LOG_LEVEL: "info"
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy.monitoring.svc.cluster.local:4318"
-  BUTLER_OPERATIONS_PATH: "/var/lib/butler/operations.json"
 
 resources:
   requests:
@@ -32,11 +32,6 @@ resources:
   limits:
     cpu: 250m
     memory: 256Mi
-
-persistence:
-  enabled: true
-  size: 1Gi
-  storageClass: ""
 
 serviceAccount:
   name: butler
@@ -78,8 +73,8 @@ networkPolicy:
 # /etc/butler/config.yaml inside the container. This replaces the embedded
 # butler.yaml fallback at runtime.
 #
-# Everything butler used to require a rebuild for (certificate domain, OAuth clients,
-# Vault JWT roles, K8s issuance roles) lives here.
+# Shared endpoints, certificate policy, Vault roles and K8s issuance live here.
+# Pocket ID clients and generated credentials live beside their owning charts.
 config:
   vault:
     address: http://vault.security.svc.cluster.local:8200
@@ -87,6 +82,12 @@ config:
       role: butler
       tokenPath: /var/run/secrets/butler-vault/token
       consumers:
+        - name: vso-homepage
+          namespace: homepage
+          serviceAccounts: [default]
+          paths:
+            - applications/homepage
+            - oauth/homepage
         - name: vso-kitchenowl
           namespace: kitchenowl
           serviceAccounts: [default]
@@ -118,6 +119,17 @@ config:
           serviceAccounts: [default]
           paths:
             - infrastructure/acme-dns
+        - name: vso-smart-home
+          namespace: smart-home
+          serviceAccounts: [default]
+          paths:
+            - smart-home/mqtt
+        - name: vso-zigbee
+          namespace: zigbee
+          serviceAccounts: [default]
+          paths:
+            - smart-home/mqtt
+            - smart-home/zigbee2mqtt
   server:
     port: "8080"
   reconcile:
@@ -130,37 +142,6 @@ config:
     allowedAudiences:
       - homelabctl
     adminURL: http://pocket-id.security.svc.cluster.local
-  # Butler owns group definitions through Pocket ID's admin API. Human users,
-  # passkeys, and group membership remain deliberate operator actions.
-  pocketIdGroups:
-    - name: homelab-admin
-      friendlyName: Homelab administrators
-    - name: homelab-operator
-      friendlyName: Homelab operators
-    - name: homelab-viewer
-      friendlyName: Homelab viewers
-  oauthClients:
-    - name: homelabctl
-      kind: public
-      redirectURIs:
-        - http://127.0.0.1:17654/callback
-    - name: butler
-      kind: public
-      redirectURIs:
-        - https://butler.6940469.xyz/auth/callback
-    - name: vault
-      kind: confidential
-      redirectURIs:
-        - http://localhost:8250/oidc/callback
-        - https://vault.6940469.xyz/ui/vault/auth/jwt/oidc/callback
-    - name: grafana
-      kind: confidential
-      redirectURIs:
-        - https://grafana.6940469.xyz/login/generic_oauth
-    - name: vaultwarden
-      kind: confidential
-      redirectURIs:
-        - https://vaultwarden.6940469.xyz/identity/connect/oidc-signin
   certificates:
     acmeDNSURL: https://auth.acme-dns.io
     domain: 6940469.xyz
@@ -201,88 +182,6 @@ config:
         vaultPolicies:
           - vault-read
           - k8s-viewer
-  secrets:
-    - path: security/pocket-id
-      keys:
-        encryption-key:
-          length: 32
-    - path: databases/postgresql
-      keys:
-        postgres-password:
-          length: 32
-        kitchenowl-password:
-          length: 32
-        paperless-password:
-          length: 32
-        vaultwarden-password:
-          length: 32
-        vaultwarden-url:
-          template: "postgresql://vaultwarden:{{vaultwarden-password}}@postgresql.databases.svc.cluster.local:5432/vaultwarden"
-        init.sql:
-          template: |
-            CREATE ROLE kitchenowl LOGIN PASSWORD '{{kitchenowl-password}}';
-            CREATE DATABASE kitchenowl OWNER kitchenowl;
-            CREATE ROLE paperless LOGIN PASSWORD '{{paperless-password}}';
-            CREATE DATABASE paperless OWNER paperless;
-            CREATE ROLE vaultwarden LOGIN PASSWORD '{{vaultwarden-password}}';
-            CREATE DATABASE vaultwarden OWNER vaultwarden;
-    - path: databases/redis
-      keys:
-        redis-password:
-          length: 32
-        redis-url:
-          template: "redis://:{{redis-password}}@redis-master.databases.svc.cluster.local:6379/0"
-    - path: storage/garage
-      keys:
-        rpc-secret:
-          hexLength: 32
-        admin-token:
-          length: 32
-        metrics-token:
-          length: 32
-    - path: applications/kitchenowl
-      keys:
-        jwt-secret:
-          length: 48
-    - path: applications/paperless-ngx
-      keys:
-        secret-key:
-          length: 48
-        admin-user:
-          static: admin
-        admin-password:
-          length: 32
-    - path: applications/vaultwarden
-      keys:
-        admin-token:
-          length: 48
-    - path: monitoring/grafana
-      keys:
-        admin-user:
-          static: admin
-        admin-password:
-          length: 32
-  managedCredentials:
-    - sourcePath: databases/postgresql
-      destinationPath: applications/kitchenowl/database
-      keys:
-        password: kitchenowl-password
-      static:
-        username: kitchenowl
-    - sourcePath: databases/postgresql
-      destinationPath: applications/paperless-ngx/database
-      keys:
-        password: paperless-password
-      static:
-        username: paperless
-    - sourcePath: databases/redis
-      destinationPath: applications/paperless-ngx/redis
-      keys:
-        redis-url: redis-url
-    - sourcePath: databases/postgresql
-      destinationPath: applications/vaultwarden/database
-      keys:
-        database-url: vaultwarden-url
   garage:
     enabled: true
     endpoint: http://garage.storage.svc.cluster.local:3903
@@ -292,9 +191,3 @@ config:
       zone: titan
       # Logical Garage capacity budget; keep below the actual persistent disk.
       capacityBytes: 53687091200
-    buckets:
-      - name: homelab-backups
-        credentialPath: storage/garage/clients/backups
-        read: true
-        write: true
-        owner: false

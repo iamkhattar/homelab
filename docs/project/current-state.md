@@ -29,7 +29,7 @@ machine. Do not interpret **Ready in repo** as **Deployed**.
 | Required before important data | Choose encrypted off-node storage and prove that K3s, Vault, database and application backups can be restored from it. |
 | Required before relying on alerts | Choose an off-cluster Alertmanager receiver, deliver its credential through Vault and verify a test notification. |
 | Required during platform bootstrap | Complete the one-time Butler-generated Namecheap CNAME ceremony, define Vault recovery-share custody, complete the Pocket ID owner ceremony, initialize Vault through Butler and export recovery material. |
-| Later design decisions | Self-hosting acme-dns, internal resolver failover, ZHA versus Zigbee2MQTT, and the future Tailscale/Hetzner design. |
+| Later design decisions | Self-hosting acme-dns, internal resolver failover, component-specific smart-home metrics, and the future Tailscale/Hetzner design. |
 
 Repository enhancements such as controlled automatic security updates,
 SMART/NVMe telemetry and signed build provenance are useful follow-up work, but
@@ -58,11 +58,11 @@ they do not block the first recoverable Titan installation.
 | Prometheus, Grafana, Loki, Tempo and Alloy | Ready in repo | Pinned bounded charts, seven-day retention, kube-state-metrics, node-exporter, OTLP receivers, log collection, Butler metrics/logs/traces, Grafana correlation, reusable all-workload dashboards and workload/Job/PVC/OOM alerts render. Choose and test the final off-cluster Alertmanager receiver before relying on alerts. |
 | Pocket ID | Ready in repo | Pinned v2 deployment, Vault-provided encryption key, native OTLP, Butler-managed groups, users and OIDC clients, secret rotation into Vault, and Butler PKCE login exist; first owner/API key remain an interactive Titan checkpoint. |
 | Vault and Butler | Ready in repo | Top-level Butler has separate normal and private recovery runtimes. Recovery performs confirmed, resumable initialization and now remains identity-pending until real Pocket ID logins to Butler and Vault pass. Normal reconciliation uses projected Kubernetes auth. VSO remains the application secret-delivery path. Export the recovery Secret to an age-encrypted off-cluster bundle and restore-test on Titan. |
-| Shared PostgreSQL, Redis and Garage | Ready in repo | Helmfile order, least-privilege consumer projections, per-application PostgreSQL identities, persistence, NetworkPolicies and Garage v2 API reconciliation render successfully; deploy and restore-test on Titan |
+| Shared PostgreSQL, Redis and Garage | Ready in repo | PostgreSQL 18.6 (chart 18.8.13), Redis 8.10 (chart 28.0.12), least-privilege consumer projections, persistence, NetworkPolicies and Garage v2 API reconciliation render successfully. Mutable Bitnami community tags are pinned by multi-architecture digest; deploy and restore-test on Titan. |
 | Actions Runner Controller | Ready in repo | Controller and one scale-to-zero runner set render successfully; create/import a least-privilege GitHub App and prove a read-only job before deployment authority |
-| Homepage, KitchenOwl, ntfy, Vaultwarden and Paperless-ngx | Ready in repo | Each app has its own namespace; selected charts, pinned images, resources, persistence, scoped Vault credentials and initial NetworkPolicies exist; keep internal until per-app TLS/auth/backup checks pass |
-| Home Assistant | Not deployed | Storage, backup and a tested USB device strategy |
-| Zigbee and MQTT | Not deployed | Stable `/dev/serial/by-id` mapping and a decision on Zigbee2MQTT/Mosquitto |
+| Homepage, KitchenOwl, ntfy, Vaultwarden and Paperless-ngx | Ready in repo | Each app has its own namespace, pinned images, resources, persistence, scoped Vault credentials and initial NetworkPolicies. Homepage 2.1.2 and Vaultwarden 1.37.2 use Butler-managed Pocket ID clients; ntfy is pinned to 2.28.0. Keep the others internal until their TLS/auth/backup checks pass. |
+| Home Assistant | Ready in repo | Opt-in release, native owner/MFA enrollment, off-node `/config` backup and restore test |
+| Zigbee and MQTT | Ready in repo | Sonoff zStack/Zigbee2MQTT is accepted; record the exact `/dev/serial/by-id` path, survey the radio channel, then deploy Mosquitto and Zigbee2MQTT incrementally |
 | Internal docs hosting | Not deployed | Container registry, ingress and access policy |
 | Tailscale | Not deployed | Tailnet identity, ACL and key-expiry decisions |
 | Hetzner agents | Legacy review | Tailscale transport and replacement of token-bearing cloud-init |
@@ -73,8 +73,20 @@ they do not block the first recoverable Titan installation.
   loopback callback; logout removes the private cached session.
 - Butler issues only configured short-lived Kubernetes roles from Vault and
   never records the returned bearer token.
-- Butler operations and audit-safe events survive pod restarts on a dedicated
-  PVC.
+- Butler is stateless. Operations and audit-safe events survive pod restarts as
+  bounded, secret-free `ButlerOperation` Kubernetes resources; there is no
+  Butler PVC.
+- Butler serializes scheduled and manually requested reconciliation, retries
+  Kubernetes optimistic-lock conflicts, sanitizes persisted failures, rejects
+  cross-kind Vault output-path collisions, and validates dependent credential
+  templates before writing Vault.
+- One-time Pocket ID and Garage credentials use compensating cleanup: a failed
+  Vault write revokes the new provider credential, while successful Pocket ID
+  rotation persists the replacement before retiring older secrets.
+- App charts now own `PocketIDClient`, `ManagedCredential`, and where relevant
+  `GarageBucket` declarations. Shared Pocket ID groups live with Butler, while
+  the removed `ApplicationIntegration` ConfigMap no longer duplicates chart
+  metadata.
 - Bootstrap pauses for the Pocket ID management credential, reconciles groups
   and OIDC clients, then requires real Butler and Vault Pocket ID login proofs
   before becoming operational. The temporary Vault token remains on the
@@ -95,8 +107,9 @@ they do not block the first recoverable Titan installation.
 The host baseline, SSH hardening and K3s readiness check are complete. Continue
 with:
 
-1. Merge and publish the Butler/acme-dns certificate change, deploy through the
-   secrets stage, then create only the exact Namecheap CNAME Butler generates.
+1. Publish the audited chart update, pull the resulting immutable Butler image
+   SHA, deploy through the secrets stage, then create only the exact Namecheap
+   CNAME Butler generates.
 2. Run `homelabctl cluster diagnose --ask-become-pass` and review the K3s
    service, journal, events and embedded-etcd snapshot configuration.
 3. Run `homelabctl cluster snapshot list --ask-become-pass`.
@@ -112,9 +125,9 @@ checks are complete. The detailed
 acceptance criteria for later phases live in the [roadmap](/project/roadmap).
 After the foundation passes, continue with the
 [platform bootstrap runbook](/operations/platform-bootstrap): deploy only
-through identity first, finish Pocket ID and Vault verification, export and
-trust the CA, and then add data, observability, CI/CD and applications one stage
-at a time.
+through identity first, finish Pocket ID and Vault verification, verify the
+public wildcard certificate, and then add data, observability, CI/CD and
+applications one stage at a time.
 
 ## Sources of truth
 

@@ -16,8 +16,27 @@ the node.
 | Observability | Prometheus, kube-state-metrics, node-exporter, Loki, Tempo, Alloy and Grafana |
 | Delivery | Actions Runner Controller and `titan` runner scale set |
 | Applications | Homepage, KitchenOwl, ntfy, Vaultwarden, Paperless-ngx |
-| Preserved, not in the first sync | Home Assistant, Mosquitto, Zigbee2MQTT |
+| Opt-in home automation | Home Assistant, Vault-backed Mosquitto, Titan-pinned Zigbee2MQTT for the Sonoff zStack coordinator |
 | Deferred and removed | CrowdSec, Gatekeeper, Fluent Bit |
+
+The first-install chart audit pins PostgreSQL chart `18.8.13` (PostgreSQL
+`18.6`), Redis chart `28.0.12` (Redis `8.10`), cert-manager `1.21.1`, Vault
+chart `0.34.1` (Vault `2.0.4`), VSO `1.5.1`, metrics-server chart `3.14.0` and
+Traefik chart `41.4.0` (Traefik `3.7.12`). Grafana, Loki, Tempo, Alloy,
+Prometheus and ARC were already at the current audited releases. Chart locks
+are committed. The opt-in home-automation images are pinned to Home Assistant
+`2026.8.3`, Zigbee2MQTT `2.13.0` and the newest published official Mosquitto
+container, `2.0.22`, plus immutable multi-architecture digests. Bitnami's free community database images expose a mutable
+`latest` tag, so PostgreSQL, Redis and exporter manifests are additionally
+pinned by digest; updating those charts requires deliberately refreshing and
+testing the matching digests.
+
+On a fresh cluster, `homelabctl deploy diff` and `deploy apply` pass Helmfile's
+`--skip-diff-validation-on-install` option so custom resources can be rendered
+before their owning CRDs have been installed. The relaxation applies only when
+Helmfile detects a new release; diffs for installed releases retain Kubernetes
+API validation. Helm lint, the complete Helmfile render and repository security
+checks remain mandatory before deployment.
 
 Fluent Bit is not part of the target design because Grafana Alloy will own the
 Kubernetes log and OTLP collection path. CrowdSec has no useful blocking path
@@ -42,8 +61,9 @@ shared data  ARC credentials
 applications   scale-to-zero runners
 ```
 
-Butler being active before VSO is intentional. Butler initializes and
-configures Vault and creates managed values in Vault KV. VSO then materializes
+Butler recovery being active before VSO is intentional. It initializes and
+configures Vault, then reconciles `ManagedCredential` declarations into Vault
+KV. VSO materializes
 only the Kubernetes Secrets required by a workload. A Helm `needs` edge orders
 release submission; it does not prove that Vault is unsealed or a VSO Secret is
 ready. Deploy and verify one checkpoint at a time during first bootstrap.
@@ -68,15 +88,21 @@ storage.
 
 Garage provides an internal S3-compatible API. Its RPC and admin tokens come
 from Vault. Butler calls Garage's v2 admin API to assign the one live node,
-apply the layout, create the declared bucket and access key, grant its bounded
+apply the layout, reconcile each app-owned `GarageBucket` and access key, grant its bounded
 permissions and persist the one-time key to Vault. Garage data stored on Titan
 is not an off-node backup.
+
+These contracts are Kubernetes APIs, not entries in Butler's ConfigMap. Each
+chart owns its `ManagedCredential` and `PocketIDClient` resources beside the
+`VaultStaticSecret` that consumes the resulting path. The separate
+`butler-crds` foundation release makes the types available before any consumer
+release is rendered or applied.
 
 ## Application credentials and authentication
 
 | Application | Vault material | Data dependency | Pocket ID state |
 | --- | --- | --- | --- |
-| Homepage | none initially | Kubernetes read-only API and service links | keep internal until the ingress auth pattern is ready |
+| Homepage | generated auth secret and OIDC client | Kubernetes read-only API and service links | native Pocket ID OIDC is configured in Homepage 2.1.2 |
 | KitchenOwl | JWT key plus its database credential | PostgreSQL | review native support; use the shared proxy if required |
 | ntfy | user/token lifecycle still to be managed through its API | local cache | login is required; Pocket ID proxy integration remains a gate for ingress |
 | Vaultwarden | admin token, database URL and OIDC client | PostgreSQL | native OIDC is configured for Pocket ID |

@@ -2,3 +2,17 @@
 ## All services are exposed as subdomains: <service>.<domain>
 ## Update this value before deploying.
 domain: "6940469.xyz"
+
+## Home automation is deliberately opt-in. Enable one increment at a time and
+## commit the resulting desired state only after its acceptance checks pass.
+smartHome:
+  homeAssistant:
+    enabled: false
+  mqtt:
+    enabled: false
+  zigbee2mqtt:
+    enabled: false
+    # Use the exact path reported on Titan; never use /dev/ttyUSB0.
+    device: ""
+    # The installed SONOFF coordinator is the zStack/ZBDongle-P family.
+    adapter: "zstack"

@@ -13,6 +13,12 @@ This runs Helmfile's diff workflow from `cluster/` and does not apply releases.
 Use it before every routine deployment. A clean diff is not a substitute for
 application-specific backup or migration checks.
 
+For releases that are not installed yet, `homelabctl` passes
+`--skip-diff-validation-on-install`. This allows a first-cluster diff to include
+resources such as `VaultStaticSecret`, `Certificate` and `TLSStore` before VSO,
+cert-manager and Traefik have installed their CRDs. Installed releases still
+receive normal live API validation.
+
 All deploy subcommands pass `HOMELAB_IMAGE_TAG` to Helmfile. By default it is
 the repository's full committed Git SHA—the same immutable tag CI publishes.
 The image must exist in the registry before applying that commit. To select a
@@ -61,7 +67,9 @@ homelabctl deploy apply --stage data
 ```
 
 The current stage labels are `foundation`, `networking`, `secrets`, `identity`,
-`data`, `observability`, `cicd` and `applications`. A release argument and
+`data`, `observability`, `cicd`, `applications` and `smart-home`. Smart-home
+releases remain disabled by desired-state switches until their hardware and
+backup checkpoints are complete. A release argument and
 `--stage` cannot be combined. Selected deploys pass Helmfile's
 `--include-needs`, so declared dependencies are included; the operator must
 still stop at the documented readiness checkpoints because a Helm dependency

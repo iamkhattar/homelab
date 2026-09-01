@@ -124,7 +124,7 @@ func TestKubernetesCredentialEndpointDoesNotAuditToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv.ConfigureDomains(nil, nil, service)
+	srv.ConfigureControlPlane(nil, service)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/access/kubernetes-credentials", bytes.NewBufferString(`{"role":"homelab-viewer","ttl":"15m"}`))
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)

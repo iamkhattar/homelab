@@ -3,8 +3,8 @@ name: redis
 description: A Helm chart to deploy Redis for the homelab k3s cluster
 type: application
 version: 0.1.0
-appVersion: "7.4.0"
+appVersion: "8.10.1"
 dependencies:
   - name: redis
-    version: "20.6.2"
+    version: "28.0.12"
     repository: https://charts.bitnami.com/bitnami

@@ -8,41 +8,93 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ .Release.Name }}
       app.kubernetes.io/instance: {{ .Release.Name }}
   template:
     metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
       labels:
         app.kubernetes.io/name: {{ .Release.Name }}
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1883
+        runAsGroup: 1883
+        fsGroup: 1883
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: build-authentication-files
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              cp /input/mosquitto.conf /work/mosquitto.conf
+              cp /input/acl_file /work/acl_file
+              mosquitto_passwd -b -c /work/password_file "$ZIGBEE2MQTT_USERNAME" "$ZIGBEE2MQTT_PASSWORD"
+              mosquitto_passwd -b /work/password_file "$HOME_ASSISTANT_USERNAME" "$HOME_ASSISTANT_PASSWORD"
+              chmod 0600 /work/password_file
+          env:
+            - name: ZIGBEE2MQTT_USERNAME
+              valueFrom: {secretKeyRef: {name: mqtt-credentials, key: zigbee2mqtt-username}}
+            - name: ZIGBEE2MQTT_PASSWORD
+              valueFrom: {secretKeyRef: {name: mqtt-credentials, key: zigbee2mqtt-password}}
+            - name: HOME_ASSISTANT_USERNAME
+              valueFrom: {secretKeyRef: {name: mqtt-credentials, key: home-assistant-username}}
+            - name: HOME_ASSISTANT_PASSWORD
+              valueFrom: {secretKeyRef: {name: mqtt-credentials, key: home-assistant-password}}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: config-source, mountPath: /input, readOnly: true}
+            - {name: config, mountPath: /work}
       containers:
         - name: {{ .Release.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: mqtt
               containerPort: {{ .Values.service.mqttPort }}
-              protocol: TCP
-            - name: websocket
-              containerPort: {{ .Values.service.websocketPort }}
               protocol: TCP
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             - name: config
-              mountPath: /mosquitto/config/mosquitto.conf
-              subPath: mosquitto.conf
+              mountPath: /mosquitto/config
             {{- if .Values.persistence.enabled }}
             - name: data
               mountPath: {{ .Values.persistence.mountPath }}
             {{- end }}
+          readinessProbe:
+            tcpSocket: {port: mqtt}
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: {port: mqtt}
+            periodSeconds: 20
+            failureThreshold: 6
       volumes:
-        - name: config
+        - name: config-source
           configMap:
             name: {{ .Release.Name }}-config
+        - name: config
+          emptyDir: {}
         {{- if .Values.persistence.enabled }}
         - name: data
           persistentVolumeClaim:

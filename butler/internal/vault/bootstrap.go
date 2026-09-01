@@ -58,7 +58,7 @@ type BootstrapInput struct {
 	// 'homelab-admin' across auth/jwt and kubernetes/.
 	JWTRoles []JWTRoleSpec
 
-	// Kubernetes secrets engine config (enabled in Phase 1B). Disabled when
+	// Kubernetes secrets engine config. Disabled when
 	// K8sEngine.Enabled is false.
 	K8sEngine K8sEngineConfig
 
@@ -341,10 +341,10 @@ func (c *Client) ensureRole(ctx context.Context) error {
 
 // ensureJWTAuth enables and configures the jwt auth method for OIDC-issued
 // JWTs from Pocket-ID. If the issuer is empty, this is a no-op (typical
-// during the Phase 1A bootstrap when Pocket-ID isn't reachable yet).
+// during initial bootstrap when Pocket ID is not reachable yet).
 //
 // If the issuer is set but the OAuth client_id/client_secret aren't yet
-// available (the OAuthClients reconciler writes them to secret/oauth/vault
+// available (the PocketIDClient reconciler writes them to secret/oauth/vault
 // on a later pass), we still mount auth/jwt and set the discovery URL —
 // but skip configuring the OIDC client. That's enough for `vault login
 // -method=jwt` (token-only JWTs), and is upgraded to full OIDC once the
@@ -506,7 +506,7 @@ func firstDomain(in BootstrapInput) string {
 // homelab-{admin,operator,viewer} roles.
 //
 // Soft-fails (returns nil with a warning log) when:
-//   - K8sEngine.Enabled is false (Phase 1A / disabled deployments).
+//   - K8sEngine.Enabled is false for disabled or local-development deployments.
 //   - The token-reviewer Secret exists but hasn't yet been populated by
 //     the kube-controller-manager (typical on the very first reconcile
 //     pass right after the rbac-policies chart applied).

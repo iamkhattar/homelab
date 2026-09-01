@@ -3,4 +3,4 @@ name: homepage
 description: A Helm chart to deploy Homepage dashboard for the homelab k3s cluster
 type: application
 version: 0.1.0
-appVersion: "0.9.0"
+appVersion: "2.1.2"

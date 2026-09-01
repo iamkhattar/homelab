@@ -1,0 +1,10 @@
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: ManagedCredential
+metadata:
+  name: pocket-id-runtime
+  namespace: {{ .Release.Namespace }}
+spec:
+  vaultPath: security/pocket-id
+  fields:
+    encryption-key:
+      generate: {type: password, length: 32}

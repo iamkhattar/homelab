@@ -68,7 +68,7 @@ kubectl top node titan
 ```
 
 This creates platform namespaces, per-application namespaces, Pod Security
-labels and foundational RBAC, then installs the separately pinned metrics-server
+labels, foundational RBAC and the `platform.6940469.xyz` CRDs, then installs the separately pinned metrics-server
 release that replaces the disabled K3s package. Do not continue until its
 deployment is available, the aggregated Metrics API reports `Available=True`
 and `kubectl top` returns Titan CPU and memory usage.
@@ -168,7 +168,14 @@ kubectl get clusterissuer letsencrypt-production
 kubectl -n cert-manager get secret acme-dns
 kubectl -n networking get certificate homelab-wildcard
 kubectl -n networking get secret homelab-wildcard-tls
+kubectl get pocketidclients,managedcredentials,garagebuckets -A
+kubectl get pocketidgroups
 ```
+
+The custom resources contain intent and non-secret status only. Butler writes
+generated or provider-issued credentials directly to Vault; VSO then projects
+ordinary Kubernetes Secrets for workloads. `kubectl describe` should show a
+`Ready=True` condition after reconciliation.
 
 ## 4. Pocket ID and management handoff
 
@@ -192,7 +199,7 @@ rm /secure/pocket-id-api-key
 ```
 
 Butler reconciles `homelab-admin`, `homelab-operator` and `homelab-viewer`, plus
-stable OIDC clients for Butler, Vault, Grafana and Vaultwarden. Assign the first
+stable OIDC clients for Butler, Vault, Grafana, Homepage and Vaultwarden. Assign the first
 owner to `homelab-admin`. Bootstrap now pauses at
 `awaiting-identity-verification`.
 

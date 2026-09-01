@@ -47,7 +47,7 @@ homelabctl control
 ├── login|logout
 ├── bootstrap|verify-identity|recovery
 ├── status|operations|events
-├── users|groups|clients|applications
+├── users|groups|clients
 └── credentials issue
 ```
 
@@ -140,8 +140,8 @@ and submits only non-secret acceptance evidence through the recovery API.
 
 ## Current boundary
 
-The typed client, Pocket ID browser login, role-aware API, persisted operation
-history, application integrations, bounded credential issuance and recovery
+The typed client, Pocket ID browser login, role-aware API, Kubernetes-persisted
+operation history, declarative provider resources, bounded credential issuance and recovery
 workflow are implemented. Titan deployment, first-owner enrollment, real
 integration execution and restore rehearsal remain operational checkpoints,
 not repository claims. See [current state](/project/current-state) and the

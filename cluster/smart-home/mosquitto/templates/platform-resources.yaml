@@ -1,0 +1,16 @@
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: ManagedCredential
+metadata:
+  name: mqtt-clients
+  namespace: {{ .Release.Namespace }}
+spec:
+  vaultPath: smart-home/mqtt
+  fields:
+    zigbee2mqtt-username:
+      value: zigbee2mqtt
+    zigbee2mqtt-password:
+      generate: {type: password, length: 48}
+    home-assistant-username:
+      value: home-assistant
+    home-assistant-password:
+      generate: {type: password, length: 48}

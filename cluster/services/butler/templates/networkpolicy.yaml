@@ -16,8 +16,8 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Anyone in-cluster can hit the HTTP API; AuthN is enforced at the app
-    # layer via OIDC (Phase 1B).
+    # Anyone in-cluster can hit the HTTP API; normal-mode authentication is
+    # enforced by Butler with Pocket ID OIDC.
     - from:
         - namespaceSelector: {}
       ports:

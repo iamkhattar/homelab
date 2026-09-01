@@ -1,8 +1,8 @@
 replicaCount: 1
 
 image:
-  repository: koenkk/zigbee2mqtt
-  tag: "1.41.0"
+  repository: ghcr.io/koenkk/zigbee2mqtt
+  tag: "2.13.0@sha256:4fb4db4d49a217bed6d0204f454ce809febc565bbe051b85c556ee2bcef73d8c"
   pullPolicy: IfNotPresent
 
 service:
@@ -12,12 +12,41 @@ service:
 
 env:
   ZIGBEE2MQTT_CONFIG_MQTT_SERVER: "mqtt://mosquitto.smart-home.svc.cluster.local:1883"
-  ZIGBEE2MQTT_CONFIG_SERIAL_PORT: "/dev/ttyUSB0"  # Update to match your Zigbee adapter
-  ZIGBEE2MQTT_CONFIG_FRONTEND: "true"
+  ZIGBEE2MQTT_CONFIG_SERIAL_PORT: "/dev/zigbee"
+  ZIGBEE2MQTT_CONFIG_FRONTEND_ENABLED: "true"
+  ZIGBEE2MQTT_CONFIG_HOMEASSISTANT_ENABLED: "true"
+
+coordinator:
+  # Helmfile always overrides this chart-only render placeholder from the
+  # desired-state value. Set the real path only after checking Titan.
+  device: "/dev/serial/by-id/REQUIRED_AT_DEPLOYMENT"
+  # SONOFF ZBDongle-P uses zstack; ZBDongle-E uses ember.
+  adapter: "zstack"
+
+zigbee:
+  # Pick before pairing devices. Channel 20 is a broadly compatible starting
+  # point; survey the 2.4 GHz Wi-Fi channel before enabling this release.
+  channel: 20
+
+nodeSelector:
+  kubernetes.io/hostname: titan
+  hardware.6940469.xyz/zigbee-coordinator: "true"
 
 # USB device passthrough for Zigbee adapter
 securityContext:
   privileged: true
+
+podSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+ingress:
+  enabled: true
+  className: traefik
+  host: zigbee.6940469.xyz
 
 persistence:
   enabled: true
@@ -32,4 +61,4 @@ resources:
     memory: 128Mi
   limits:
     cpu: 250m
-    memory: 256Mi
+    memory: 512Mi

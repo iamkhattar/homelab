@@ -94,10 +94,43 @@ func TestScheduler_Statuses_RecordsError(t *testing.T) {
 	if statuses[0].Success {
 		t.Error("expected success=false")
 	}
-	if statuses[0].Error != "broken" {
-		t.Errorf("expected error 'broken', got %q", statuses[0].Error)
+	if statuses[0].Error != "reconciliation failed; inspect Butler logs for details" {
+		t.Errorf("unexpected safe error: %q", statuses[0].Error)
 	}
 }
+
+func TestSchedulerSerializesConcurrentRuns(t *testing.T) {
+	entered := make(chan struct{}, 2)
+	release := make(chan struct{})
+	r := ReconcilerFunc{"serialized", func(context.Context) error {
+		entered <- struct{}{}
+		<-release
+		return nil
+	}}
+	s := NewScheduler(time.Minute, r)
+	done := make(chan struct{}, 2)
+	go func() { _ = s.RunOnce(context.Background()); done <- struct{}{} }()
+	<-entered
+	go func() { _ = s.RunOnce(context.Background()); done <- struct{}{} }()
+	select {
+	case <-entered:
+		t.Fatal("second reconciliation entered before the first completed")
+	case <-time.After(25 * time.Millisecond):
+	}
+	release <- struct{}{}
+	<-entered
+	release <- struct{}{}
+	<-done
+	<-done
+}
+
+type ReconcilerFunc struct {
+	name string
+	fn   func(context.Context) error
+}
+
+func (r ReconcilerFunc) Name() string                        { return r.name }
+func (r ReconcilerFunc) Reconcile(ctx context.Context) error { return r.fn(ctx) }
 
 func TestScheduler_Start_CancelStops(t *testing.T) {
 	r1 := &mockReconciler{name: "a"}

@@ -1,4 +1,8 @@
 redis:
+  # See the PostgreSQL chart: the free Bitnami image uses a mutable latest tag,
+  # so keep the resolved multi-architecture image immutable by digest.
+  image:
+    digest: sha256:d75bda00b778ad5e03a639ec36e00f6665a5d7e0f35a6250be5b103fb2117275
   architecture: standalone
   auth:
     enabled: true
@@ -17,6 +21,8 @@ redis:
         memory: 256Mi
   metrics:
     enabled: true
+    image:
+      digest: sha256:09233726b19097ccbeb7a90347a7a0975c015de9efafaf2ac90d62dae241ca67
     serviceMonitor:
       enabled: false
   networkPolicy:
