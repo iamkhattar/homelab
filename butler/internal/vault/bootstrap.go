@@ -135,6 +135,10 @@ const (
 // gracefully degrade — they no-op when their inputs are missing and the
 // next reconcile pass re-tries.
 func (c *Client) Bootstrap(ctx context.Context, in BootstrapInput) error {
+	oidcReady, err := oidcBootstrapReady(in)
+	if err != nil {
+		return err
+	}
 	if err := c.ensureKVv2(ctx); err != nil {
 		return err
 	}
@@ -156,19 +160,44 @@ func (c *Client) Bootstrap(ctx context.Context, in BootstrapInput) error {
 	if err := c.ensureAuditDevice(ctx); err != nil {
 		return err
 	}
-	if err := c.ensureJWTAuth(ctx, in); err != nil {
-		return err
-	}
-	if err := c.ensureJWTPolicies(ctx, in.OIDCIssuer); err != nil {
-		return err
-	}
-	if err := c.ensureJWTRoles(ctx, in); err != nil {
-		return err
+	// Pocket ID is created after the Vault foundation. Configure the JWT
+	// method atomically only after Butler has reconciled Vault's confidential
+	// Pocket ID client and persisted both halves of its credential.
+	if oidcReady {
+		if err := c.ensureJWTAuth(ctx, in); err != nil {
+			return err
+		}
+		if err := c.ensureJWTPolicies(ctx, in.OIDCIssuer); err != nil {
+			return err
+		}
+		if err := c.ensureJWTRoles(ctx, in); err != nil {
+			return err
+		}
 	}
 	if err := c.ensureK8sPolicies(ctx, in.K8sEngine); err != nil {
 		return err
 	}
 	return nil
+}
+
+func oidcBootstrapReady(in BootstrapInput) (bool, error) {
+	issuer := strings.TrimSpace(in.OIDCIssuer)
+	clientID := strings.TrimSpace(in.OIDCClientID)
+	clientSecret := strings.TrimSpace(in.OIDCClientSecret)
+
+	if issuer == "" {
+		if clientID != "" || clientSecret != "" {
+			return false, fmt.Errorf("vault oidc client credentials require an issuer")
+		}
+		return false, nil
+	}
+	if clientID == "" && clientSecret == "" {
+		return false, nil
+	}
+	if clientID == "" || clientSecret == "" {
+		return false, fmt.Errorf("vault oidc configuration requires both client ID and client secret")
+	}
+	return true, nil
 }
 
 func (c *Client) ensureButlerAuth(ctx context.Context, in BootstrapInput) error {
@@ -340,18 +369,16 @@ func (c *Client) ensureRole(ctx context.Context) error {
 }
 
 // ensureJWTAuth enables and configures the jwt auth method for OIDC-issued
-// JWTs from Pocket-ID. If the issuer is empty, this is a no-op (typical
-// during initial bootstrap when Pocket ID is not reachable yet).
-//
-// If the issuer is set but the OAuth client_id/client_secret aren't yet
-// available (the PocketIDClient reconciler writes them to secret/oauth/vault
-// on a later pass), we still mount auth/jwt and set the discovery URL —
-// but skip configuring the OIDC client. That's enough for `vault login
-// -method=jwt` (token-only JWTs), and is upgraded to full OIDC once the
-// creds materialize.
+// tokens from Pocket ID. Bootstrap calls it only after the confidential
+// Pocket ID client credential exists; initial Vault foundation setup must not
+// depend on Pocket ID discovery.
 func (c *Client) ensureJWTAuth(ctx context.Context, in BootstrapInput) error {
-	if in.OIDCIssuer == "" {
-		slog.Info("oidc issuer not configured, skipping vault jwt auth bootstrap")
+	ready, err := oidcBootstrapReady(in)
+	if err != nil {
+		return err
+	}
+	if !ready {
+		slog.Info("pocket id oidc client not ready, deferring vault jwt auth bootstrap")
 		return nil
 	}
 
@@ -375,12 +402,8 @@ func (c *Client) ensureJWTAuth(ctx context.Context, in BootstrapInput) error {
 	cfg := map[string]interface{}{
 		"oidc_discovery_url": in.OIDCIssuer,
 		"bound_issuer":       in.OIDCIssuer,
-	}
-	// Full OIDC flow (used by `vault login -method=oidc` and the Vault UI)
-	// requires client credentials. Without them only the JWT mode works.
-	if in.OIDCClientID != "" && in.OIDCClientSecret != "" {
-		cfg["oidc_client_id"] = in.OIDCClientID
-		cfg["oidc_client_secret"] = in.OIDCClientSecret
+		"oidc_client_id":     in.OIDCClientID,
+		"oidc_client_secret": in.OIDCClientSecret,
 	}
 
 	if _, err := c.raw.Logical().WriteWithContext(ctx, "auth/jwt/config", cfg); err != nil {
@@ -388,7 +411,7 @@ func (c *Client) ensureJWTAuth(ctx context.Context, in BootstrapInput) error {
 	}
 
 	slog.Info("configured jwt auth method", "issuer", in.OIDCIssuer,
-		"oidc_client_configured", in.OIDCClientID != "")
+		"oidc_client_configured", true)
 	return nil
 }
 
@@ -419,8 +442,7 @@ func (c *Client) ensureJWTPolicies(ctx context.Context, oidcIssuer string) error
 // If JWTRoles is empty or OIDC isn't configured, this is a no-op.
 //
 // Each role binds:
-//   - audience = the vault OAuth client_id (or "vault" as a fallback when
-//     OIDCClientID is empty, e.g. pre-OAuth-reconciler-pass).
+//   - audience = the Vault OAuth client ID.
 //   - groups claim = "groups" (Pocket-ID's standard claim name).
 //   - bound_claims.groups = [<spec.PocketIDGroup>].
 func (c *Client) ensureJWTRoles(ctx context.Context, in BootstrapInput) error {
@@ -429,9 +451,6 @@ func (c *Client) ensureJWTRoles(ctx context.Context, in BootstrapInput) error {
 	}
 
 	audience := in.OIDCClientID
-	if audience == "" {
-		audience = "vault"
-	}
 
 	for _, spec := range in.JWTRoles {
 		ttl := spec.TTL

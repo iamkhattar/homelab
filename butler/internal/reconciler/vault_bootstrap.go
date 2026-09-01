@@ -47,10 +47,10 @@ func (r *VaultBootstrap) Name() string {
 // Reconcile drives the full Vault bootstrap each pass: init + unseal, then
 // the idempotent Bootstrap (KV, k8s auth, audit, jwt, policies, roles).
 //
-// Resources that aren't always available (OAuth client creds for OIDC, the
-// PKI CA bundle) are looked up best-effort here and passed in via
-// BootstrapInput. ensureJWTAuth degrades to a partial config when they're
-// missing.
+// Resources that aren't always available are looked up best-effort here and
+// passed in via BootstrapInput. Vault's OIDC method is deferred until the
+// PocketIDClient reconciler has stored the complete confidential client
+// credential; the recovery state machine runs this reconciler again then.
 func (r *VaultBootstrap) Reconcile(ctx context.Context) error {
 	if !r.lifecycle {
 		if err := r.vault.LoginKubernetes(ctx, r.cfg.Vault.KubernetesAuth.Role, r.cfg.Vault.KubernetesAuth.TokenPath); err != nil {
@@ -90,10 +90,9 @@ func (r *VaultBootstrap) configure(ctx context.Context) error {
 		PublicDomain:           r.cfg.Certificates.Domain,
 	}
 
-	// Best-effort: read OAuth client creds for Vault from KV. If they
-	// haven't been written yet (PocketIDClient reconciler hasn't run, or
-	// Pocket-ID isn't reachable), in.OIDCClientID stays empty and
-	// ensureJWTAuth skips the OIDC client config.
+	// Best-effort: read OAuth client creds for Vault from KV. If they have not
+	// been written yet, Bootstrap configures only the Vault foundation and
+	// does not contact Pocket ID's discovery endpoint.
 	if r.cfg.OIDC.Issuer != "" {
 		data, err := r.vault.ReadSecret(ctx, vaultOAuthClientPath)
 		if err != nil {

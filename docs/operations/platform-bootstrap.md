@@ -189,7 +189,12 @@ credential at `secret/infrastructure/acme-dns`, then pauses at
 `awaiting-dns-delegation`. The operation
 is idempotent and refuses an already initialized Vault if `butler-vault-init`
 is missing. Successful Vault foundation creates the bounded normal and
-recovery Kubernetes-auth roles; it does not claim that identity works yet.
+recovery Kubernetes-auth roles; it does not contact Pocket ID or claim that
+identity works yet. Vault JWT/OIDC is deliberately deferred until the later
+identity phase has created Vault's confidential Pocket ID client. A failure
+from `auth/jwt/config` while Pocket ID is absent indicates an older Butler
+image; deploy the current `main` image and repeat this resumable command. Do
+not reset Vault or delete its PVC or recovery Secret.
 
 Display the non-secret registration metadata:
 
