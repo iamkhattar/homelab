@@ -78,9 +78,22 @@ func TestEnsureJWTAuthDoesNotContactVaultBeforePocketIDClientExists(t *testing.T
 	}
 }
 
-func TestRecoveryPolicyCanManagePocketIDRuntimeCredential(t *testing.T) {
-	want := `path "secret/data/security/pocket-id" { capabilities = ["create", "read", "update"] }`
-	if !strings.Contains(butlerRecoveryPolicy, want) {
-		t.Fatal("recovery policy must be able to read and replace the exact Pocket ID runtime credential")
+func TestRecoveryPolicyCanManageOnlyBootstrapIdentityCredentials(t *testing.T) {
+	paths := []string{
+		"security/pocket-id",
+		"oauth/butler",
+		"oauth/homelabctl",
+		"oauth/vault",
+	}
+	for _, path := range paths {
+		want := `path "secret/data/` + path + `" { capabilities = ["create", "read", "update"] }`
+		if !strings.Contains(butlerRecoveryPolicy, want) {
+			t.Errorf("recovery policy must manage exact bootstrap credential path %q", path)
+		}
+	}
+	for _, forbidden := range []string{`secret/data/oauth/*`, `secret/data/*`} {
+		if strings.Contains(butlerRecoveryPolicy, forbidden) {
+			t.Errorf("recovery policy must not contain broad data path %q", forbidden)
+		}
 	}
 }

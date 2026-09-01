@@ -80,6 +80,11 @@ identity acceptance gate. Repeating bootstrap after `operational` is a no-op.
 The foundation pass does not contact Pocket ID. Vault's JWT/OIDC method and
 group roles are configured atomically only after Butler has created Vault's
 confidential Pocket ID client and stored its complete credential.
+The bounded recovery Vault role can create, read and update only the bootstrap
+identity documents at `security/pocket-id`, `oauth/butler`,
+`oauth/homelabctl`, and `oauth/vault`, in addition to the acme-dns document.
+It has no wildcard `oauth/*` permission; application clients remain owned by
+normal Butler after the identity gate is operational.
 
 The initialization root token and unseal key live in the named recovery Secret
 because that is the chosen single-node recovery model. Normal Butler cannot
