@@ -12,7 +12,9 @@ service:
 
 env:
   APP_URL: ""  # Set via helmfile; Pocket ID uses this as its WebAuthn origin and OIDC issuer.
-  INTERNAL_APP_URL: "http://pocket-id.security.svc.cluster.local"
+  # Do not set INTERNAL_APP_URL. Pocket ID uses it to rewrite client-facing
+  # discovery endpoints, which would make workstation OIDC clients attempt to
+  # resolve Kubernetes-only service DNS. APP_URL is reachable from both sides.
   # Traefik runs inside the K3s pod CIDR. Trust forwarded client headers only
   # from cluster pods instead of accepting them from every source.
   TRUST_PROXY: "10.42.0.0/16"

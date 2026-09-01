@@ -131,14 +131,24 @@ replace it with the internal Service URL, an IP address or the obsolete
 Check the public discovery document without exposing credentials:
 
 ```bash
-curl -fsS https://auth.6940469.xyz/.well-known/openid-configuration | jq .issuer
+curl -fsS https://auth.6940469.xyz/.well-known/openid-configuration |
+  jq '{issuer, authorization_endpoint, token_endpoint, jwks_uri}'
 ```
 
-The result must be `https://auth.6940469.xyz`. An issuer such as
-`http://localhost:1411` means Pocket ID did not receive `APP_URL`; deploy the
-corrected identity release, wait for its rollout, reload the setup page at the
-public HTTPS URL and retry the passkey. Pocket ID's PVC retains the owner and
-setup state across the rollout.
+Every displayed URL must begin with `https://auth.6940469.xyz`. An issuer such
+as `http://localhost:1411` means Pocket ID did not receive `APP_URL`. A token or
+JWKS endpoint under `pocket-id.security.svc.cluster.local` means
+`INTERNAL_APP_URL` incorrectly rewrote the client-facing discovery document;
+an operator workstation cannot resolve that Kubernetes-only name. Deploy the
+corrected identity release and wait for its rollout. Pocket ID's PVC retains
+the owner, passkeys, groups and clients across this configuration-only rollout.
+
+After the rollout, remove any incomplete local session and repeat login:
+
+```bash
+homelabctl control logout
+homelabctl control login
+```
 
 ## Upgrade fails
 
