@@ -311,6 +311,13 @@ healthy indicates that the current Butler Helm release predates that egress
 rule. Deploy the current `secrets` stage and repeat the idempotent command. Do
 not reset Pocket ID or delete its PVC for this failure.
 
+The same pass writes the bootstrap clients only to `oauth/butler`,
+`oauth/homelabctl`, and `oauth/vault`. A Vault `403 permission denied` for
+those exact paths means the deployed Butler image predates the bounded recovery
+OAuth policy. Wait for the current `main` image to publish, deploy Butler, and
+repeat the idempotent command. Do not grant recovery a wildcard `oauth/*`
+policy and do not modify the stored client documents manually.
+
 The `--pocket-id-api-key-file` flag is retained only for break-glass rotation
 of the generated machine credential. It replaces `static-api-key` in the same
 Vault document without changing `encryption-key`; it is not part of normal
