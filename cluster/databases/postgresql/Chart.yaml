@@ -3,8 +3,8 @@ name: postgresql
 description: A Helm chart to deploy PostgreSQL for the homelab k3s cluster
 type: application
 version: 0.1.0
-appVersion: "16.6.0"
+appVersion: "18.6.0"
 dependencies:
   - name: postgresql
-    version: "16.4.3"
+    version: "18.8.13"
     repository: https://charts.bitnami.com/bitnami

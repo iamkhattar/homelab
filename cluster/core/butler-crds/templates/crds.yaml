@@ -1,0 +1,267 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: pocketidclients.platform.6940469.xyz
+spec:
+  group: platform.6940469.xyz
+  scope: Namespaced
+  names:
+    plural: pocketidclients
+    singular: pocketidclient
+    kind: PocketIDClient
+    shortNames: [pidclient]
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources: {status: {}}
+      additionalPrinterColumns:
+        - {name: Type, type: string, jsonPath: .spec.type}
+        - {name: Ready, type: string, jsonPath: '.status.conditions[?(@.type=="Ready")].status'}
+        - {name: Provider, type: string, jsonPath: .status.providerID}
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            apiVersion: {type: string}
+            kind: {type: string}
+            metadata: {type: object}
+            spec:
+              type: object
+              required: [type, redirectURIs, vaultPath]
+              properties:
+                type: {type: string, enum: [public, confidential]}
+                redirectURIs:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  x-kubernetes-validations:
+                    - rule: "self.all(uri, uri.startsWith('https://') || uri.startsWith('http://127.0.0.1') || uri.startsWith('http://localhost'))"
+                      message: redirect URIs must use HTTPS except for localhost loopback clients
+                  items: {type: string, format: uri, maxLength: 2048}
+                vaultPath:
+                  type: string
+                  minLength: 1
+                  maxLength: 512
+                  pattern: '^[A-Za-z0-9](?:[A-Za-z0-9._/-]*[A-Za-z0-9])?$'
+                  x-kubernetes-validations:
+                    - rule: "!self.contains('..') && !self.contains('//')"
+                      message: Vault paths cannot contain '..' or empty segments
+            status:
+{{ include "butler-crds.statusSchema" . | indent 14 }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: butleroperations.platform.6940469.xyz
+spec:
+  group: platform.6940469.xyz
+  scope: Namespaced
+  names:
+    plural: butleroperations
+    singular: butleroperation
+    kind: ButlerOperation
+    shortNames: [bop]
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - {name: Category, type: string, jsonPath: .spec.category}
+        - {name: State, type: string, jsonPath: .spec.state}
+        - {name: Actor, type: string, jsonPath: .spec.actor}
+        - {name: Created, type: date, jsonPath: .spec.createdAt}
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            apiVersion: {type: string}
+            kind: {type: string}
+            metadata: {type: object}
+            spec:
+              type: object
+              required: [category, actor, createdAt]
+              x-kubernetes-validations:
+                - rule: "self.category == 'operation' ? has(self.kind) && has(self.state) : has(self.eventType) && has(self.message)"
+                  message: operations require kind and state; events require eventType and message
+              properties:
+                category: {type: string, enum: [operation, event]}
+                kind: {type: string, maxLength: 128}
+                eventType: {type: string, maxLength: 128}
+                actor: {type: string, minLength: 1, maxLength: 320}
+                operation: {type: string, maxLength: 64}
+                message: {type: string, maxLength: 4096}
+                state: {type: string, enum: [pending, running, succeeded, failed]}
+                createdAt: {type: string, format: date-time}
+                completedAt: {type: string, format: date-time}
+                error: {type: string, maxLength: 4096}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: pocketidgroups.platform.6940469.xyz
+spec:
+  group: platform.6940469.xyz
+  scope: Cluster
+  names:
+    plural: pocketidgroups
+    singular: pocketidgroup
+    kind: PocketIDGroup
+    shortNames: [pidgroup]
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources: {status: {}}
+      additionalPrinterColumns:
+        - {name: Friendly name, type: string, jsonPath: .spec.friendlyName}
+        - {name: Ready, type: string, jsonPath: '.status.conditions[?(@.type=="Ready")].status'}
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            apiVersion: {type: string}
+            kind: {type: string}
+            metadata: {type: object}
+            spec:
+              type: object
+              required: [friendlyName]
+              properties:
+                friendlyName: {type: string, minLength: 1, maxLength: 128}
+            status:
+{{ include "butler-crds.statusSchema" . | indent 14 }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: managedcredentials.platform.6940469.xyz
+spec:
+  group: platform.6940469.xyz
+  scope: Namespaced
+  names:
+    plural: managedcredentials
+    singular: managedcredential
+    kind: ManagedCredential
+    shortNames: [mcred]
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources: {status: {}}
+      additionalPrinterColumns:
+        - {name: Vault path, type: string, jsonPath: .spec.vaultPath}
+        - {name: Ready, type: string, jsonPath: '.status.conditions[?(@.type=="Ready")].status'}
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            apiVersion: {type: string}
+            kind: {type: string}
+            metadata: {type: object}
+            spec:
+              type: object
+              required: [vaultPath, fields]
+              properties:
+                vaultPath:
+                  type: string
+                  minLength: 1
+                  maxLength: 512
+                  pattern: '^[A-Za-z0-9](?:[A-Za-z0-9._/-]*[A-Za-z0-9])?$'
+                  x-kubernetes-validations:
+                    - rule: "!self.contains('..') && !self.contains('//')"
+                      message: Vault paths cannot contain '..' or empty segments
+                fields:
+                  type: object
+                  minProperties: 1
+                  maxProperties: 64
+                  additionalProperties:
+                    type: object
+                    x-kubernetes-validations:
+                      - rule: "(has(self.generate) ? 1 : 0) + (has(self.value) ? 1 : 0) + (has(self.template) ? 1 : 0) + (has(self.sourceRef) ? 1 : 0) == 1"
+                        message: exactly one of generate, value, template, or sourceRef is required
+                    properties:
+                      value: {type: string}
+                      template: {type: string, minLength: 1}
+                      generate:
+                        type: object
+                        required: [type, length]
+                        properties:
+                          type: {type: string, enum: [password, hex]}
+                          length: {type: integer, minimum: 1, maximum: 4096}
+                      sourceRef:
+                        type: object
+                        required: [path, key]
+                        properties:
+                          path:
+                            type: string
+                            minLength: 1
+                            maxLength: 512
+                            pattern: '^[A-Za-z0-9](?:[A-Za-z0-9._/-]*[A-Za-z0-9])?$'
+                            x-kubernetes-validations:
+                              - rule: "!self.contains('..') && !self.contains('//')"
+                                message: Vault paths cannot contain '..' or empty segments
+                          key: {type: string, minLength: 1, maxLength: 253}
+            status:
+{{ include "butler-crds.statusSchema" . | indent 14 }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: garagebuckets.platform.6940469.xyz
+spec:
+  group: platform.6940469.xyz
+  scope: Namespaced
+  names:
+    plural: garagebuckets
+    singular: garagebucket
+    kind: GarageBucket
+    shortNames: [gbucket]
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources: {status: {}}
+      additionalPrinterColumns:
+        - {name: Bucket, type: string, jsonPath: .spec.bucketName}
+        - {name: Ready, type: string, jsonPath: '.status.conditions[?(@.type=="Ready")].status'}
+        - {name: Provider, type: string, jsonPath: .status.providerID}
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            apiVersion: {type: string}
+            kind: {type: string}
+            metadata: {type: object}
+            spec:
+              type: object
+              required: [bucketName, credentialPath, permissions]
+              x-kubernetes-validations:
+                - rule: "self.permissions.read || self.permissions.write || self.permissions.owner"
+                  message: at least one bucket permission is required
+              properties:
+                bucketName:
+                  type: string
+                  minLength: 3
+                  maxLength: 63
+                  pattern: '^[a-z0-9][a-z0-9.-]*[a-z0-9]$'
+                credentialPath:
+                  type: string
+                  minLength: 1
+                  maxLength: 512
+                  pattern: '^[A-Za-z0-9](?:[A-Za-z0-9._/-]*[A-Za-z0-9])?$'
+                  x-kubernetes-validations:
+                    - rule: "!self.contains('..') && !self.contains('//')"
+                      message: Vault paths cannot contain '..' or empty segments
+                permissions:
+                  type: object
+                  properties:
+                    read: {type: boolean, default: false}
+                    write: {type: boolean, default: false}
+                    owner: {type: boolean, default: false}
+            status:
+{{ include "butler-crds.statusSchema" . | indent 14 }}

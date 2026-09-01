@@ -1,3 +1,10 @@
+{{- $device := required "coordinator.device must be the Sonoff /dev/serial/by-id path" .Values.coordinator.device -}}
+{{- if not (hasPrefix "/dev/serial/by-id/" $device) -}}
+{{- fail "coordinator.device must start with /dev/serial/by-id/; ttyUSB paths are unstable" -}}
+{{- end -}}
+{{- if not (has .Values.coordinator.adapter (list "zstack" "ember")) -}}
+{{- fail "coordinator.adapter must be zstack for ZBDongle-P or ember for ZBDongle-E" -}}
+{{- end -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -8,6 +15,9 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ .Release.Name }}
@@ -18,6 +28,56 @@ spec:
         app.kubernetes.io/name: {{ .Release.Name }}
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      initContainers:
+        - name: initialise-configuration
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              if [ -e /app/data/configuration.yaml ]; then
+                exit 0
+              fi
+              mesh_material="$(printf '%s' "$ZIGBEE_NETWORK_KEY" | sed 's/../0x&,/g; s/,$//')"
+              {
+                printf '%s\n' \
+                  'version: 5' \
+                  'mqtt:' \
+                  '  server: mqtt://mosquitto.smart-home.svc.cluster.local:1883' \
+                  '  base_topic: zigbee2mqtt' \
+                  'serial:' \
+                  '  port: /dev/zigbee' \
+                  '  adapter: {{ .Values.coordinator.adapter }}' \
+                  'advanced:' \
+                  '  channel: {{ .Values.zigbee.channel }}' \
+                  "  network_key: [$mesh_material]" \
+                  '  pan_id: GENERATE' \
+                  '  ext_pan_id: GENERATE' \
+                  '  log_output: [console]' \
+                  'frontend:' \
+                  '  enabled: true' \
+                  '  url: https://{{ .Values.ingress.host }}' \
+                  'homeassistant:' \
+                  '  enabled: true' \
+                  'permit_join: false'
+              } > /app/data/configuration.yaml
+              chmod 0600 /app/data/configuration.yaml
+          env:
+            - name: ZIGBEE_NETWORK_KEY
+              valueFrom: {secretKeyRef: {name: zigbee2mqtt-runtime, key: network-key}}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: data, mountPath: /app/data}
       containers:
         - name: {{ .Release.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -32,6 +92,14 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+            - name: ZIGBEE2MQTT_CONFIG_SERIAL_ADAPTER
+              value: {{ .Values.coordinator.adapter | quote }}
+            - name: ZIGBEE2MQTT_CONFIG_MQTT_USER
+              valueFrom: {secretKeyRef: {name: mqtt-credentials, key: zigbee2mqtt-username}}
+            - name: ZIGBEE2MQTT_CONFIG_MQTT_PASSWORD
+              valueFrom: {secretKeyRef: {name: mqtt-credentials, key: zigbee2mqtt-password}}
+            - name: ZIGBEE2MQTT_CONFIG_FRONTEND_AUTH_TOKEN
+              valueFrom: {secretKeyRef: {name: zigbee2mqtt-runtime, key: frontend-auth-token}}
           {{- end }}
           {{- if .Values.securityContext }}
           securityContext:
@@ -44,8 +112,19 @@ spec:
             - name: data
               mountPath: {{ .Values.persistence.mountPath }}
             - name: usb
-              mountPath: /dev/ttyUSB0
+              mountPath: /dev/zigbee
           {{- end }}
+          startupProbe:
+            httpGet: {path: /, port: http}
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {path: /, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /, port: http}
+            periodSeconds: 20
+            failureThreshold: 6
       {{- if .Values.persistence.enabled }}
       volumes:
         - name: data
@@ -53,5 +132,6 @@ spec:
             claimName: {{ .Release.Name }}-data
         - name: usb
           hostPath:
-            path: /dev/ttyUSB0
+            path: {{ $device | quote }}
+            type: CharDevice
       {{- end }}

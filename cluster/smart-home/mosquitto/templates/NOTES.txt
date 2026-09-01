@@ -1,4 +1,6 @@
 Mosquitto MQTT broker has been deployed to the cluster.
 
 MQTT: mosquitto.smart-home.svc.cluster.local:{{ .Values.service.mqttPort }}
-WebSocket: mosquitto.smart-home.svc.cluster.local:{{ .Values.service.websocketPort }}
+
+Anonymous access is disabled. Butler owns the generated client passwords in
+Vault and VSO projects them into mqtt-credentials.

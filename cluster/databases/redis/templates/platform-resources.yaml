@@ -1,0 +1,12 @@
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: ManagedCredential
+metadata:
+  name: redis
+  namespace: {{ .Release.Namespace }}
+spec:
+  vaultPath: databases/redis
+  fields:
+    redis-password:
+      generate: {type: password, length: 32}
+    redis-url:
+      template: {{ printf "redis://:{{redis-password}}@redis-master.databases.svc.cluster.local:6379/0" | quote }}

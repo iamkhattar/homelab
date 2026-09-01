@@ -33,6 +33,7 @@ type Scheduler struct {
 	reconcilers []Reconciler
 	interval    time.Duration
 
+	runMu    sync.Mutex
 	mu       sync.RWMutex
 	statuses map[string]Status
 }
@@ -53,6 +54,11 @@ func NewScheduler(interval time.Duration, reconcilers ...Reconciler) *Scheduler 
 
 // RunOnce executes all reconcilers sequentially and returns the first error.
 func (s *Scheduler) RunOnce(ctx context.Context) error {
+	// Provider creates and one-time secret responses are not safe to reconcile
+	// concurrently. Serialize timer- and API-triggered runs in this replica.
+	s.runMu.Lock()
+	defer s.runMu.Unlock()
+
 	var failures []error
 	for _, r := range s.reconcilers {
 		start := time.Now()
@@ -76,7 +82,9 @@ func (s *Scheduler) RunOnce(ctx context.Context) error {
 			Duration: dur.String(),
 		}
 		if err != nil {
-			status.Error = err.Error()
+			// Provider errors can contain response bodies or sensitive metadata.
+			// The authenticated status API exposes only a stable safe message.
+			status.Error = "reconciliation failed; inspect Butler logs for details"
 			slog.ErrorContext(reconcileCtx, "reconciler failed", "reconciler", r.Name(), "error", err, "duration", dur, "trace_id", span.SpanContext().TraceID().String())
 		} else {
 			slog.InfoContext(reconcileCtx, "reconciler succeeded", "reconciler", r.Name(), "duration", dur, "trace_id", span.SpanContext().TraceID().String())

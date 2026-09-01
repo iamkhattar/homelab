@@ -5,9 +5,11 @@ package identity
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/iamkhattar/homelab/butler/internal/platform"
 	"github.com/iamkhattar/homelab/butler/internal/pocketid"
 )
 
@@ -21,10 +23,15 @@ type SecretStore interface {
 type Service struct {
 	secrets SecretStore
 	baseURL string
+	clients ClientRegistry
 }
 
-func NewService(secrets SecretStore, baseURL string) *Service {
-	return &Service{secrets: secrets, baseURL: baseURL}
+type ClientRegistry interface {
+	ListPocketIDClients(context.Context) ([]platform.PocketIDClient, error)
+}
+
+func NewService(secrets SecretStore, baseURL string, clients ClientRegistry) *Service {
+	return &Service{secrets: secrets, baseURL: baseURL, clients: clients}
 }
 
 func (s *Service) client(ctx context.Context) (*pocketid.Client, error) {
@@ -121,13 +128,50 @@ func (s *Service) RotateClientSecret(ctx context.Context, id string) error {
 	if selected.IsPublic {
 		return fmt.Errorf("public OIDC clients do not have a client secret")
 	}
-	secret, err := client.RotateSecret(ctx, selected.ID)
+	vaultPath, err := s.clientVaultPath(ctx, *selected)
 	if err != nil {
 		return err
 	}
-	return s.secrets.WriteSecret(ctx, "oauth/"+selected.Name, map[string]interface{}{
-		"client_id": selected.ID, "client_secret": secret,
-	})
+	existing, err := client.ListClientSecrets(ctx, selected.ID)
+	if err != nil {
+		return err
+	}
+	created, err := client.CreateSecret(ctx, selected.ID)
+	if err != nil {
+		return err
+	}
+	if err := s.secrets.WriteSecret(ctx, vaultPath, map[string]interface{}{
+		"client_id": selected.ID, "client_secret": created.Secret, "client_secret_id": created.ID,
+	}); err != nil {
+		return errors.Join(err, client.DeleteClientSecret(ctx, selected.ID, created.ID))
+	}
+	var cleanup []error
+	for _, secret := range existing {
+		if err := client.DeleteClientSecret(ctx, selected.ID, secret.ID); err != nil {
+			cleanup = append(cleanup, err)
+		}
+	}
+	return errors.Join(cleanup...)
+}
+
+func (s *Service) clientVaultPath(ctx context.Context, selected pocketid.OIDCClient) (string, error) {
+	if s.clients == nil {
+		return "", fmt.Errorf("PocketIDClient registry is unavailable")
+	}
+	items, err := s.clients.ListPocketIDClients(ctx)
+	if err != nil {
+		return "", fmt.Errorf("listing PocketIDClient declarations: %w", err)
+	}
+	var matches []platform.PocketIDClient
+	for i := range items {
+		if items[i].Status.ProviderID == selected.ID || items[i].Name == selected.Name {
+			matches = append(matches, items[i])
+		}
+	}
+	if len(matches) != 1 || strings.TrimSpace(matches[0].Spec.VaultPath) == "" {
+		return "", fmt.Errorf("OIDC client %q must map to exactly one PocketIDClient before rotation", selected.ID)
+	}
+	return matches[0].Spec.VaultPath, nil
 }
 
 func validateUser(user pocketid.User) error {

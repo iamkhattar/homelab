@@ -1,0 +1,27 @@
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: ManagedCredential
+metadata:
+  name: garage-runtime
+  namespace: {{ .Release.Namespace }}
+spec:
+  vaultPath: storage/garage
+  fields:
+    rpc-secret:
+      generate: {type: hex, length: 32}
+    admin-token:
+      generate: {type: password, length: 32}
+    metrics-token:
+      generate: {type: password, length: 32}
+---
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: GarageBucket
+metadata:
+  name: homelab-backups
+  namespace: {{ .Release.Namespace }}
+spec:
+  bucketName: homelab-backups
+  credentialPath: storage/garage/clients/backups
+  permissions:
+    read: true
+    write: true
+    owner: false

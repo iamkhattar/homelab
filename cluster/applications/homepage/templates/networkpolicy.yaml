@@ -29,7 +29,7 @@ spec:
             matchExpressions:
               - key: kubernetes.io/metadata.name
                 operator: In
-                values: [kitchenowl, monitoring, ntfy, paperless-ngx, security, smart-home, vaultwarden]
+                values: [kitchenowl, monitoring, ntfy, paperless-ngx, security, smart-home, vaultwarden, zigbee]
       ports:
         - {protocol: TCP, port: 80}
         - {protocol: TCP, port: 443}

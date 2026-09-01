@@ -33,6 +33,8 @@ vaultAuth:
     - paperless-ngx
     - vaultwarden
     - cicd
+    - smart-home
+    - zigbee
 
 # Application VaultAuth objects are local to their namespace and map to a
 # distinct Vault Kubernetes role. A compromised application cannot use VSO to
@@ -40,6 +42,8 @@ vaultAuth:
 applicationVaultAuths:
   - namespace: cert-manager
     role: vso-cert-manager
+  - namespace: homepage
+    role: vso-homepage
   - namespace: kitchenowl
     role: vso-kitchenowl
   - namespace: paperless-ngx
@@ -48,3 +52,7 @@ applicationVaultAuths:
     role: vso-vaultwarden
   - namespace: monitoring
     role: vso-grafana
+  - namespace: smart-home
+    role: vso-smart-home
+  - namespace: zigbee
+    role: vso-zigbee

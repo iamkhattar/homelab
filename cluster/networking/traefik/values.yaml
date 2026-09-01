@@ -25,17 +25,20 @@ traefik:
       protocol: TCP
       # Redirect all HTTP to HTTPS by default; individual IngressRoutes
       # can opt out if needed.
-      redirectTo:
-        port: websecure
-        scheme: https
+      http:
+        redirections:
+          entryPoint:
+            to: websecure
+            scheme: https
     websecure:
       port: 8443
       expose:
         default: true
       exposedPort: 443
       protocol: TCP
-      tls:
-        enabled: true
+      http:
+        tls:
+          enabled: true
 
   # Default to permissive ingress class so existing
   # ingressClassName: traefik manifests keep working.
@@ -65,12 +68,12 @@ traefik:
     enabled: true
     namespaced: false
 
-  logs:
-    general:
-      level: INFO
-    access:
-      enabled: true
-      # Sent to stdout for Loki/promtail to pick up in Phase 4.
+  # Chart 41 follows Traefik's native log/accessLog key names.
+  log:
+    level: INFO
+  accessLog:
+    # Sent to stdout for Alloy to collect for Loki.
+    format: json
 
   resources:
     requests:

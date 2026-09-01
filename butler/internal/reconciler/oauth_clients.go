@@ -6,160 +6,218 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/iamkhattar/homelab/butler/internal/config"
+	"github.com/iamkhattar/homelab/butler/internal/platform"
 	"github.com/iamkhattar/homelab/butler/internal/pocketid"
 	"github.com/iamkhattar/homelab/butler/internal/vault"
 )
 
-// adminAPIKeyVaultPath is where the Pocket-ID admin API key lives. An
-// operator generates the key in the Pocket-ID UI once on first install and
-// stores it here; butler reads it for every reconcile.
 const (
 	adminAPIKeyVaultPath = "pocket-id/admin"
 	adminAPIKeyField     = "api-key"
-	oauthClientPathFmt   = "oauth/%s"
 )
 
-// OAuthClients ensures every OIDC client declared in butler's config exists
-// in Pocket-ID and that the {client_id, client_secret} pair is persisted at
-// secret/oauth/<name>. Other charts (vault, butler itself, applications)
-// consume those creds via VaultStaticSecret.
-type OAuthClients struct {
-	vault  *vault.Client
-	specs  []config.OAuthClientSpec
-	pidURL string // base URL of Pocket-ID, e.g. https://auth.shivlab.com
+// PocketIDClients reconciles namespaced PocketIDClient resources. Provider
+// secrets go directly to Vault and are never written to resource status.
+type PocketIDClients struct {
+	vault     *vault.Client
+	resources platform.Resources
+	pidURL    string
 }
 
-// NewOAuthClients builds an OAuthClients reconciler. If pidURL is empty,
-// reconciliation no-ops (used during bootstrap before Pocket-ID is up).
-func NewOAuthClients(vc *vault.Client, pidURL string, specs []config.OAuthClientSpec) *OAuthClients {
-	return &OAuthClients{vault: vc, specs: specs, pidURL: pidURL}
+func NewPocketIDClients(vc *vault.Client, resources platform.Resources, pidURL string) *PocketIDClients {
+	return &PocketIDClients{vault: vc, resources: resources, pidURL: pidURL}
 }
 
-// Name implements Reconciler.
-func (r *OAuthClients) Name() string { return "oauth-clients" }
+func (r *PocketIDClients) Name() string { return "pocket-id-clients" }
 
-// Reconcile ensures each declared client exists in Pocket-ID with the
-// right callback URLs, and that its credentials are stored in Vault.
-//
-// Three failure modes are handled gracefully (logged + reconciliation
-// continues to the next pass):
-//   - No Pocket-ID URL configured yet (Phase 1A bootstrap): no-op.
-//   - No admin API key in Vault yet: log a one-time warning. Operator must
-//     create one in Pocket-ID UI and store at secret/pocket-id/admin.
-//   - Pocket-ID is unreachable: surface as error so the scheduler retries.
-func (r *OAuthClients) Reconcile(ctx context.Context) error {
-	if r.pidURL == "" || len(r.specs) == 0 {
+func (r *PocketIDClients) Reconcile(ctx context.Context) error {
+	items, err := r.resources.ListPocketIDClients(ctx)
+	if err != nil {
+		return fmt.Errorf("listing PocketIDClients: %w", err)
+	}
+	if r.pidURL == "" || len(items) == 0 {
 		return nil
 	}
 
 	apiKey, err := r.readAPIKey(ctx)
 	if err != nil {
-		// Soft-fail: operator hasn't bootstrapped the admin key yet.
-		slog.Warn("pocket-id admin api key not configured; oauth client provisioning disabled",
-			"path", "secret/"+adminAPIKeyVaultPath, "err", err)
-		return nil
+		slog.Warn("pocket-id admin api key not configured; client provisioning is waiting", "path", "secret/"+adminAPIKeyVaultPath)
+		var failures []error
+		for i := range items {
+			if statusErr := convergeStatus(&items[i].Status, platform.Failed(items[i].Generation, "AwaitingAPIKey", err), func() error {
+				return r.resources.UpdatePocketIDClientStatus(ctx, &items[i])
+			}); statusErr != nil {
+				failures = append(failures, statusErr)
+			}
+		}
+		return errors.Join(failures...)
 	}
 
 	pid := pocketid.NewClient(r.pidURL, apiKey)
-
 	existing, err := pid.ListClients(ctx)
 	if err != nil {
 		return fmt.Errorf("listing pocket-id clients: %w", err)
 	}
 	byName := make(map[string]pocketid.OIDCClient, len(existing))
-	for _, c := range existing {
-		byName[c.Name] = c
+	for _, client := range existing {
+		byName[client.Name] = client
+	}
+	nameCounts := make(map[string]int, len(items))
+	for i := range items {
+		nameCounts[items[i].Name]++
+	}
+	pathCounts, err := platform.VaultPathOwners(ctx, r.resources)
+	if err != nil {
+		return err
 	}
 
 	var failures []error
-	for _, spec := range r.specs {
-		if err := r.reconcileOne(ctx, pid, spec, byName); err != nil {
-			// Continue with the rest of the specs even if one fails — we
-			// don't want a single broken client to block the others.
-			slog.Error("reconciling oauth client failed", "name", spec.Name, "err", err)
-			failures = append(failures, fmt.Errorf("%s: %w", spec.Name, err))
+	for i := range items {
+		if nameCounts[items[i].Name] > 1 {
+			err := fmt.Errorf("Pocket ID client name %q must be unique across namespaces", items[i].Name)
+			failures = append(failures, err)
+			if statusErr := convergeStatus(&items[i].Status, platform.Failed(items[i].Generation, "DuplicateProviderName", err), func() error {
+				return r.resources.UpdatePocketIDClientStatus(ctx, &items[i])
+			}); statusErr != nil {
+				failures = append(failures, statusErr)
+			}
+			continue
+		}
+		if pathCounts[items[i].Spec.VaultPath] > 1 {
+			err := fmt.Errorf("Vault path %q must be owned by exactly one platform resource", items[i].Spec.VaultPath)
+			failures = append(failures, err)
+			if statusErr := convergeStatus(&items[i].Status, platform.Failed(items[i].Generation, "DuplicateVaultPath", err), func() error {
+				return r.resources.UpdatePocketIDClientStatus(ctx, &items[i])
+			}); statusErr != nil {
+				failures = append(failures, statusErr)
+			}
+			continue
+		}
+		providerID, err := r.reconcileOne(ctx, pid, &items[i], byName)
+		if err != nil {
+			failures = append(failures, fmt.Errorf("%s/%s: %w", items[i].Namespace, items[i].Name, err))
+			if statusErr := convergeStatus(&items[i].Status, platform.Failed(items[i].Generation, "ReconcileFailed", err), func() error {
+				return r.resources.UpdatePocketIDClientStatus(ctx, &items[i])
+			}); statusErr != nil {
+				failures = append(failures, statusErr)
+			}
+			continue
+		}
+		if err := convergeStatus(&items[i].Status, platform.Ready(items[i].Generation, providerID), func() error {
+			return r.resources.UpdatePocketIDClientStatus(ctx, &items[i])
+		}); err != nil {
+			failures = append(failures, fmt.Errorf("updating %s/%s status: %w", items[i].Namespace, items[i].Name, err))
 		}
 	}
 	return errors.Join(failures...)
 }
 
-func (r *OAuthClients) reconcileOne(
-	ctx context.Context,
-	pid *pocketid.Client,
-	spec config.OAuthClientSpec,
-	existing map[string]pocketid.OIDCClient,
-) error {
-	want := pocketid.OIDCClient{
-		ID:           spec.Name,
-		Name:         spec.Name,
-		IsPublic:     spec.Kind == "public",
-		PKCEEnabled:  spec.Kind == "public",
-		CallbackURLs: spec.RedirectURIs,
+func (r *PocketIDClients) reconcileOne(ctx context.Context, pid *pocketid.Client, item *platform.PocketIDClient, existing map[string]pocketid.OIDCClient) (string, error) {
+	if item.Spec.Type != "public" && item.Spec.Type != "confidential" {
+		return "", errors.New("type must be public or confidential")
 	}
-
-	have, present := existing[spec.Name]
+	if len(item.Spec.RedirectURIs) == 0 || item.Spec.VaultPath == "" {
+		return "", errors.New("redirectURIs and vaultPath are required")
+	}
+	want := pocketid.OIDCClient{ID: item.Name, Name: item.Name, IsPublic: item.Spec.Type == "public", PKCEEnabled: item.Spec.Type == "public", CallbackURLs: item.Spec.RedirectURIs}
+	have, present := existing[item.Name]
 	if !present {
 		created, err := pid.CreateClient(ctx, want)
 		if err != nil {
-			return fmt.Errorf("creating client: %w", err)
+			return "", fmt.Errorf("creating client: %w", err)
 		}
-		slog.Info("created pocket-id oauth client", "name", spec.Name, "id", created.ID)
-		return r.persistCreds(ctx, spec.Name, created.ID, created.Secret)
+		if err := r.persistCreds(ctx, item.Spec.VaultPath, created.ID, created.SecretID, created.Secret); err != nil {
+			if created.SecretID != "" {
+				cleanupErr := pid.DeleteClientSecret(ctx, created.ID, created.SecretID)
+				return "", errors.Join(err, cleanupErr)
+			}
+			return "", err
+		}
+		return created.ID, nil
 	}
-	if have.ID != spec.Name {
-		return fmt.Errorf("client %q has generated id %q; recreate it with stable id %q before Butler can enforce audience validation", spec.Name, have.ID, spec.Name)
-	}
-
-	// Detect drift in callback URLs / name shape. Pocket-ID doesn't return
-	// the secret on read so we only update the metadata; the existing
-	// secret stays in Vault from the previous run.
 	if !sameStringSet(have.CallbackURLs, want.CallbackURLs) || have.IsPublic != want.IsPublic || have.PKCEEnabled != want.PKCEEnabled {
 		want.ID = have.ID
 		if err := pid.UpdateClient(ctx, have.ID, want); err != nil {
-			return fmt.Errorf("updating client: %w", err)
+			return "", fmt.Errorf("updating client: %w", err)
 		}
-		slog.Info("updated pocket-id oauth client", "name", spec.Name, "id", have.ID)
+		have = want
 	}
-
-	// If we have a client_id in Pocket-ID but no creds in Vault (e.g.
-	// because someone manually deleted the Vault path), rotate the
-	// secret and persist.
-	hasCreds, err := r.vault.SecretExists(ctx, fmt.Sprintf(oauthClientPathFmt, spec.Name))
+	creds, err := r.vault.ReadSecretIfExists(ctx, item.Spec.VaultPath)
 	if err != nil {
-		return fmt.Errorf("checking vault creds: %w", err)
+		return "", err
 	}
-	if !hasCreds {
-		newSecret, err := pid.RotateSecret(ctx, have.ID)
+	if have.IsPublic {
+		secrets, err := pid.ListClientSecrets(ctx, have.ID)
 		if err != nil {
-			return fmt.Errorf("rotating secret: %w", err)
+			return "", err
 		}
-		slog.Info("rotated pocket-id oauth client secret to repopulate vault", "name", spec.Name)
-		return r.persistCreds(ctx, spec.Name, have.ID, newSecret)
+		for _, secret := range secrets {
+			if err := pid.DeleteClientSecret(ctx, have.ID, secret.ID); err != nil {
+				return "", err
+			}
+		}
+		clientID, _ := creds["client_id"].(string)
+		if len(creds) != 1 || clientID != have.ID {
+			if err := r.persistCreds(ctx, item.Spec.VaultPath, have.ID, "", ""); err != nil {
+				return "", err
+			}
+		}
+		return have.ID, nil
 	}
-	return nil
+	secretID, _ := creds["client_secret_id"].(string)
+	secrets, err := pid.ListClientSecrets(ctx, have.ID)
+	if err != nil {
+		return "", err
+	}
+	if secretID == "" || !containsSecret(secrets, secretID) {
+		created, createErr := pid.CreateSecret(ctx, have.ID)
+		if createErr != nil {
+			return "", fmt.Errorf("creating replacement client secret: %w", createErr)
+		}
+		if err := r.persistCreds(ctx, item.Spec.VaultPath, have.ID, created.ID, created.Secret); err != nil {
+			cleanupErr := pid.DeleteClientSecret(ctx, have.ID, created.ID)
+			return "", errors.Join(err, cleanupErr)
+		}
+		secretID = created.ID
+	}
+	for _, secret := range secrets {
+		if secret.ID != secretID {
+			if err := pid.DeleteClientSecret(ctx, have.ID, secret.ID); err != nil {
+				return "", err
+			}
+		}
+	}
+	return have.ID, nil
 }
 
-func (r *OAuthClients) readAPIKey(ctx context.Context) (string, error) {
+func (r *PocketIDClients) readAPIKey(ctx context.Context) (string, error) {
 	data, err := r.vault.ReadSecret(ctx, adminAPIKeyVaultPath)
 	if err != nil {
 		return "", err
 	}
-	if data == nil {
-		return "", errors.New("no data at secret/" + adminAPIKeyVaultPath)
-	}
-	key, ok := data[adminAPIKeyField].(string)
-	if !ok || key == "" {
-		return "", fmt.Errorf("missing field %q at secret/%s", adminAPIKeyField, adminAPIKeyVaultPath)
+	key, _ := data[adminAPIKeyField].(string)
+	if key == "" {
+		return "", errors.New("Pocket ID API key is unavailable")
 	}
 	return key, nil
 }
 
-func (r *OAuthClients) persistCreds(ctx context.Context, name, clientID, clientSecret string) error {
-	return r.vault.WriteSecret(ctx, fmt.Sprintf(oauthClientPathFmt, name), map[string]interface{}{
-		"client_id":     clientID,
-		"client_secret": clientSecret,
-	})
+func (r *PocketIDClients) persistCreds(ctx context.Context, path, clientID, clientSecretID, clientSecret string) error {
+	data := map[string]interface{}{"client_id": clientID}
+	if clientSecret != "" {
+		data["client_secret"] = clientSecret
+		data["client_secret_id"] = clientSecretID
+	}
+	return r.vault.WriteSecret(ctx, path, data)
+}
+
+func containsSecret(secrets []pocketid.OIDCClientSecret, id string) bool {
+	for _, secret := range secrets {
+		if secret.ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 func sameStringSet(a, b []string) bool {
@@ -167,11 +225,11 @@ func sameStringSet(a, b []string) bool {
 		return false
 	}
 	set := make(map[string]struct{}, len(a))
-	for _, s := range a {
-		set[s] = struct{}{}
+	for _, value := range a {
+		set[value] = struct{}{}
 	}
-	for _, s := range b {
-		if _, ok := set[s]; !ok {
+	for _, value := range b {
+		if _, ok := set[value]; !ok {
 			return false
 		}
 	}

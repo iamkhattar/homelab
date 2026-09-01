@@ -7,8 +7,8 @@ metadata:
     app.kubernetes.io/name: {{ .Release.Name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 data:
-  # Rendered as YAML by Helm's toYaml so structured fields (oauthClients,
-  # k8sIssuance.roles) come out correctly. Butler reads this file in
+  # Rendered as YAML by Helm's toYaml so runtime endpoints and shared security
+  # policy come out correctly. Provider intent lives in typed CRs. Butler reads this file in
   # config.Load() if BUTLER_CONFIG_PATH isn't set; the deployment mounts
   # this ConfigMap at /etc/butler/config.yaml.
   config.yaml: |

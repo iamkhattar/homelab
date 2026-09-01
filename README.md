@@ -10,9 +10,12 @@ interface. It validates intent, discovers repository state and delegates to
 Ansible, Helmfile, Terraform, Docker and npm without replacing their native
 configuration.
 
-The cluster foundation comes before workloads. Pocket ID, Vault, Prometheus,
-Grafana, Loki, Home Assistant, MQTT and Zigbee integration are planned cluster
-services; they are not prerequisites for securely bootstrapping Titan.
+The cluster foundation comes before workloads. Vault, Butler, Pocket ID,
+Prometheus, Grafana, Loki and Tempo are represented in the repository but must
+still pass the staged Titan bootstrap runbook before they count as deployed.
+Home Assistant, authenticated MQTT and Zigbee2MQTT are wired as disabled-by-
+default increments for the Sonoff zStack coordinator; physical deployment and
+restore testing remain later work.
 
 ## Repository map
 
@@ -25,8 +28,11 @@ services; they are not prerequisites for securely bootstrapping Titan.
 | [`butler/`](butler/) | Butler control-plane service, API and embedded operator UI |
 | [`docs/`](docs/) | Isolated VitePress handbook and internal documentation site |
 
-Desired state remains in the native configuration for each layer. The CLI owns
-the safe, repeatable workflow around those files.
+Desired state remains in the native configuration for each layer. Concrete
+provider intent is declared through Butler's `PocketIDClient`,
+`ManagedCredential`, and `GarageBucket` Kubernetes APIs beside the chart that
+owns it; generated values go directly to Vault. The CLI owns the safe,
+repeatable workflow around those files.
 
 ## Start here
 
@@ -97,8 +103,8 @@ homelabctl cluster upgrade --ask-become-pass
 # Bootstrap and operate Butler over private port-forwards.
 homelabctl control recovery
 homelabctl control bootstrap --confirm
-BUTLER_TOKEN="$(security find-generic-password -w -s homelab-butler)" \
-  homelabctl control status
+homelabctl control login
+homelabctl control status
 
 # Update the installed CLI from a verified release.
 homelabctl update
@@ -190,7 +196,7 @@ homelabctl docs serve --image iamkhattar/homelab-docs:dev --port 8080
 
 - Secrets, private SSH keys, kubeconfig and recovery exports do not belong in
   the repository.
-- Vault will manage application secrets later; it cannot replace host SSH
+- Vault is the application-secret source of truth; it cannot replace host SSH
   trust, Debian accounts, sudo policy or off-node recovery material.
 - Titan stays private on the home network with no router port forwards.
 - Mutating commands support narrowly scoped targets where the underlying tool

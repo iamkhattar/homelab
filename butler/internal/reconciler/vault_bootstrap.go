@@ -9,7 +9,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// vaultOAuthClientPath is where the OAuthClients reconciler stores the
+// vaultOAuthClientPath is where the PocketIDClient reconciler stores the
 // vault client_id/client_secret. ensureJWTAuth uses these to configure
 // OIDC discovery against Pocket-ID.
 const vaultOAuthClientPath = "oauth/vault"
@@ -91,7 +91,7 @@ func (r *VaultBootstrap) configure(ctx context.Context) error {
 	}
 
 	// Best-effort: read OAuth client creds for Vault from KV. If they
-	// haven't been written yet (OAuthClients reconciler hasn't run, or
+	// haven't been written yet (PocketIDClient reconciler hasn't run, or
 	// Pocket-ID isn't reachable), in.OIDCClientID stays empty and
 	// ensureJWTAuth skips the OIDC client config.
 	if r.cfg.OIDC.Issuer != "" {

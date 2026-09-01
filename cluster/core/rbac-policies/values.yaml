@@ -8,7 +8,7 @@ serviceAccounts:
   - name: storage-admin
     namespace: storage
 
-  # --- Vault Kubernetes secrets engine (Phase 1B) ---
+  # --- Vault Kubernetes secrets engine ---
   # Token reviewer: Vault calls this SA's identity at TokenReview to validate
   # tokens it issues, and uses its long-lived JWT (see serviceAccountTokens)
   # to call the TokenRequest API.
@@ -85,7 +85,7 @@ clusterRoleBindings:
     namespace: storage
     clusterRole: storage-admin
 
-  # --- Vault Kubernetes secrets engine (Phase 1B) ---
+  # --- Vault Kubernetes secrets engine ---
   # Token reviewer needs system:auth-delegator to call TokenReview during
   # token validation, plus vault-token-issuer to call TokenRequest to mint
   # SA JWTs for the managed SAs.

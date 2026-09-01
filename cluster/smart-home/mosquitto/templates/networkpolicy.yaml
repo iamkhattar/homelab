@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: home-assistant}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: zigbee}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: zigbee2mqtt}
+      ports:
+        - {protocol: TCP, port: {{ .Values.service.mqttPort }}}
+  egress: []

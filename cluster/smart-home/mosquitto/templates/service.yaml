@@ -13,10 +13,6 @@ spec:
       targetPort: mqtt
       protocol: TCP
       name: mqtt
-    - port: {{ .Values.service.websocketPort }}
-      targetPort: websocket
-      protocol: TCP
-      name: websocket
   selector:
     app.kubernetes.io/name: {{ .Release.Name }}
     app.kubernetes.io/instance: {{ .Release.Name }}

@@ -1,3 +1,4 @@
-Home Assistant has been deployed to the cluster.
+Home Assistant is available at https://{{ .Values.ingress.host }}.
 
-Web UI: home-assistant.smart-home.svc.cluster.local:{{ .Values.service.port }}
+Complete native owner enrollment, enable MFA, then configure the MQTT
+integration only after Mosquitto and its Vault-managed credentials are Ready.

@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/gethomepage/homepage
-  tag: v1.10.1
+  tag: v2.1.2
   pullPolicy: IfNotPresent
 
 service:
@@ -12,6 +12,21 @@ service:
 
 env:
   HOMEPAGE_ALLOWED_HOSTS: "home.6940469.xyz"
+  HOMEPAGE_AUTH_ENABLED: "true"
+  HOMEPAGE_EXTERNAL_URL: "https://home.6940469.xyz"
+  HOMEPAGE_OIDC_ISSUER: "https://auth.6940469.xyz"
+  HOMEPAGE_OIDC_NAME: "Pocket ID"
+
+secretEnv:
+  - name: HOMEPAGE_AUTH_SECRET
+    secretName: homepage-auth
+    key: auth-secret
+  - name: HOMEPAGE_OIDC_CLIENT_ID
+    secretName: homepage-oidc
+    key: client_id
+  - name: HOMEPAGE_OIDC_CLIENT_SECRET
+    secretName: homepage-oidc
+    key: client_secret
 
 persistence:
   enabled: false
@@ -50,11 +65,11 @@ config:
   services.yaml: |
     - Smart Home:
         - Home Assistant:
-            href: http://home-assistant.smart-home.svc.cluster.local:8123
+            href: https://ha.6940469.xyz
             icon: home-assistant
             description: Home automation
         - Zigbee2MQTT:
-            href: http://zigbee2mqtt.smart-home.svc.cluster.local:80
+            href: https://zigbee.6940469.xyz
             icon: zigbee2mqtt
             description: Zigbee device management
     - Monitoring:

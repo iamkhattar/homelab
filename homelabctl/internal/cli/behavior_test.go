@@ -18,14 +18,15 @@ func TestOperationalCommandsConstructExpectedDryRuns(t *testing.T) {
 		args []string
 		want []string
 	}{
-		{name: "deploy diff", args: []string{"deploy", "diff"}, want: []string{"helmfile diff", "/cluster"}},
-		{name: "deploy selected release", args: []string{"deploy", "apply", "cert-manager"}, want: []string{"helmfile apply --selector name=cert-manager --include-needs"}},
-		{name: "deploy selected stage", args: []string{"deploy", "apply", "--stage", "data"}, want: []string{"helmfile apply --selector stage=data --include-needs"}},
+		{name: "deploy diff", args: []string{"deploy", "diff"}, want: []string{"helmfile diff --skip-diff-validation-on-install", "/cluster"}},
+		{name: "deploy selected release", args: []string{"deploy", "apply", "cert-manager"}, want: []string{"helmfile apply --selector name=cert-manager --include-needs --skip-diff-validation-on-install"}},
+		{name: "deploy selected stage", args: []string{"deploy", "apply", "--stage", "data"}, want: []string{"helmfile apply --selector stage=data --include-needs --skip-diff-validation-on-install"}},
 		{name: "certificate status", args: []string{"control", "certificate", "status"}, want: []string{"create token butler-recovery-client"}},
 		{name: "verify certificate dns", args: []string{"control", "certificate", "verify-dns", "--confirm"}, want: []string{"create token butler-recovery-client"}},
 		{name: "deploy sync", args: []string{"deploy", "sync"}, want: []string{"helmfile sync"}},
 		{name: "deploy ordered identity platform", args: []string{"deploy", "platform", "--through", "identity", "--confirm"}, want: []string{"stage=foundation", "stage=networking", "stage=secrets", "stage=identity"}},
 		{name: "deploy gated observability platform", args: []string{"deploy", "platform", "--through", "observability", "--confirm"}, want: []string{"stage=data", "butler-bootstrap-state", "stage=observability"}},
+		{name: "deploy opt-in smart home stage", args: []string{"deploy", "platform", "--through", "smart-home", "--confirm"}, want: []string{"stage=applications", "butler-bootstrap-state", "stage=smart-home"}},
 		{name: "terraform format", args: []string{"infra", "fmt"}, want: []string{"terraform fmt -check -recursive", "/infra"}},
 		{name: "terraform validate", args: []string{"infra", "validate"}, want: []string{"terraform init -backend=false -input=false", "terraform validate"}},
 		{name: "terraform plan", args: []string{"infra", "plan"}, want: []string{"terraform plan"}},

@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/home-assistant/home-assistant
-  tag: "2024.12"
+  tag: "2026.8.3@sha256:14931c6b13756317849f46da1d01b45937a1150db66c081cfe529d48215943fe"
   pullPolicy: IfNotPresent
 
 service:
@@ -10,15 +10,25 @@ service:
   port: 8123
   containerPort: 8123
 
-# Host network required for mDNS/SSDP device discovery
-hostNetwork: false  # Set to true if you need local device discovery
+# Keep the pod network-isolated initially. Enabling host networking improves
+# mDNS/SSDP discovery but also exposes port 8123 directly on Titan and weakens
+# NetworkPolicy enforcement, so it is a reviewed follow-up change.
+hostNetwork: false
 
 env:
-  TZ: "UTC"  # Update with your timezone
+  TZ: "Europe/London"
+
+ingress:
+  enabled: true
+  className: traefik
+  host: ha.6940469.xyz
+
+bootstrap:
+  trustedProxyCIDR: 10.42.0.0/16
 
 persistence:
   enabled: true
-  size: 5Gi
+  size: 10Gi
   accessMode: ReadWriteOnce
   mountPath: /config
   storageClass: ""
@@ -30,3 +40,7 @@ resources:
   limits:
     cpu: 1000m
     memory: 1Gi
+
+networkPolicy:
+  enabled: true
+  lanCIDR: 192.168.1.0/24

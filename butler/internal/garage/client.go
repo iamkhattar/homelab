@@ -78,6 +78,10 @@ func (c *Client) CreateKey(ctx context.Context, name string) (*AccessKey, error)
 	return &out, err
 }
 
+func (c *Client) DeleteKey(ctx context.Context, accessKeyID string) error {
+	return c.do(ctx, http.MethodPost, "/v2/DeleteKey", map[string]any{"accessKeyId": accessKeyID}, nil)
+}
+
 func (c *Client) AllowBucketKey(ctx context.Context, bucketID, keyID string, read, write, owner bool) error {
 	body := map[string]any{"bucketId": bucketID, "accessKeyId": keyID, "permissions": map[string]bool{"read": read, "write": write, "owner": owner}}
 	return c.do(ctx, http.MethodPost, "/v2/AllowBucketKey", body, nil)

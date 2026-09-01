@@ -55,7 +55,7 @@ func newDoctorCommand(s *state) *cobra.Command {
 			files := []string{
 				"ansible/inventory/hosts.yml",
 				"ansible/playbooks/site.yml",
-				"cluster/helmfile.yaml",
+				"cluster/helmfile.yaml.gotmpl",
 				"infra/main.tf",
 				"docs/package-lock.json",
 			}

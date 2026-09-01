@@ -148,15 +148,6 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 		long:    "Rotate one confidential Pocket ID OIDC client secret and write the one-time value directly to its Vault oauth path. The CLI receives only a success status.",
 		example: "  BUTLER_TOKEN=... homelabctl control clients rotate grafana",
 	},
-	"homelabctl control applications": {long: "Manage non-secret ApplicationIntegration ownership, namespace, authentication, ingress and Vault-path contracts."},
-	"homelabctl control applications list": {
-		long:    "List ApplicationIntegration records stored by Butler in a dedicated non-secret Kubernetes ConfigMap.",
-		example: "  BUTLER_TOKEN=... homelabctl control applications list",
-	},
-	"homelabctl control applications put": {
-		long:    "Create or replace an ApplicationIntegration contract. Butler validates its namespace during reconciliation and never stores credential values in this resource.",
-		example: "  BUTLER_TOKEN=... homelabctl control applications put paperless --app-namespace paperless-ngx --authentication forward-auth --owner homelab-admin --host paperless.6940469.xyz --vault-path applications/paperless-ngx",
-	},
 	"homelabctl deploy": {long: "Preview or reconcile Helmfile desired state. Deployment remains separate from image publication and CI. The shared image tag defaults to the full committed Git SHA and must already exist in the registry."},
 	"homelabctl deploy diff": {
 		long:    "Run Helmfile diff from cluster/ without applying releases.",

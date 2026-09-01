@@ -7,59 +7,29 @@ metadata:
     app.kubernetes.io/name: {{ .Release.Name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 ---
-# Normal Butler stores non-secret ApplicationIntegration metadata only. It
-# cannot read the recovery Secret.
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ .Release.Name }}
-  namespace: {{ .Release.Namespace }}
-  labels:
-    app.kubernetes.io/name: {{ .Release.Name }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-rules:
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    resourceNames: ["butler-application-integrations"]
-    verbs: ["get", "update", "patch"]
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    verbs: ["create"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ .Release.Name }}
-  namespace: {{ .Release.Namespace }}
-  labels:
-    app.kubernetes.io/name: {{ .Release.Name }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ .Release.Name }}
-subjects:
-  - kind: ServiceAccount
-    name: {{ .Values.serviceAccount.name }}
-    namespace: {{ .Release.Namespace }}
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ .Release.Name }}-namespace-reader
+  name: {{ .Release.Name }}-platform-controller
 rules:
-  - apiGroups: [""]
-    resources: ["namespaces"]
-    verbs: ["get"]
+  - apiGroups: ["platform.6940469.xyz"]
+    resources: ["pocketidclients", "pocketidgroups", "managedcredentials", "garagebuckets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["platform.6940469.xyz"]
+    resources: ["pocketidclients/status", "pocketidgroups/status", "managedcredentials/status", "garagebuckets/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["platform.6940469.xyz"]
+    resources: ["butleroperations"]
+    verbs: ["create", "get", "list", "update", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ .Release.Name }}-namespace-reader
+  name: {{ .Release.Name }}-platform-controller
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ .Release.Name }}-namespace-reader
+  name: {{ .Release.Name }}-platform-controller
 subjects:
   - kind: ServiceAccount
     name: {{ .Values.serviceAccount.name }}
@@ -79,6 +49,33 @@ metadata:
   name: {{ .Values.recovery.clientServiceAccount }}
   namespace: {{ .Release.Namespace }}
 automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Name }}-recovery-platform-bootstrap
+rules:
+  - apiGroups: ["platform.6940469.xyz"]
+    # GarageBucket is read-only here because cross-kind Vault output-path
+    # ownership must also be safe during bootstrap reconciliation.
+    resources: ["pocketidclients", "pocketidgroups", "managedcredentials", "garagebuckets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["platform.6940469.xyz"]
+    resources: ["pocketidclients/status", "pocketidgroups/status", "managedcredentials/status"]
+    verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Name }}-recovery-platform-bootstrap
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Name }}-recovery-platform-bootstrap
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.recovery.serviceAccount }}
+    namespace: {{ .Release.Namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

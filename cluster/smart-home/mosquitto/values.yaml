@@ -2,13 +2,12 @@ replicaCount: 1
 
 image:
   repository: eclipse-mosquitto
-  tag: "2.0.20"
+  tag: "2.0.22@sha256:212f89e1eaeb2c322d6441b64396e3346026674db8fa9c27beac293405c32b3c"
   pullPolicy: IfNotPresent
 
 service:
   type: ClusterIP
   mqttPort: 1883
-  websocketPort: 9001
 
 persistence:
   enabled: true
@@ -20,12 +19,26 @@ persistence:
 config:
   mosquitto.conf: |
     listener 1883
-    listener 9001
-    protocol websockets
     allow_anonymous false
     password_file /mosquitto/config/password_file
+    acl_file /mosquitto/config/acl_file
     persistence true
     persistence_location /mosquitto/data/
+    autosave_interval 300
+    log_dest stdout
+    log_type error
+    log_type warning
+    log_type notice
+  acl_file: |
+    user zigbee2mqtt
+    topic readwrite zigbee2mqtt/#
+    topic readwrite homeassistant/#
+    topic read $SYS/#
+
+    user home-assistant
+    topic readwrite zigbee2mqtt/#
+    topic readwrite homeassistant/#
+    topic read $SYS/#
 
 resources:
   requests:
@@ -33,4 +46,4 @@ resources:
     memory: 32Mi
   limits:
     cpu: 100m
-    memory: 64Mi
+    memory: 128Mi

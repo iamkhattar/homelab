@@ -156,7 +156,7 @@ func doctorRepository(t *testing.T) string {
 	for _, path := range []string{
 		"ansible/inventory/hosts.yml",
 		"ansible/playbooks/site.yml",
-		"cluster/helmfile.yaml",
+		"cluster/helmfile.yaml.gotmpl",
 		"infra/main.tf",
 		"docs/package-lock.json",
 	} {

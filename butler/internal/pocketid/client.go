@@ -1,11 +1,11 @@
 // Package pocketid is a minimal client for the Pocket-ID admin API.
 //
 // Pocket-ID exposes a REST surface under /api for managing OIDC clients,
-// users, and groups. Butler uses this client to provision the OAuth clients
-// declared in its ConfigMap (the OAuthClients reconciler).
+// users, and groups. Butler uses this client to provision the OIDC clients
+// declared by PocketIDClient resources.
 //
 // Authentication is via an admin API key minted in the Pocket-ID UI by a
-// human operator and persisted in Vault at secret/pocket-id/admin-api-key.
+// human operator and persisted in Vault at secret/pocket-id/admin.
 // The reconciler fetches it from Vault and passes it here on construction.
 package pocketid
 
@@ -29,7 +29,7 @@ import (
 type ErrAPIKeyMissing struct{}
 
 func (ErrAPIKeyMissing) Error() string {
-	return "pocket-id admin api key not found; provision one in the Pocket-ID UI and store it at secret/pocket-id/admin-api-key"
+	return "pocket-id admin api key not found; provision one in the Pocket ID UI and import it to secret/pocket-id/admin through recovery bootstrap"
 }
 
 // Client is a tiny HTTP client for Pocket-ID's admin API.
@@ -63,7 +63,14 @@ type OIDCClient struct {
 	CallbackURLs []string `json:"callbackURLs"`
 	LogoutURLs   []string `json:"logoutCallbackURLs,omitempty"`
 	// Returned only on create.
-	Secret string `json:"secret,omitempty"`
+	Secret   string `json:"secret,omitempty"`
+	SecretID string `json:"-"`
+}
+
+type OIDCClientSecret struct {
+	ID       string `json:"id"`
+	Secret   string `json:"secret,omitempty"`
+	IsActive bool   `json:"isActive,omitempty"`
 }
 
 // ListClients returns all OIDC clients configured in Pocket-ID.
@@ -95,7 +102,8 @@ func (c *Client) CreateClient(ctx context.Context, in OIDCClient) (*OIDCClient, 
 		if err != nil {
 			return nil, err
 		}
-		out.Secret = secret
+		out.Secret = secret.Secret
+		out.SecretID = secret.ID
 	}
 	return &out, nil
 }
@@ -112,25 +120,41 @@ func (c *Client) UpdateClient(ctx context.Context, id string, in OIDCClient) err
 	return nil
 }
 
-// RotateSecret asks Pocket-ID to generate a fresh secret for the client and
-// returns the new value.
-func (c *Client) RotateSecret(ctx context.Context, id string) (string, error) {
-	return c.CreateSecret(ctx, id)
-}
-
 // CreateSecret adds a new secret to a confidential OIDC client. Pocket ID
 // returns its value exactly once, so callers must persist it immediately.
-func (c *Client) CreateSecret(ctx context.Context, id string) (string, error) {
+func (c *Client) CreateSecret(ctx context.Context, id string) (OIDCClientSecret, error) {
 	if c.apiKey == "" {
-		return "", ErrAPIKeyMissing{}
+		return OIDCClientSecret{}, ErrAPIKeyMissing{}
 	}
-	var resp struct {
-		Secret string `json:"secret"`
-	}
+	var resp OIDCClientSecret
 	if err := c.do(ctx, http.MethodPost, "/api/oidc/clients/"+url.PathEscape(id)+"/secrets", struct{}{}, &resp); err != nil {
-		return "", fmt.Errorf("rotating secret for oidc client %q: %w", id, err)
+		return OIDCClientSecret{}, fmt.Errorf("creating secret for oidc client %q: %w", id, err)
 	}
-	return resp.Secret, nil
+	if resp.ID == "" || resp.Secret == "" {
+		return OIDCClientSecret{}, fmt.Errorf("Pocket ID returned an incomplete secret for oidc client %q", id)
+	}
+	return resp, nil
+}
+
+func (c *Client) ListClientSecrets(ctx context.Context, id string) ([]OIDCClientSecret, error) {
+	if c.apiKey == "" {
+		return nil, ErrAPIKeyMissing{}
+	}
+	var out []OIDCClientSecret
+	if err := c.do(ctx, http.MethodGet, "/api/oidc/clients/"+url.PathEscape(id)+"/secrets", nil, &out); err != nil {
+		return nil, fmt.Errorf("listing secrets for oidc client %q: %w", id, err)
+	}
+	return out, nil
+}
+
+func (c *Client) DeleteClientSecret(ctx context.Context, clientID, secretID string) error {
+	if c.apiKey == "" {
+		return ErrAPIKeyMissing{}
+	}
+	if err := c.do(ctx, http.MethodDelete, "/api/oidc/clients/"+url.PathEscape(clientID)+"/secrets/"+url.PathEscape(secretID), nil, nil); err != nil {
+		return fmt.Errorf("deleting secret %q for oidc client %q: %w", secretID, clientID, err)
+	}
+	return nil
 }
 
 // UserGroup is the API representation Butler needs for declarative groups.

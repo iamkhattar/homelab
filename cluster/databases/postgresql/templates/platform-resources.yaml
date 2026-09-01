@@ -1,0 +1,20 @@
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: ManagedCredential
+metadata:
+  name: postgresql
+  namespace: {{ .Release.Namespace }}
+spec:
+  vaultPath: databases/postgresql
+  fields:
+    postgres-password:
+      generate: {type: password, length: 32}
+    kitchenowl-password:
+      generate: {type: password, length: 32}
+    paperless-password:
+      generate: {type: password, length: 32}
+    vaultwarden-password:
+      generate: {type: password, length: 32}
+    vaultwarden-url:
+      template: {{ printf "postgresql://vaultwarden:{{vaultwarden-password}}@postgresql.databases.svc.cluster.local:5432/vaultwarden" | quote }}
+    init.sql:
+      template: {{ printf "CREATE ROLE kitchenowl LOGIN PASSWORD '{{kitchenowl-password}}';\nCREATE DATABASE kitchenowl OWNER kitchenowl;\nCREATE ROLE paperless LOGIN PASSWORD '{{paperless-password}}';\nCREATE DATABASE paperless OWNER paperless;\nCREATE ROLE vaultwarden LOGIN PASSWORD '{{vaultwarden-password}}';\nCREATE DATABASE vaultwarden OWNER vaultwarden;" | quote }}

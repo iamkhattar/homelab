@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-bootstrap
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  initialise.sh: |
+    #!/bin/sh
+    set -eu
+    if [ -e /config/configuration.yaml ]; then
+      exit 0
+    fi
+    printf '%s\n' \
+      'default_config:' \
+      '' \
+      'http:' \
+      '  use_x_forwarded_for: true' \
+      '  trusted_proxies:' \
+      '    - {{ .Values.bootstrap.trustedProxyCIDR }}' \
+      > /config/configuration.yaml

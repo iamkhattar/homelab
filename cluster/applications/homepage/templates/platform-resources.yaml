@@ -1,0 +1,21 @@
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: ManagedCredential
+metadata:
+  name: homepage
+  namespace: {{ .Release.Namespace }}
+spec:
+  vaultPath: applications/homepage
+  fields:
+    auth-secret:
+      generate: {type: password, length: 48}
+---
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: PocketIDClient
+metadata:
+  name: homepage
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: confidential
+  redirectURIs:
+    - https://home.6940469.xyz/api/auth/callback/homepage-oidc
+  vaultPath: oauth/homepage

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"regexp"
+	"sort"
 	"strings"
 
 	butlercrypto "github.com/iamkhattar/homelab/butler/internal/crypto"
@@ -110,22 +112,65 @@ func GenerateSecretDataWithExisting(keys map[string]KeySpec, existing map[string
 		return nil, fmt.Errorf("key %s has no supported generator", name)
 	}
 
-	// Second pass: resolve templates.
+	// Resolve templates deterministically and support templates that reference
+	// other templates. Unknown references and cycles fail instead of silently
+	// persisting an unresolved credential.
+	pending := make(map[string]string)
 	for name, spec := range keys {
-		if spec.Template == "" {
-			continue
+		if spec.Template != "" {
+			if _, exists := data[name]; !exists {
+				pending[name] = spec.Template
+			}
 		}
-		if _, ok := data[name]; ok {
-			continue
+	}
+	for len(pending) > 0 {
+		names := make([]string, 0, len(pending))
+		for name := range pending {
+			names = append(names, name)
 		}
-		resolved := spec.Template
-		for k, v := range data {
-			resolved = strings.ReplaceAll(resolved, "{{"+k+"}}", fmt.Sprintf("%v", v))
+		sort.Strings(names)
+		progress := false
+		for _, name := range names {
+			resolved, ready, err := resolveTemplate(pending[name], data, pending)
+			if err != nil {
+				return nil, fmt.Errorf("resolving template for key %s: %w", name, err)
+			}
+			if !ready {
+				continue
+			}
+			data[name] = resolved
+			delete(pending, name)
+			progress = true
 		}
-		data[name] = resolved
+		if !progress {
+			return nil, fmt.Errorf("template dependency cycle among keys %s", strings.Join(names, ", "))
+		}
 	}
 
 	return data, nil
+}
+
+var templateReference = regexp.MustCompile(`\{\{([A-Za-z0-9._-]+)\}\}`)
+
+func resolveTemplate(value string, data map[string]interface{}, pending map[string]string) (string, bool, error) {
+	ready := true
+	var resolveErr error
+	resolved := templateReference.ReplaceAllStringFunc(value, func(match string) string {
+		name := templateReference.FindStringSubmatch(match)[1]
+		if replacement, ok := data[name]; ok {
+			return fmt.Sprintf("%v", replacement)
+		}
+		if _, ok := pending[name]; ok {
+			ready = false
+			return match
+		}
+		resolveErr = fmt.Errorf("unknown key %q", name)
+		return match
+	})
+	if resolveErr != nil {
+		return "", false, resolveErr
+	}
+	return resolved, ready, nil
 }
 
 // KeySpec describes a single secret key's generation parameters.

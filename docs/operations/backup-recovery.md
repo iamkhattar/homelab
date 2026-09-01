@@ -119,7 +119,7 @@ against the only copy of the data.
 
 ## Vault dependency rule
 
-Vault will eventually improve day-to-day secret handling, but in-cluster Vault
+Vault is the source of truth for day-to-day application secrets, but in-cluster Vault
 cannot be the sole recovery store for the cluster that runs it. Its unseal or
 recovery material and the credentials required to restore its storage belong in
 the off-cluster recovery set.

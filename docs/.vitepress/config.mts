@@ -95,6 +95,7 @@ function mainSidebar() {
         { text: 'Bootstrap the platform', link: '/operations/platform-bootstrap' },
         { text: 'Routine maintenance', link: '/operations/maintenance' },
         { text: 'Backup and recovery', link: '/operations/backup-recovery' },
+        { text: 'Home automation and Zigbee', link: '/operations/smart-home' },
         { text: 'Change and evidence record', link: '/operations/change-evidence' },
         { text: 'Troubleshooting', link: '/operations/troubleshooting' },
       ],

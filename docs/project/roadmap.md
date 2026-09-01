@@ -221,15 +221,23 @@ Acceptance criteria:
 
 **Goal:** run Home Assistant and Zigbee reliably enough for household use.
 
+**State:** the staged architecture and hardened charts are ready in the
+repository; the exact Sonoff `/dev/serial/by-id` path, Titan deployment and
+restore evidence remain outstanding.
+
 Work:
 
 - deploy Home Assistant with persistent configuration and tested backups;
 - identify the Sonoff dongle through `/dev/serial/by-id`, not a changing `ttyUSB`
   number;
-- decide between Home Assistant's native Zigbee integration and Zigbee2MQTT;
-- deploy Mosquitto only if the chosen design needs MQTT;
+- use Zigbee2MQTT as the sole owner of the Sonoff zStack coordinator;
+- deploy authenticated Mosquitto with Butler-generated credentials;
 - constrain USB access to the intended workload and Titan node;
 - document maintenance windows, rollback and automation fallbacks.
+
+The three opt-in increments are Home Assistant, Mosquitto, then Zigbee2MQTT.
+The last increment cannot render with an empty or unstable USB path. See the
+[home automation runbook](/operations/smart-home).
 
 Acceptance criteria:
 

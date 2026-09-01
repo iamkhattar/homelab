@@ -1,0 +1,12 @@
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: ManagedCredential
+metadata:
+  name: zigbee2mqtt-runtime
+  namespace: {{ .Release.Namespace }}
+spec:
+  vaultPath: smart-home/zigbee2mqtt
+  fields:
+    network-key:
+      generate: {type: hex, length: 16}
+    frontend-auth-token:
+      generate: {type: password, length: 64}

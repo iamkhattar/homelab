@@ -49,7 +49,6 @@ func newControlCommand(s *state) *cobra.Command {
 	cmd.AddCommand(newControlUsersCommand(s, options))
 	cmd.AddCommand(newControlGetCommand(s, options, "groups", "List Pocket ID groups", "/api/v1/identity/groups"))
 	cmd.AddCommand(newControlClientsCommand(s, options))
-	cmd.AddCommand(newControlApplicationsCommand(s, options))
 	cmd.AddCommand(newControlCredentialsCommand(s, options))
 	return cmd
 }
@@ -464,33 +463,6 @@ func newControlUsersCommand(s *state, options *controlOptions) *cobra.Command {
 	}}
 	setGroups.Flags().StringSliceVar(&groups, "group", nil, "Pocket ID group ID; repeat as required")
 	cmd.AddCommand(create, update, setGroups)
-	return cmd
-}
-
-func newControlApplicationsCommand(s *state, options *controlOptions) *cobra.Command {
-	cmd := &cobra.Command{Use: "applications", Short: "Manage application integration metadata"}
-	cmd.AddCommand(newControlGetCommand(s, options, "list", "List managed application integrations", "/api/v1/applications"))
-	var namespace, authentication, owner, host string
-	var vaultPaths []string
-	put := &cobra.Command{Use: "put <name>", Short: "Create or update an ApplicationIntegration", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		if err := validateReleaseName(args[0]); err != nil {
-			return fmt.Errorf("application name: %w", err)
-		}
-		body := map[string]interface{}{"name": args[0], "namespace": namespace, "authentication": authentication, "owner": owner, "ingressHost": host, "vaultPaths": vaultPaths}
-		return withNormalClient(cmd.Context(), s, options, func(client *controlapi.Client) error {
-			var result interface{}
-			if err := client.Do(cmd.Context(), http.MethodPut, "/api/v1/applications/"+args[0], body, &result); err != nil {
-				return err
-			}
-			return printJSON(s, result)
-		})
-	}}
-	put.Flags().StringVar(&namespace, "app-namespace", "", "application namespace")
-	put.Flags().StringVar(&authentication, "authentication", "", "native-oidc, forward-auth, or none")
-	put.Flags().StringVar(&owner, "owner", "", "owning Pocket ID group")
-	put.Flags().StringVar(&host, "host", "", "internal ingress hostname")
-	put.Flags().StringSliceVar(&vaultPaths, "vault-path", nil, "approved Vault path; repeat as required")
-	cmd.AddCommand(put)
 	return cmd
 }
 

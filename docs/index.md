@@ -59,6 +59,7 @@ on Titan stops the cluster.
 
 ## Documentation scope
 
-The host and K3s bootstrap layer has detailed runbooks now. Pocket ID, Vault,
-observability, Home Assistant, Zigbee and remote Hetzner capacity are captured
-as sequenced future work rather than being presented as already operational.
+The host and K3s bootstrap layer is operational and documented. Pocket ID,
+Vault, Butler and observability are implemented in the repository but remain
+staged Titan deployment checkpoints. Home Assistant, Zigbee and remote Hetzner
+capacity remain sequenced future work.

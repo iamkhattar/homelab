@@ -12,7 +12,7 @@ spec:
     type: Recreate
     # Recreate (not RollingUpdate) because butler holds the Vault token in
     # memory and races with itself if two replicas run during a rollout.
-    # Phase 2 will add leader election so this can move to RollingUpdate.
+    # Leader election is required before this can move to RollingUpdate.
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ .Release.Name }}
@@ -71,10 +71,6 @@ spec:
             - name: vault-token
               mountPath: /var/run/secrets/butler-vault
               readOnly: true
-            {{- if .Values.persistence.enabled }}
-            - name: operations
-              mountPath: /var/lib/butler
-            {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
@@ -92,8 +88,3 @@ spec:
                   path: token
                   audience: vault
                   expirationSeconds: 3600
-        {{- if .Values.persistence.enabled }}
-        - name: operations
-          persistentVolumeClaim:
-            claimName: {{ .Release.Name }}-operations
-        {{- end }}
