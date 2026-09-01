@@ -13,9 +13,19 @@ service:
 env:
   APP_URL: ""  # Set via helmfile; Pocket ID uses this as its WebAuthn origin and OIDC issuer.
   INTERNAL_APP_URL: "http://pocket-id.security.svc.cluster.local"
-  TRUST_PROXY: "true"
+  # Traefik runs inside the K3s pod CIDR. Trust forwarded client headers only
+  # from cluster pods instead of accepting them from every source.
+  TRUST_PROXY: "10.42.0.0/16"
+  PROXY_PROTOCOL: "false"
+  ALLOW_INSECURE_CALLBACK_URLS: "false"
   ANALYTICS_DISABLED: "true"
   VERSION_CHECK_DISABLED: "true"
+  LOG_LEVEL: "info"
+  LOG_JSON: "true"
+  # Database query arguments can contain credentials, tokens or personal data.
+  LOG_QUERY_ARGS: "false"
+  AUDIT_LOG_RETENTION_DAYS: "90"
+  DISABLE_RATE_LIMITING: "false"
   OTEL_SERVICE_NAME: "pocket-id"
   OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=homelab,k8s.namespace.name=security"
   OTEL_TRACES_EXPORTER: "otlp"

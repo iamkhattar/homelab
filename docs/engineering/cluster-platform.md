@@ -185,8 +185,12 @@ client.
 This avoids duplicate metric collection: Alloy receives pushed OTLP metrics,
 while Prometheus owns pull-based cluster scraping. Retention is seven days for
 the initial single-node budget. None of Loki, Tempo or Prometheus has an
-Ingress. Pocket ID is configured to export native OTLP metrics and traces to
-Alloy; structured container logs from every pod are collected independently.
+Ingress. Pocket ID emits JSON stdout logs and exports native OTLP metrics and
+traces to Alloy. OTLP log export stays disabled because Alloy already collects
+container stdout; enabling both would duplicate every record in Loki. Query
+arguments remain excluded because they may contain credentials, tokens or
+personal data. Other workloads should use JSON stdout where their supported
+configuration exposes it, while Alloy remains the single log-shipping path.
 
 ## First bootstrap checkpoints
 
