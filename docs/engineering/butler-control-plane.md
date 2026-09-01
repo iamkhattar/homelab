@@ -44,6 +44,12 @@ Kubernetes API calls only to the configured API Service and node endpoint
 `/32`s on ports 443/6443. Namespace selectors cannot represent a virtual
 Service IP or host-network API server; future nodes must update these values
 through their cluster profile rather than widening access to the LAN CIDR.
+Recovery Butler additionally has pod-selected egress to Vault on port 8200 and
+Pocket ID on Service/container ports 80/1411. Both Pocket ID ports account for
+policy enforcement before or after Kubernetes Service DNAT. This path is
+required only for the resumable identity bootstrap: recovery creates and
+verifies the provider configuration before normal Butler's Pocket
+ID-authenticated surface can become authoritative.
 
 ## Resumable bootstrap
 

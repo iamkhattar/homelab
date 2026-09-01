@@ -304,6 +304,13 @@ Advance bootstrap after owner enrollment:
 homelabctl control bootstrap --confirm
 ```
 
+Recovery Butler contacts Pocket ID directly during this pass. Its bounded
+NetworkPolicy permits only the `pocket-id` pods on TCP 80/1411; a persistent
+`connect: connection refused` from the recovery command while Pocket ID is
+healthy indicates that the current Butler Helm release predates that egress
+rule. Deploy the current `secrets` stage and repeat the idempotent command. Do
+not reset Pocket ID or delete its PVC for this failure.
+
 The `--pocket-id-api-key-file` flag is retained only for break-glass rotation
 of the generated machine credential. It replaces `static-api-key` in the same
 Vault document without changing `encryption-key`; it is not part of normal
