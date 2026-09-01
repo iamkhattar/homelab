@@ -68,6 +68,7 @@ networkPolicy:
   enabled: true
   vaultNamespace: security
   pocketIdNamespace: security
+  ingressNamespace: networking
   kubernetesAPI:
     # K3s' kubernetes.default Service IP plus Titan's sole API endpoint. Both
     # are required because NetworkPolicy enforcement may observe traffic

@@ -93,7 +93,7 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 		long:    "Create a new snapshot and fetch it with the K3s server token into a unique private directory outside the repository. The destination is staging space and must be encrypted and moved off-device.",
 		example: "  homelabctl cluster recovery export \\\n    --destination /secure/homelab-recovery \\\n    --name first-install \\\n    --ask-become-pass",
 	},
-	"homelabctl control": {long: "Use Butler's versioned API through a private Kubernetes port-forward. Normal commands require a Pocket ID token; bootstrap and recovery use a short-lived, audience-bound Kubernetes service-account token."},
+	"homelabctl control": {long: "Use Butler's versioned API. Normal commands reach the Pocket ID-protected HTTPS ingress; --port-forward is an explicit diagnostic fallback. Bootstrap and recovery use the isolated recovery service with a short-lived, audience-bound Kubernetes service-account token."},
 	"homelabctl control bootstrap": {
 		long:    "Advance Butler's idempotent bootstrap state machine through the isolated recovery service. Butler generates Pocket ID's machine credential directly in Vault; the optional file flag is only a break-glass replacement path.",
 		example: "  homelabctl control bootstrap --confirm",

@@ -63,6 +63,21 @@ spec:
           port: 443
         - protocol: TCP
           port: 1411
+    # Pocket ID's public OIDC issuer resolves to Titan's Traefik ingress.
+    # NetworkPolicy enforcement may observe this flow after Service DNAT, so
+    # allow only Traefik's selected pods and HTTPS container ports.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.ingressNamespace }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 8443
     # Garage admin API in storage/ for layout, bucket and key reconciliation.
     - to:
         - namespaceSelector:

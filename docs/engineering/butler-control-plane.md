@@ -50,6 +50,12 @@ policy enforcement before or after Kubernetes Service DNAT. This path is
 required only for the resumable identity bootstrap: recovery creates and
 verifies the provider configuration before normal Butler's Pocket
 ID-authenticated surface can become authoritative.
+Normal Butler also resolves the public Pocket ID issuer and validates its OIDC
+discovery and signing keys over `https://auth.6940469.xyz`. That address enters
+the cluster through Traefik, so its policy narrowly permits egress to
+Traefik-selected pods in `networking` on ports 443/8443. This covers policy
+enforcement after Service DNAT without granting general namespace or internet
+egress.
 
 ## Resumable bootstrap
 
@@ -147,6 +153,12 @@ After reconciliation, the operator must prove both authentication paths:
 homelabctl control login
 homelabctl control verify-identity --confirm
 ```
+
+Normal `homelabctl control` requests use
+`https://butler.6940469.xyz` through Traefik by default. An explicit
+`--port-forward` remains available for diagnosing ingress failures. Bootstrap
+and recovery never inherit the normal address: they continue through the
+non-ingressed recovery Service using a fresh audience-bound Kubernetes token.
 
 The first command proves Pocket ID issuer, audience, nonce, PKCE and Butler
 role mapping. The second checks `/api/v1/me`, performs Vault's browser OIDC

@@ -21,9 +21,21 @@ func TestNormalControlCommandRequiresToken(t *testing.T) {
 	t.Setenv("BUTLER_TOKEN", "")
 	runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
 	root := New(BuildInfo{}, runner)
-	root.SetArgs([]string{"--repo-root", testRepository(t), "control", "status", "--address", "http://127.0.0.1:1"})
+	root.SetArgs([]string{"--repo-root", testRepository(t), "control", "status", "--session-file", t.TempDir() + "/missing-session.json"})
 	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "control login") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestNormalControlDefaultsToHTTPSIngress(t *testing.T) {
+	command := newControlCommand(&state{})
+	address := command.PersistentFlags().Lookup("address")
+	if address == nil || address.DefValue != defaultButlerAddress {
+		t.Fatalf("address default = %v, want %q", address, defaultButlerAddress)
+	}
+	portForward := command.PersistentFlags().Lookup("port-forward")
+	if portForward == nil || portForward.DefValue != "false" {
+		t.Fatalf("port-forward default = %v, want false", portForward)
 	}
 }
 
@@ -39,6 +51,32 @@ func TestControlDryRunUsesShortLivedRecoveryToken(t *testing.T) {
 		if !strings.Contains(stderr.String(), expected) {
 			t.Fatalf("output %q does not contain %q", stderr.String(), expected)
 		}
+	}
+}
+
+func TestNormalControlPortForwardIsExplicit(t *testing.T) {
+	t.Setenv("BUTLER_TOKEN", "test-token")
+	var stderr bytes.Buffer
+	runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &stderr)
+	root := New(BuildInfo{}, runner)
+	root.SetArgs([]string{"--repo-root", testRepository(t), "--dry-run", "control", "status", "--port-forward"})
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"port-forward service/butler", "8080:8080", "--address 127.0.0.1"} {
+		if !strings.Contains(stderr.String(), expected) {
+			t.Fatalf("output %q does not contain %q", stderr.String(), expected)
+		}
+	}
+}
+
+func TestNormalControlRejectsBlankAddress(t *testing.T) {
+	t.Setenv("BUTLER_TOKEN", "test-token")
+	runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+	root := New(BuildInfo{}, runner)
+	root.SetArgs([]string{"--repo-root", testRepository(t), "control", "status", "--address="})
+	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "--port-forward") {
+		t.Fatalf("error = %v", err)
 	}
 }
 

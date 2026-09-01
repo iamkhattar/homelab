@@ -1,18 +1,108 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Butler · Titan</title>
-<style>
-:root{color-scheme:dark;--bg:#070b14;--side:#0c1220;--panel:#111a2c;--panel2:#162238;--line:#23334f;--text:#edf4ff;--muted:#8fa5c5;--cyan:#22d3ee;--green:#34d399;--amber:#fbbf24;--red:#fb7185}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,ui-sans-serif,system-ui,sans-serif}.layout{min-height:100vh;display:grid;grid-template-columns:250px 1fr}aside{background:linear-gradient(180deg,var(--side),#080d17);border-right:1px solid var(--line);padding:24px 18px;position:sticky;top:0;height:100vh}.brand{display:flex;gap:12px;align-items:center;font-size:18px;font-weight:800}.mark{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#0891b2,#4f46e5);box-shadow:0 0 30px #22d3ee33}.caption{color:var(--muted);font-size:12px;margin:20px 10px 8px;text-transform:uppercase;letter-spacing:.12em}.nav{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--muted);padding:10px 12px;border-radius:9px;cursor:pointer}.nav:hover,.nav.active{background:#17233a;color:white}.account{position:absolute;bottom:22px;left:18px;right:18px;border-top:1px solid var(--line);padding-top:15px}main{padding:34px;max-width:1500px;width:100%;margin:auto}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}.eyebrow{color:var(--cyan);font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}h1{margin:4px 0;font-size:30px}h2{margin:0;font-size:16px}.muted{color:var(--muted)}button,.button{border:0;border-radius:9px;padding:9px 13px;font-weight:750;cursor:pointer;background:var(--cyan);color:#05202a;text-decoration:none}button.secondary{background:#1d2a43;color:#dceafe;border:1px solid #304363}.stats,.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:24px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.card{background:linear-gradient(145deg,var(--panel),#0d1627);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 18px 60px #0003}.stat strong{display:block;font-size:25px;margin-top:8px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:7px}.toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.table{width:100%;border-collapse:collapse}.table th,.table td{text-align:left;padding:11px 8px;border-bottom:1px solid var(--line)}.table th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}.badge{padding:3px 8px;border-radius:99px;background:#123227;color:#6ee7b7;font-size:12px}.badge.failed{background:#3c1621;color:#fda4af}section[hidden]{display:none}.empty{padding:30px;color:var(--muted);text-align:center}pre{white-space:pre-wrap;overflow:auto;background:#060a12;border-radius:10px;padding:12px;color:#b8cae5}@media(max-width:900px){.layout{grid-template-columns:1fr}aside{position:static;height:auto}.account{position:static;margin-top:20px}.stats,.grid{grid-template-columns:1fr 1fr}}@media(max-width:560px){main{padding:20px}.stats,.grid{grid-template-columns:1fr}}
-</style></head><body><div class="layout"><aside><div class="brand"><span class="mark">B</span><span>Butler</span></div><div class="caption">Control plane</div><button class="nav active" data-view="overview">Overview</button><button class="nav" data-view="identity">Identity</button><button class="nav" data-view="operations">Operations</button><button class="nav" data-view="events">Events</button><div class="account"><div id="actor" class="muted">Not signed in</div><a class="button" href="/auth/login" style="display:block;text-align:center;margin-top:12px">Sign in with Pocket ID</a></div></aside><main>
-<div class="top"><div><div class="eyebrow">Titan · private control plane</div><h1 id="title">Overview</h1><div class="muted">API-backed operations for the homelab platform.</div></div><button class="secondary" onclick="refresh()">Refresh</button></div>
-<section id="overview"><div class="stats"><div class="card stat"><span class="muted">Reconcilers</span><strong id="reconciler-count">—</strong></div><div class="card stat"><span class="muted">Healthy</span><strong id="healthy-count">—</strong></div><div class="card stat"><span class="muted">Provider APIs</span><strong>4</strong></div><div class="card stat"><span class="muted">Recent operations</span><strong id="operation-count">—</strong></div></div><div class="grid"><div class="card"><div class="toolbar"><h2>Reconciliation</h2><button onclick="reconcile()">Run now</button></div><div id="reconcilers"></div></div><div class="card"><h2>Safety boundary</h2><p class="muted">Normal Butler uses Pocket ID and bounded Vault Kubernetes auth. Bootstrap and recovery are intentionally absent from this ingress and available only through <code>homelabctl control recovery</code>.</p><pre id="message">Ready.</pre></div></div></section>
-<section id="identity" hidden><div class="grid"><div class="card"><h2>Users</h2><div id="users" class="empty">Loading…</div></div><div class="card"><h2>Groups</h2><div id="groups" class="empty">Loading…</div></div><div class="card"><h2>OIDC clients</h2><div id="clients" class="empty">Loading…</div></div></div></section>
-<section id="operations" hidden><div class="card"><h2>Operations</h2><div id="ops" class="empty">Loading…</div></div></section>
-<section id="events" hidden><div class="card"><h2>Audit-safe events</h2><div id="event-list" class="empty">Loading…</div></div></section>
-</main></div><script>
-const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-async function api(path,options){const r=await fetch(path,options);if(r.status===401)throw new Error('Sign in with Pocket ID to continue.');if(!r.ok)throw new Error(`${r.status} ${await r.text()}`);return r.json()}
-function table(columns,rows){if(!rows?.length)return '<div class="empty">No records.</div>';return `<table class="table"><thead><tr>${columns.map(c=>`<th>${esc(c[0])}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${columns.map(c=>`<td>${c[1](row)}</td>`).join('')}</tr>`).join('')}</tbody></table>`}
-async function refresh(){try{const [me,status,ops,events]=await Promise.all([api('/api/v1/me'),api('/api/v1/status'),api('/api/v1/operations'),api('/api/v1/events')]);$('#actor').textContent=`${me.email||me.subject} · ${me.role}`;$('#reconciler-count').textContent=status.length;$('#healthy-count').textContent=status.filter(x=>x.success).length;$('#operation-count').textContent=ops.length;$('#reconcilers').innerHTML=table([['Name',x=>esc(x.name)],['State',x=>`<span class="badge ${x.success?'':'failed'}">${x.success?'healthy':'failed'}</span>`],['Last run',x=>esc(x.last_run||'not run')]],status);$('#ops').innerHTML=table([['Operation',x=>esc(x.kind)],['Actor',x=>esc(x.actor)],['State',x=>`<span class="badge ${x.state==='failed'?'failed':''}">${esc(x.state)}</span>`],['Created',x=>esc(x.createdAt)]],ops);$('#event-list').innerHTML=table([['Type',x=>esc(x.type)],['Actor',x=>esc(x.actor)],['Message',x=>esc(x.message)],['Time',x=>esc(x.createdAt)]],events);await identity()}catch(e){$('#message').textContent=String(e)}}
-async function identity(){try{const [users,groups,clients]=await Promise.all([api('/api/v1/identity/users'),api('/api/v1/identity/groups'),api('/api/v1/identity/clients')]);$('#users').innerHTML=table([['User',x=>esc(x.displayName||x.username)],['Username',x=>esc(x.username)],['State',x=>x.disabled?'<span class="badge failed">disabled</span>':'<span class="badge">active</span>']],users);$('#groups').innerHTML=table([['Group',x=>esc(x.friendlyName)],['Claim',x=>esc(x.name)]],groups);$('#clients').innerHTML=table([['Client',x=>esc(x.name)],['Type',x=>x.isPublic?'public':'confidential']],clients)}catch(e){$('#users').textContent=$('#groups').textContent=$('#clients').textContent=String(e)}}
-async function reconcile(){try{const op=await api('/api/v1/reconcile',{method:'POST'});$('#message').textContent=`Queued operation ${op.id}`;setTimeout(refresh,500)}catch(e){$('#message').textContent=String(e)}}
-document.querySelectorAll('.nav').forEach(n=>n.onclick=()=>{document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));n.classList.add('active');document.querySelectorAll('main section').forEach(x=>x.hidden=true);$('#'+n.dataset.view).hidden=false;$('#title').textContent=n.textContent});refresh();
-</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Butler operator console</title>
+  <link rel="stylesheet" href="/assets/butler.css">
+  <script src="/assets/butler.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <a class="brand" href="/" aria-label="Butler home"><span class="brand-mark">B</span><span><strong>Butler</strong><small>Operator console</small></span></a>
+      <nav aria-label="Console sections">
+        <button class="nav active" data-view="overview">Control posture</button>
+        <button class="nav" data-view="actions">Exceptional actions</button>
+        <button class="nav" data-view="activity">Operations &amp; events</button>
+      </nav>
+      <div class="destinations">
+        <div class="nav-label">Authoritative tools</div>
+        <a href="https://home.6940469.xyz" target="_blank" rel="noreferrer">Homepage <span>↗</span></a>
+        <a href="https://grafana.6940469.xyz" target="_blank" rel="noreferrer">Grafana <span>↗</span></a>
+        <a href="https://auth.6940469.xyz" target="_blank" rel="noreferrer">Pocket ID <span>↗</span></a>
+        <a href="https://vault.6940469.xyz" target="_blank" rel="noreferrer">Vault <span>↗</span></a>
+      </div>
+      <div class="identity-card">
+        <div class="avatar" id="avatar">?</div>
+        <div class="identity-copy"><strong id="actor">Not signed in</strong><small id="role">Pocket ID required</small></div>
+        <a id="login" class="button compact" href="/auth/login">Sign in</a>
+        <form id="logout" method="post" action="/auth/logout" hidden><button class="button compact ghost" type="submit">Sign out</button></form>
+      </div>
+    </aside>
+
+    <main>
+      <header>
+        <div><div class="eyebrow">Titan · private management plane</div><h1 id="page-title">Control posture</h1><p id="page-description">Is Butler safe and ready to perform management work?</p></div>
+        <div class="header-actions"><span id="last-refresh">Not refreshed</span><button class="button ghost" id="refresh">Refresh</button></div>
+      </header>
+
+      <div id="signed-out" class="notice warning">
+        <div><strong>Authentication required</strong><p>Sign in with Pocket ID to inspect Butler. Routine dashboards, identity settings, and secrets remain in their authoritative applications.</p></div>
+        <a class="button" href="/auth/login">Sign in with Pocket ID</a>
+      </div>
+
+      <div id="console" hidden>
+        <section id="overview">
+          <div class="metric-grid">
+            <article class="metric"><span>Control state</span><strong id="control-state">Unknown</strong><small id="control-detail">Waiting for Butler</small></article>
+            <article class="metric"><span>Reconcilers</span><strong id="reconciler-count">—</strong><small id="reconciler-detail">No status loaded</small></article>
+            <article class="metric"><span>Operations</span><strong id="operation-count">—</strong><small id="operation-detail">No history loaded</small></article>
+            <article class="metric"><span>OIDC clients</span><strong id="client-count">—</strong><small>Managed by Butler, secrets in Vault</small></article>
+          </div>
+
+          <div class="two-column">
+            <article class="panel">
+              <div class="panel-heading"><div><span class="kicker">Drift repair</span><h2>Reconciler health</h2></div><span class="status-pill" id="health-pill">Unknown</span></div>
+              <div id="reconcilers" class="empty">Waiting for status…</div>
+            </article>
+            <article class="panel boundary">
+              <span class="kicker">Responsibility boundary</span><h2>Use the right control surface</h2>
+              <div class="boundary-row"><span class="boundary-icon">G</span><div><strong>Grafana observes</strong><p>Metrics, logs, traces, alerts, capacity, and workload health.</p></div></div>
+              <div class="boundary-row"><span class="boundary-icon">P</span><div><strong>Pocket ID identifies</strong><p>People, passkeys, sessions, and ordinary group administration.</p></div></div>
+              <div class="boundary-row"><span class="boundary-icon">V</span><div><strong>Vault protects</strong><p>Secrets, policies, leases, and token-based emergency access.</p></div></div>
+              <div class="boundary-row"><span class="boundary-icon accent">B</span><div><strong>Butler intervenes</strong><p>Provider reconciliation, controlled rotation, audit evidence, and recovery coordination.</p></div></div>
+            </article>
+          </div>
+        </section>
+
+        <section id="actions" hidden>
+          <div class="section-intro"><span class="kicker">Deliberately uncommon</span><h2>Exceptional actions</h2><p>These actions change provider-owned state. Routine application management belongs in the linked applications.</p></div>
+          <div class="action-grid">
+            <article class="panel action-card">
+              <div class="action-number">01</div><h2>Reconcile desired state</h2>
+              <p>Queue one serialized pass across Butler’s configured domains. Use this after a reviewed Git change or when drift is suspected.</p>
+              <label for="reconcile-confirmation">Type <strong>RECONCILE</strong> to confirm</label>
+              <input id="reconcile-confirmation" autocomplete="off" spellcheck="false" placeholder="RECONCILE">
+              <button class="button" id="run-reconcile">Queue reconciliation</button>
+              <small class="permission">Requires operator or administrator</small>
+            </article>
+            <article class="panel action-card">
+              <div class="action-number">02</div><h2>Rotate an OIDC client secret</h2>
+              <p>Create and persist a replacement in Vault before Butler revokes the previous Pocket ID secret. Public PKCE clients are excluded.</p>
+              <label for="client-select">Confidential client</label><select id="client-select"><option value="">Select a client</option></select>
+              <label for="rotate-confirmation">Type the selected client name</label><input id="rotate-confirmation" autocomplete="off" spellcheck="false">
+              <button class="button danger" id="rotate-client">Rotate and persist</button>
+              <small class="permission">Requires administrator</small>
+            </article>
+            <article class="panel action-card recovery-card">
+              <div class="action-number">03</div><h2>Enter break-glass recovery</h2>
+              <p>The normal console intentionally cannot initialize or unseal Vault, replace Pocket ID’s machine credential, or read recovery material.</p>
+              <pre><code>homelabctl control recovery ui</code></pre>
+              <p class="fine-print">The CLI creates a loopback proxy, holds a ten-minute Kubernetes token in memory, and opens the isolated recovery UI. Recovery export remains CLI-only.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="activity" hidden>
+          <div class="section-intro"><span class="kicker">Audit-safe metadata</span><h2>Operations and events</h2><p>No request bodies, provider responses, tokens, client secrets, or Vault material are retained here.</p></div>
+          <article class="panel"><div class="panel-heading"><h2>Recent operations</h2><span id="running-pill" class="status-pill">0 running</span></div><div id="operations" class="empty">No operations loaded.</div></article>
+          <article class="panel spaced"><div class="panel-heading"><h2>Recent events</h2></div><div id="events" class="empty">No events loaded.</div></article>
+        </section>
+      </div>
+    </main>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

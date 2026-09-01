@@ -18,6 +18,12 @@ callback, validates issuer, audience, state and nonce, then saves the short-live
 ID token in the private user config directory. `--token` and `BUTLER_TOKEN` are
 explicit overrides and take precedence over the cached session.
 
+Normal commands call `https://butler.6940469.xyz` through Traefik and the
+publicly trusted wildcard certificate. Use `--port-forward` only as a
+diagnostic fallback when the normal ingress path is unavailable. Recovery and
+bootstrap continue to use the separate, non-ingressed recovery Service through
+an authenticated Kubernetes tunnel.
+
 ## Short-lived Kubernetes access
 
 ```sh
@@ -63,8 +69,8 @@ contexts:
   home:
     repository: /path/to/homelab
     kube-context: homelab
-    control-url: https://control.home.arpa
-    oidc-issuer: https://id.home.arpa
+    control-url: https://butler.6940469.xyz
+    oidc-issuer: https://auth.6940469.xyz
 ```
 
 Tokens do not belong in this future context file. The current Pocket ID session
@@ -141,8 +147,10 @@ and submits only non-secret acceptance evidence through the recovery API.
 ## Current boundary
 
 The typed client, Pocket ID browser login, role-aware API, Kubernetes-persisted
-operation history, declarative provider resources, bounded credential issuance and recovery
-workflow are implemented. Titan deployment, first-owner enrollment, real
-integration execution and restore rehearsal remain operational checkpoints,
-not repository claims. See [current state](/project/current-state) and the
+operation history, declarative provider resources, bounded credential issuance
+and recovery workflow are implemented. Titan has verified first-owner
+enrollment, Pocket ID login, and authenticated access to normal Butler through
+its HTTPS ingress. Vault's human OIDC proof, real integration execution and
+restore rehearsal remain operational checkpoints. See
+[current state](/project/current-state) and the
 [platform bootstrap runbook](/operations/platform-bootstrap).

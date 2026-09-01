@@ -150,6 +150,26 @@ homelabctl control logout
 homelabctl control login
 ```
 
+## Vault OIDC authorization returns Traefik 404
+
+`homelabctl control verify-identity` calls Vault's OIDC API through
+`https://vault.6940469.xyz`. A response body containing only `404 page not
+found` comes from Traefik when the Vault Ingress is absent; Vault API errors use
+Vault's structured error response instead.
+
+Check the route and backend without reading any Secret:
+
+```bash
+kubectl --context homelab -n security get ingress vault
+kubectl --context homelab -n security get service vault
+curl -fsS https://vault.6940469.xyz/v1/sys/health
+```
+
+Deploy the reviewed Vault chart if the Ingress is absent, then repeat
+`homelabctl control verify-identity --confirm`. The route uses Traefik's shared
+wildcard certificate and the existing Vault Service. Do not delete Vault's PVC
+or modify `auth/jwt` to repair an ingress-routing failure.
+
 ## Upgrade fails
 
 Stop and preserve evidence. Do not repeatedly reset or reinstall K3s. Record:
