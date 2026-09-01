@@ -11,7 +11,7 @@ service:
   containerPort: 1411
 
 env:
-  PUBLIC_APP_URL: ""  # Set via helmfile
+  APP_URL: ""  # Set via helmfile; Pocket ID uses this as its WebAuthn origin and OIDC issuer.
   INTERNAL_APP_URL: "http://pocket-id.security.svc.cluster.local"
   TRUST_PROXY: "true"
   ANALYTICS_DISABLED: "true"
