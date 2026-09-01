@@ -54,6 +54,22 @@ func TestControlDryRunUsesShortLivedRecoveryToken(t *testing.T) {
 	}
 }
 
+func TestControlRecoveryUIDryRunKeepsTokenOutOfOutput(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	runner := command.NewRunner(strings.NewReader(""), &stdout, &stderr)
+	root := New(BuildInfo{}, runner)
+	root.SetArgs([]string{"--repo-root", testRepository(t), "--dry-run", "control", "recovery", "ui"})
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	combined := stdout.String() + stderr.String()
+	for _, expected := range []string{"create token butler-recovery-client", "--audience=butler-recovery", "loopback-only recovery console"} {
+		if !strings.Contains(combined, expected) {
+			t.Fatalf("output %q does not contain %q", combined, expected)
+		}
+	}
+}
+
 func TestNormalControlPortForwardIsExplicit(t *testing.T) {
 	t.Setenv("BUTLER_TOKEN", "test-token")
 	var stderr bytes.Buffer

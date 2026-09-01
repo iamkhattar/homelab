@@ -184,6 +184,49 @@ The current API is under `/api/v1`:
 | `POST /identity/clients/{id}/rotate` | admin | Rotate directly into Vault |
 | `POST /bootstrap/identity-verification` | recovery identity | Accept non-secret evidence for both real human login paths |
 
+## Operator console and break-glass UI
+
+Butler's embedded normal UI is an exceptional-operations console, not the
+homelab homepage and not another observability dashboard. It deliberately
+shows only control-plane posture, reconciler state, bounded operation/event
+history, and Butler-owned actions:
+
+- queue one serialized reconciliation after explicit typed confirmation;
+- rotate a confidential Pocket ID client secret through Butler's
+  persist-before-revoke workflow after selecting and typing the client name;
+- link to Grafana for telemetry, Pocket ID for ordinary identity work, Vault
+  for secret/policy inspection, and Homepage for application navigation; and
+- explain which recovery operations are intentionally unavailable from the
+  Pocket ID-dependent normal runtime.
+
+Short-lived Kubernetes credential issuance stays CLI-only because its response
+contains a bearer token. Vault recovery export and Pocket ID machine-key
+replacement also stay CLI-only so secret material never enters browser state.
+The UI ships as embedded HTML, CSS, and JavaScript with no CDN or runtime asset
+dependency. Butler serves a restrictive Content Security Policy, no-store
+headers, and same-origin assets.
+
+True break-glass access uses:
+
+```bash
+homelabctl control recovery ui
+```
+
+The CLI creates the audience-bound ten-minute recovery token and Kubernetes
+port-forward, then starts a second random loopback-only proxy. A one-time
+capability path grants an HTTP-only, `SameSite=Strict` local session; the proxy
+injects the recovery bearer token upstream. The token never appears in the
+URL, browser JavaScript, DOM, cookie, local storage, or server response. The
+console can inspect recovery posture, verify DNS delegation, and advance one
+resumable bootstrap pass with typed confirmation. Closing the CLI destroys the
+proxy and tunnel; expiry bounds the underlying token even if the browser tab
+remains open.
+
+Do not expose recovery Butler through Traefik. Do not place Pocket ID
+forward-auth in front of Vault: Vault's native Pocket ID OIDC is the normal
+login, while direct token login remains the lower-layer break-glass path when
+Pocket ID is unavailable.
+
 Operations keep only ID, kind, actor, state, timestamps and sanitized errors.
 Events contain no request bodies, tokens, API keys or provider responses. Each
 entry is persisted as a `ButlerOperation` object, so Butler remains stateless

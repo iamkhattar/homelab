@@ -106,6 +106,10 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 		long:    "Read the named Vault initialization Secret into memory and write only an age-encrypted, mode-0600 bundle outside the repository. Existing output files are never overwritten.",
 		example: "  homelabctl control recovery export --output /secure/titan-vault.age --age-recipient age1example",
 	},
+	"homelabctl control recovery ui": {
+		long:    "Open a ten-minute, loopback-only break-glass console. homelabctl holds the audience-bound Kubernetes token in memory and injects it through a random local session; the browser never stores the token.",
+		example: "  homelabctl control recovery ui",
+	},
 	"homelabctl control status": {
 		long:    "List Butler domain reconcilers and their most recent outcome through the Pocket ID-protected normal API.",
 		example: "  BUTLER_TOKEN=... homelabctl control status",

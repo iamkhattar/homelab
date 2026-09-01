@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -386,7 +387,55 @@ func newControlRecoveryCommand(s *state, options *controlOptions) *cobra.Command
 	_ = export.MarkFlagRequired("output")
 	_ = export.MarkFlagRequired("age-recipient")
 	cmd.AddCommand(export)
+	cmd.AddCommand(newControlRecoveryUICommand(s, options))
 	return cmd
+}
+
+func newControlRecoveryUICommand(s *state, options *controlOptions) *cobra.Command {
+	return &cobra.Command{
+		Use:     "ui",
+		Short:   "Open the loopback-only break-glass recovery console",
+		Long:    "Mint a ten-minute audience-bound Kubernetes token, keep it in CLI memory, and inject it through a random loopback-only browser session to the non-ingressed recovery service.",
+		Example: "  homelabctl control recovery ui",
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if s.dryRun {
+				if err := s.run(cmd.Context(), s.root, "kubectl", "--context", s.kubeContext, "--namespace", options.namespace, "create", "token", "butler-recovery-client", "--audience=butler-recovery", "--duration=10m"); err != nil {
+					return err
+				}
+				s.info("would open a random loopback-only recovery console without exposing the token to the browser")
+				return nil
+			}
+			token, err := s.output(cmd.Context(), s.root, "kubectl", "--context", s.kubeContext, "--namespace", options.namespace, "create", "token", "butler-recovery-client", "--audience=butler-recovery", "--duration=10m")
+			if err != nil {
+				return err
+			}
+			upstream := options.recoveryAddress
+			var tunnel *controlapi.Tunnel
+			if upstream == "" {
+				tunnel, err = controlapi.StartTunnel(cmd.Context(), s.runner.Stderr, s.kubeContext, options.namespace, "butler-recovery", 8081)
+				if err != nil {
+					return err
+				}
+				defer func() { _ = tunnel.Close() }()
+				upstream = tunnel.URL
+			}
+			console, err := controlapi.StartRecoveryConsole(upstream, strings.TrimSpace(token))
+			if err != nil {
+				return err
+			}
+			defer console.Close()
+			s.info("Break-glass console is available for ten minutes. Press Ctrl-C to close it.")
+			if err := browser.OpenURL(console.URL); err != nil {
+				s.info("If the browser does not open, visit: " + console.URL)
+			}
+			interruptContext, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
+			defer stop()
+			sessionContext, cancel := context.WithTimeout(interruptContext, 10*time.Minute)
+			defer cancel()
+			return console.Wait(sessionContext)
+		},
+	}
 }
 
 func newControlGetCommand(s *state, options *controlOptions, use, short, path string) *cobra.Command {

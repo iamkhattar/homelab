@@ -102,6 +102,10 @@ they do not block the first recoverable Titan installation.
   dashboards are represented in Helmfile.
 - Real Vault, Pocket ID and Kubernetes integration tests exist behind the
   explicit `integration` build tag and `BUTLER_INTEGRATION=1` guard.
+- Butler's normal embedded UI is an exceptional-operations console rather than
+  a duplicate dashboard. A separate `control recovery ui` command provides a
+  random loopback-only break-glass session while keeping its Kubernetes token
+  out of browser state.
 
 ## Immediate next checkpoint
 
