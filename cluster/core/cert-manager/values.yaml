@@ -2,17 +2,3 @@ cert-manager:
   crds:
     enabled: true
     keep: false
-
-letsencrypt:
-  server: https://acme-v02.api.letsencrypt.org/directory
-
-acmeDNS:
-  host: https://auth.acme-dns.io
-  secretName: acme-dns
-  secretKey: acmedns.json
-
-certificate:
-  name: homelab-wildcard
-  namespace: networking
-  secretName: homelab-wildcard-tls
-  domain: 6940469.xyz

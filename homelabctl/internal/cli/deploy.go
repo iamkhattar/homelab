@@ -11,60 +11,80 @@ import (
 )
 
 func newDeployCommand(s *state) *cobra.Command {
-	var stage string
 	var imageTag string
 	cmd := &cobra.Command{
 		Use:   "deploy",
 		Short: "Preview and apply the Helmfile desired state",
 	}
 
+	var diffStage string
 	diffCmd := &cobra.Command{
-		Use:   "diff",
-		Short: "Preview pending Helm changes",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runHelmfileDeploy(cmd.Context(), s, imageTag, "diff")
+		Use:   "diff [release]",
+		Short: "Preview pending Helm changes, optionally selecting one release or stage",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			helmArgs, err := helmfileSelectionArgs("diff", args, diffStage)
+			if err != nil {
+				return err
+			}
+			return runHelmfileDeploy(cmd.Context(), s, imageTag, helmArgs...)
 		},
 	}
+	diffCmd.Flags().StringVar(&diffStage, "stage", "", "preview releases with this Helmfile stage label")
 
+	var applyStage string
 	applyCmd := &cobra.Command{
 		Use:   "apply [release]",
 		Short: "Apply changed releases, optionally selecting one release",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if stage != "" && len(args) == 1 {
-				return fmt.Errorf("release and --stage cannot be used together")
-			}
-			helmArgs := []string{"apply"}
-			if len(args) == 1 {
-				if err := validateReleaseName(args[0]); err != nil {
-					return err
-				}
-				helmArgs = append(helmArgs, "--selector", fmt.Sprintf("name=%s", args[0]), "--include-needs")
-			}
-			if stage != "" {
-				if err := validateReleaseName(stage); err != nil {
-					return fmt.Errorf("invalid stage: %w", err)
-				}
-				helmArgs = append(helmArgs, "--selector", fmt.Sprintf("stage=%s", stage), "--include-needs")
+			helmArgs, err := helmfileSelectionArgs("apply", args, applyStage)
+			if err != nil {
+				return err
 			}
 			return runHelmfileDeploy(cmd.Context(), s, imageTag, helmArgs...)
 		},
 	}
-	applyCmd.Flags().StringVar(&stage, "stage", "", "apply releases with this Helmfile stage label")
+	applyCmd.Flags().StringVar(&applyStage, "stage", "", "apply releases with this Helmfile stage label")
 
+	var syncStage string
 	syncCmd := &cobra.Command{
-		Use:   "sync",
-		Short: "Synchronise every release without diff gating",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runHelmfileDeploy(cmd.Context(), s, imageTag, "sync")
+		Use:   "sync [release]",
+		Short: "Synchronise releases without diff gating, optionally selecting one release or stage",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			helmArgs, err := helmfileSelectionArgs("sync", args, syncStage)
+			if err != nil {
+				return err
+			}
+			return runHelmfileDeploy(cmd.Context(), s, imageTag, helmArgs...)
 		},
 	}
+	syncCmd.Flags().StringVar(&syncStage, "stage", "", "synchronise releases with this Helmfile stage label")
 
 	cmd.AddCommand(diffCmd, applyCmd, syncCmd, newDeployPlatformCommand(s, &imageTag))
 	cmd.PersistentFlags().StringVar(&imageTag, "image-tag", "", "shared immutable image tag (default: current full Git commit SHA)")
 	return cmd
+}
+
+func helmfileSelectionArgs(action string, args []string, stage string) ([]string, error) {
+	if stage != "" && len(args) == 1 {
+		return nil, fmt.Errorf("release and --stage cannot be used together")
+	}
+	helmArgs := []string{action}
+	if len(args) == 1 {
+		if err := validateReleaseName(args[0]); err != nil {
+			return nil, err
+		}
+		helmArgs = append(helmArgs, "--selector", fmt.Sprintf("name=%s", args[0]), "--include-needs")
+	}
+	if stage != "" {
+		if err := validateReleaseName(stage); err != nil {
+			return nil, fmt.Errorf("invalid stage: %w", err)
+		}
+		helmArgs = append(helmArgs, "--selector", fmt.Sprintf("stage=%s", stage), "--include-needs")
+	}
+	return helmArgs, nil
 }
 
 var platformStages = []string{"foundation", "networking", "secrets", "identity", "data", "observability", "cicd", "applications", "smart-home"}
