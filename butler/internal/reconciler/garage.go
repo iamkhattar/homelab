@@ -26,6 +26,16 @@ func (r *Garage) Reconcile(ctx context.Context) error {
 	if !r.cfg.Enabled {
 		return nil
 	}
+	buckets, err := r.resources.ListGarageBuckets(ctx)
+	if err != nil {
+		return fmt.Errorf("listing GarageBuckets: %w", err)
+	}
+	// Garage belongs to the later data stage. Until that chart declares a
+	// bucket there is no provider state to reconcile and its admin credential
+	// is intentionally absent.
+	if len(buckets) == 0 {
+		return nil
+	}
 	secret, err := r.vault.ReadSecret(ctx, r.cfg.AdminTokenPath)
 	if err != nil {
 		return err
@@ -41,10 +51,6 @@ func (r *Garage) Reconcile(ctx context.Context) error {
 	}
 	if err := r.ensureLayout(ctx, client, status); err != nil {
 		return err
-	}
-	buckets, err := r.resources.ListGarageBuckets(ctx)
-	if err != nil {
-		return fmt.Errorf("listing GarageBuckets: %w", err)
 	}
 	var failures []error
 	bucketCounts := make(map[string]int, len(buckets))

@@ -161,6 +161,14 @@ Kubernetes writes refetch current objects and retry optimistic-lock conflicts.
 Timer-driven and operator-triggered reconciliations are serialized because
 provider creation and one-time secret responses are unsafe to race.
 
+Butler also watches `PocketIDClient`, `PocketIDGroup`, `ManagedCredential` and
+`GarageBucket` resources. Creates, deletes and spec-generation changes send a
+coalesced immediate trigger to that same serialized scheduler; Butler's own
+status updates do not retrigger it. The one-minute timer is a drift-repair
+resync for missed events rather than the normal convergence path. Garage is
+skipped until at least one `GarageBucket` exists, so installing earlier stages
+does not poll an absent provider or credential.
+
 ## Declarative platform APIs
 
 The `platform.6940469.xyz/v1alpha1` API group is installed by the standalone

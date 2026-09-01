@@ -14,7 +14,7 @@ metadata:
 rules:
   - apiGroups: ["platform.6940469.xyz"]
     resources: ["pocketidclients", "pocketidgroups", "managedcredentials", "garagebuckets"]
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["platform.6940469.xyz"]
     resources: ["pocketidclients/status", "pocketidgroups/status", "managedcredentials/status", "garagebuckets/status"]
     verbs: ["get", "update", "patch"]
@@ -30,6 +30,34 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: {{ .Release.Name }}-platform-controller
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.serviceAccount.name }}
+    namespace: {{ .Release.Namespace }}
+---
+# Normal Butler reads only the long-lived token-reviewer Secret needed to
+# configure Vault's Kubernetes secrets engine. It never receives access to
+# butler-vault-init.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-token-reviewer-secret
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["vault-k8s-token-reviewer-token"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-token-reviewer-secret
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-token-reviewer-secret
 subjects:
   - kind: ServiceAccount
     name: {{ .Values.serviceAccount.name }}

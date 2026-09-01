@@ -277,8 +277,19 @@ ordinary Kubernetes Secrets for workloads. `kubectl describe` should show a
 
 ```bash
 homelabctl deploy apply --stage identity
+kubectl -n security wait --for=condition=Ready \
+  managedcredential/pocket-id-runtime --timeout=2m
+kubectl -n security wait --for=condition=Ready \
+  vaultstaticsecret/pocket-id-credentials --timeout=2m
 kubectl -n security rollout status deployment/pocket-id
 ```
+
+Creating the `ManagedCredential` immediately triggers Butler's coalesced
+Kubernetes event watcher. Butler writes the generated encryption key to Vault,
+VSO projects `pocket-id-credentials`, and only then can the Pocket ID container
+start. Butler retains a one-minute drift-repair resync if an event is missed.
+Do not manually create the destination Secret or restart VSO while this chain
+is converging.
 
 Open `https://auth.6940469.xyz`, create the first owner, enroll a passkey,
 and create one management API key. Pocket ID does not expose an unattended

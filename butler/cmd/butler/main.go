@@ -134,6 +134,11 @@ func main() {
 	}
 
 	sched := reconciler.NewScheduler(cfg.ReconcileInterval, reconcilers...)
+	platformChanges, err := platformResources.WatchChanges(ctx)
+	if err != nil {
+		slog.Error("watching platform resources", "error", err)
+		os.Exit(1)
+	}
 
 	auth, err := server.NewAuthMiddleware(ctx, cfg.OIDC.Issuer, cfg.OIDC.Audience, nil)
 	if err != nil {
@@ -157,7 +162,7 @@ func main() {
 	srv.ConfigureControlPlane(identity.NewService(vc, cfg.OIDC.AdminURL, platformResources), credentialService)
 
 	// Start reconciliation loop in background.
-	go sched.Start(ctx)
+	go sched.Start(ctx, platformChanges)
 
 	// Start HTTP server.
 	httpSrv := &http.Server{

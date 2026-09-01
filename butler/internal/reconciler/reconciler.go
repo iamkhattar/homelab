@@ -28,7 +28,8 @@ type Status struct {
 	Duration string    `json:"duration"`
 }
 
-// Scheduler runs reconcilers on a fixed interval.
+// Scheduler serializes initial, event-triggered, API-triggered, and periodic
+// reconciliation passes.
 type Scheduler struct {
 	reconcilers []Reconciler
 	interval    time.Duration
@@ -101,9 +102,15 @@ func (s *Scheduler) RunOnce(ctx context.Context) error {
 	return errors.Join(failures...)
 }
 
-// Start runs the reconciliation loop until the context is cancelled.
-func (s *Scheduler) Start(ctx context.Context) {
+// Start runs the reconciliation loop until the context is cancelled. An
+// optional coalescing trigger allows Kubernetes desired-state events to run an
+// immediate pass while the interval remains a periodic drift-repair resync.
+func (s *Scheduler) Start(ctx context.Context, triggers ...<-chan struct{}) {
 	slog.Info("starting reconciliation loop", "interval", s.interval)
+	var trigger <-chan struct{}
+	if len(triggers) > 0 {
+		trigger = triggers[0]
+	}
 
 	if err := s.RunOnce(ctx); err != nil {
 		slog.Error("initial reconciliation failed", "error", err)
@@ -117,6 +124,14 @@ func (s *Scheduler) Start(ctx context.Context) {
 		case <-ctx.Done():
 			slog.Info("reconciliation loop stopped")
 			return
+		case _, ok := <-trigger:
+			if !ok {
+				trigger = nil
+				continue
+			}
+			if err := s.RunOnce(ctx); err != nil {
+				slog.Error("event-triggered reconciliation failed", "error", err)
+			}
 		case <-ticker.C:
 			if err := s.RunOnce(ctx); err != nil {
 				slog.Error("reconciliation failed", "error", err)
