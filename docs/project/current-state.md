@@ -28,7 +28,7 @@ machine. Do not interpret **Ready in repo** as **Deployed**.
 | Required on Titan | The pinned Ethernet IPv4 configuration and K3s API are verified Ready. Run the full cluster diagnostic, create the first off-node K3s recovery export, verify another managed reboot, and rehearse a restore. |
 | Required before important data | Choose encrypted off-node storage and prove that K3s, Vault, database and application backups can be restored from it. |
 | Required before relying on alerts | Choose an off-cluster Alertmanager receiver, deliver its credential through Vault and verify a test notification. |
-| Required during platform bootstrap | Complete Vault's human Pocket ID login proof, export the Vault recovery material to verified encrypted off-device storage, then deploy and validate each later platform stage. |
+| Required during platform bootstrap | Vault and Butler are now operational on Titan. Export the Vault recovery material to verified encrypted off-device storage, verify a restore from that bundle, then continue with the later platform stages. |
 | Later design decisions | Self-hosting acme-dns, internal resolver failover, component-specific smart-home metrics, and the future Tailscale/Hetzner design. |
 
 Repository enhancements such as controlled automatic security updates,
@@ -57,7 +57,7 @@ they do not block the first recoverable Titan installation.
 | Persistent storage | Ready for testing | K3s local-path with bounded PVCs is the accepted single-node starting point. Select the encrypted off-node backup target and rehearse restores before storing important data. |
 | Prometheus, Grafana, Loki, Tempo and Alloy | Ready in repo | Pinned bounded charts, seven-day retention, kube-state-metrics, node-exporter, OTLP receivers, log collection, Butler metrics/logs/traces, Grafana correlation, reusable all-workload dashboards and workload/Job/PVC/OOM alerts render. Choose and test the final off-cluster Alertmanager receiver before relying on alerts. |
 | Pocket ID | Verified | The first human owner and passkey are enrolled, the owner belongs to `homelab-admin`, Butler-managed groups and clients report Ready, and `homelabctl control login` succeeds against the public issuer. |
-| Vault and Butler | Deployment in progress | Vault is initialized and unsealed, normal Butler reconciliation reports success through its authenticated HTTPS ingress, and recovery is paused at `awaiting-identity-verification`. Complete Vault's browser OIDC proof with `control verify-identity`, confirm `operational`, export the recovery Secret to an age-encrypted off-cluster bundle and restore-test it. |
+| Vault and Butler | Operational | Vault is initialized and unsealed, normal Butler reconciliation reports success through its authenticated HTTPS ingress, and recovery now reports `operational`. The Pocket ID and Vault browser proofs have both passed on Titan. Export the recovery Secret to an age-encrypted off-cluster bundle and restore-test it before relying on later stages. |
 | Shared PostgreSQL, Redis and Garage | Ready in repo | PostgreSQL 18.6 (chart 18.8.13), Redis 8.10 (chart 28.0.12), least-privilege consumer projections, persistence, NetworkPolicies and Garage v2 API reconciliation render successfully. Mutable Bitnami community tags are pinned by multi-architecture digest; deploy and restore-test on Titan. |
 | Actions Runner Controller | Ready in repo | Controller and one scale-to-zero runner set render successfully; create/import a least-privilege GitHub App and prove a read-only job before deployment authority |
 | Homepage, KitchenOwl, ntfy, Vaultwarden and Paperless-ngx | Ready in repo | Each app has its own namespace, pinned images, resources, persistence, scoped Vault credentials and initial NetworkPolicies. Homepage 2.1.2 and Vaultwarden 1.37.2 use Butler-managed Pocket ID clients; ntfy is pinned to 2.28.0. Keep the others internal until their TLS/auth/backup checks pass. |
@@ -109,34 +109,27 @@ they do not block the first recoverable Titan installation.
 
 ## Immediate next checkpoint
 
-The host baseline, SSH hardening and K3s readiness check are complete. Continue
-with:
+The host baseline, SSH hardening, K3s readiness check, Pocket ID handoff and
+Vault/bootstrap ceremony are complete. Continue with:
 
-1. Publish and apply the narrow Butler-to-Traefik NetworkPolicy update, then
-   confirm the normal CLI works without an address override.
-2. Run `homelabctl control verify-identity --confirm`, then require
-   `homelabctl control recovery` to report `operational`.
-3. Export `butler-vault-init` through `homelabctl control recovery export`,
+1. Export `butler-vault-init` through `homelabctl control recovery export`,
    store the age-encrypted artifact away from Titan and the workstation, and
    verify that the intended age identity can decrypt a disposable copy.
-4. Run `homelabctl cluster diagnose --ask-become-pass` and review the K3s
+2. Run `homelabctl cluster diagnose --ask-become-pass` and review the K3s
    service, journal, events and embedded-etcd snapshot configuration.
-5. Run `homelabctl cluster snapshot list --ask-become-pass`.
-6. Run `homelabctl cluster recovery export` into private staging space, encrypt
+3. Run `homelabctl cluster snapshot list --ask-become-pass`.
+4. Run `homelabctl cluster recovery export` into private staging space, encrypt
    it, move it off Titan and the workstation, and verify the stored copy.
-7. Create a pre-reboot snapshot, perform a managed cluster reboot, then verify
+5. Create a pre-reboot snapshot, perform a managed cluster reboot, then verify
    SSH, the router-reserved address, node readiness and all core pods.
-8. Record the first-build evidence and resolve recovery custody and the
-   off-cluster alert receiver before platform bootstrap.
+6. Record the first-build evidence and resolve the off-cluster alert receiver
+   before advancing to the later platform stages.
 
 Do not start the application platform until the recovery export and reboot
-checks are complete. The detailed
-acceptance criteria for later phases live in the [roadmap](/project/roadmap).
-After the foundation passes, continue with the
-[platform bootstrap runbook](/operations/platform-bootstrap): deploy only
-through identity first, finish Pocket ID and Vault verification, verify the
-public wildcard certificate, and then add data, observability, CI/CD and
-applications one stage at a time.
+checks are complete. The detailed acceptance criteria for later phases live in
+the [roadmap](/project/roadmap). After the foundation passes, continue with
+the [platform bootstrap runbook](/operations/platform-bootstrap): deploy data,
+observability, CI/CD and applications one stage at a time.
 
 ## Sources of truth
 

@@ -371,6 +371,12 @@ and submits only the Pocket ID subject, Butler role and Vault policy names to
 the private recovery API. No Vault token enters Butler, a file, or a Kubernetes
 Secret. The recovery phase becomes `operational` only after both proofs pass.
 
+Once recovery is `operational`, treat the bootstrap ceremony as finished.
+The next required work is to export `butler-vault-init` to age-encrypted
+off-cluster storage, verify a disposable decrypt, and complete the K3s
+recovery export and restore rehearsal before relying on any later platform
+stage.
+
 ## 5. Shared data and API provisioning
 
 ```bash
