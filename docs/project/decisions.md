@@ -41,35 +41,37 @@ runbooks so they do not become accidental or get repeatedly reopened.
 
 ## Open decisions
 
-### Enforce NetworkPolicy with a policy-only CNI — Proposed
+### Prove K3s's bundled network-policy controller on Titan — Proposed
 
-K3s ships flannel, which does not read NetworkPolicy objects. Every policy in
-this repository is therefore declarative intent, not a boundary: any pod can
-reach any other pod on any port. `docs/engineering/cluster-platform.md` records
-this as unverified, and the identity and secrets stages rely on policies that do
-not yet apply.
+K3s ships an embedded network-policy controller (kube-router's netpol library,
+policy-only, no other kube-router functionality). It is enabled by default and
+is disabled only by starting every server with `--disable-network-policy`, which
+this repository does not do. Policy enforcement is therefore expected to be
+active on Titan today, and the embedded controller is per-node, so it remains
+correct as the cluster grows.
 
-Recommended: run **kube-router in network-policy-only mode**, keeping flannel as
-the CNI dataplane, rather than replacing the network with Cilium.
+The open item is evidence, not architecture: no one has confirmed on Titan that
+the controller is programmed, nor that a policy denies what it should.
 
-- One node removes the hard part of a policy CNI — there is no inter-node
-  routing, overlay or tunnel correctness to solve.
-- Policy-only mode leaves flannel owning pod networking, so the change adds
-  enforcement without replacing a working data path, and rollback is deleting
-  the DaemonSet.
-- Cilium would work and brings BPF, eBPF and a larger memory and upgrade
-  surface than a mini PC with an already healthy network needs.
-- K3s's built-in network-policy controller flag is not an alternative: it
-  requires kube-router and is the same component reached by a narrower door.
+Required before this becomes Accepted, on Titan:
 
-Rejected: enabling the flag alone, and leaving the state undocumented while later
-phases describe the policies as isolation.
+- `iptables-save | grep KUBE-ROUTER` on the node shows programmed controller
+  rules rather than an empty result;
+- a disposable pod proves one allowed path and one denied path across
+  namespaces;
+- the result is recorded in [current state](/project/current-state) rather than
+  assumed.
 
-Accepted only when, on Titan: a fresh snapshot exists; a disposable pod proves
-both an allowed and a denied path; a policy regression check exists in
-`homelabctl ci check`; the rollback is rehearsed; and the "Verification still
-required on Titan" list in `docs/engineering/cluster-platform.md` records the
-result instead of the item being deleted.
+Explicitly rejected, so the question is not reopened later:
+
+- **Installing a policy-capable CNI (Cilium, Calico, or kube-router as a
+  standalone DaemonSet) in place of the embedded controller.** K3s already runs
+  exactly the recommended configuration — kube-router's netpol implementation in
+  policy-only mode beside flannel. Replacing a working, default, multi-node-capable
+  network path on a single-node cluster whose snapshot restore has never been
+  rehearsed would add risk and remove nothing.
+- **Enabling `--enable-network-policy` or treating a CNI swap as required.** The
+  embedded controller is already on.
 
 ## How to change a decision
 

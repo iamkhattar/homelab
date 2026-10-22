@@ -140,9 +140,22 @@ the application's callback/logout behaviour pass an end-to-end test.
 - Runner pods have no inbound path. HTTPS and Kubernetes API transport are
   allowed, but Kubernetes RBAC still determines authority.
 
-NetworkPolicy enforcement requires a CNI that enforces Kubernetes
-NetworkPolicies. Verify this explicitly on K3s before treating these manifests
-as a security boundary.
+K3s includes an embedded network-policy controller — kube-router's netpol
+implementation, in policy-only mode alongside flannel — and it is enabled by
+default unless every server starts with `--disable-network-policy`. This
+repository does not disable it, and the controller is per-node, so enforcement
+is expected to be active and to remain correct as nodes are added.
+
+Do not install a separate policy-capable CNI to obtain enforcement. Verify the
+bundled controller instead: `iptables-save | grep KUBE-ROUTER` on the node must
+show programmed rules, and a disposable pod must prove one allowed and one
+denied path across namespaces. Record the result in
+[current state](/project/current-state) rather than assuming enforcement.
+
+A namespace with no NetworkPolicy selecting its pods is fully open under an
+enforcing controller, because NetworkPolicy is allow-list only. `monitoring`
+carries a `podSelector: {}` default-deny baseline; every other namespace needs
+the same baseline before a workload lands there.
 
 ## Scale-to-zero deployment runners
 
@@ -221,7 +234,8 @@ stateful upgrade, take and verify the application's documented backup. A full
 ## Verification still required on Titan
 
 - Pod Security compatibility for every third-party image;
-- NetworkPolicy enforcement by the selected K3s CNI;
+- NetworkPolicy enforcement by K3s's bundled controller, proven by programmed
+  `KUBE-ROUTER` iptables rules plus one allowed and one denied path;
 - PostgreSQL init and restore with the VSO-generated script;
 - Garage layout, bucket and key reconciliation through Butler against Titan;
 - Pocket ID group/client API reconciliation and Butler PKCE login;
