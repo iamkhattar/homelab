@@ -36,6 +36,40 @@ runbooks so they do not become accidental or get repeatedly reopened.
 | Scale GitHub Actions runners to zero | Accepted | Ephemeral runners provide the later deployment mechanism without a permanently idle workload. Their GitHub App and Kubernetes permissions remain least privilege. |
 | Use Zigbee2MQTT with the Sonoff zStack coordinator | Accepted | Mixed switches benefit from Zigbee2MQTT's device catalogue and diagnostics, and the coordinator remains independent of Home Assistant restarts. Mosquitto is therefore an intentional dependency; ZHA must never claim the same device. |
 | Isolate the Zigbee USB exception | Accepted | Home Assistant and Mosquitto remain under baseline Pod Security in `smart-home`; only the Titan-pinned Zigbee2MQTT pod runs in the privileged `zigbee` namespace with an exact `/dev/serial/by-id` device. |
+| Reconcile Pocket ID users through the API, not a custom resource | Accepted | `ManagedCredential`, `PocketIDClient`, `PocketIDGroup` and `GarageBucket` describe provider state the cluster should converge on, so they are reconciled. A user is a one-time operator action with no steady-state shape Butler should overwrite, so `homelabctl control users` calls the identity domain directly and `PocketIDGroup` supplies the group boundary that membership depends on. |
+| Give every namespace a default-deny baseline | Accepted | A namespace without a `podSelector: {}` policy has no boundary: a new pod there may reach anything until someone writes its policy. Explicit allow policies then document each admitted flow, and a new workload fails closed instead of open. |
+
+## Open decisions
+
+### Enforce NetworkPolicy with a policy-only CNI — Proposed
+
+K3s ships flannel, which does not read NetworkPolicy objects. Every policy in
+this repository is therefore declarative intent, not a boundary: any pod can
+reach any other pod on any port. `docs/engineering/cluster-platform.md` records
+this as unverified, and the identity and secrets stages rely on policies that do
+not yet apply.
+
+Recommended: run **kube-router in network-policy-only mode**, keeping flannel as
+the CNI dataplane, rather than replacing the network with Cilium.
+
+- One node removes the hard part of a policy CNI — there is no inter-node
+  routing, overlay or tunnel correctness to solve.
+- Policy-only mode leaves flannel owning pod networking, so the change adds
+  enforcement without replacing a working data path, and rollback is deleting
+  the DaemonSet.
+- Cilium would work and brings BPF, eBPF and a larger memory and upgrade
+  surface than a mini PC with an already healthy network needs.
+- K3s's built-in network-policy controller flag is not an alternative: it
+  requires kube-router and is the same component reached by a narrower door.
+
+Rejected: enabling the flag alone, and leaving the state undocumented while later
+phases describe the policies as isolation.
+
+Accepted only when, on Titan: a fresh snapshot exists; a disposable pod proves
+both an allowed and a denied path; a policy regression check exists in
+`homelabctl ci check`; the rollback is rehearsed; and the "Verification still
+required on Titan" list in `docs/engineering/cluster-platform.md` records the
+result instead of the item being deleted.
 
 ## How to change a decision
 
