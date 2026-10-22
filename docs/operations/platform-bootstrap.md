@@ -41,8 +41,16 @@ Vault, recovery Butler, VSO, Pocket ID and the public certificate ceremony have
 since converged. The first owner has enrolled a passkey, belongs to
 `homelab-admin`, Butler-managed identity resources report Ready, Pocket ID PKCE
 login succeeds, and the normal Butler status API succeeds through
-`https://butler.6940469.xyz`. The next action is the human Vault OIDC proof at
-the end of **4. Pocket ID and management handoff**.
+`https://butler.6940469.xyz`.
+
+The identity stage completed on 1 September 2026: `homelabctl control
+verify-identity` proved Pocket ID login to both Butler and Vault, and Butler's
+recovery plane reports `operational`. The next action is **not** another step in
+**4. Pocket ID and management handoff**. It is the recovery custody work recorded
+in [current state](/project/current-state): export the Vault recovery material to
+verified encrypted off-device storage, complete the K3s recovery export and
+restore rehearsal, and only then advance to **5. Shared data and API
+provisioning**.
 
 Do not repeat that checkpoint merely to advance this runbook. Continue to use
 `homelabctl cluster status` as a quick safety check before each apply.
