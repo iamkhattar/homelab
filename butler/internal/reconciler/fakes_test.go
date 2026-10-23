@@ -132,6 +132,13 @@ func kvSecret(data map[string]any) []byte {
 // kind the reconcilers read registered, so ownership checks do not fail on an
 // unregistered kind.
 func newPlatformStore(objs ...runtime.Object) *platform.Store {
+	store, _ := newPlatformStoreClient(objs...)
+	return store
+}
+
+// newPlatformStoreClient also returns the fake dynamic client so tests can
+// inspect the raw persisted object, including its status subresource.
+func newPlatformStoreClient(objs ...runtime.Object) (*platform.Store, *dynamicfake.FakeDynamicClient) {
 	client := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(
 		runtime.NewScheme(),
 		map[schema.GroupVersionResource]string{
@@ -142,7 +149,23 @@ func newPlatformStore(objs ...runtime.Object) *platform.Store {
 		},
 		objs...,
 	)
-	return platform.NewStore(client)
+	return platform.NewStore(client), client
+}
+
+// credentialCR builds a ManagedCredential custom resource. Fields use the same
+// shape charts declare: exactly one value source per field.
+func credentialCR(namespace, name, vaultPath string, fields map[string]any) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": platform.Group + "/" + platform.Version,
+		"kind":       "ManagedCredential",
+		"metadata":   map[string]interface{}{"name": name, "namespace": namespace, "generation": int64(1)},
+		"spec":       map[string]interface{}{"vaultPath": vaultPath, "fields": fields},
+	}}
+}
+
+// generatedField is a generated password field of the given length.
+func generatedField(length int64) map[string]any {
+	return map[string]any{"generate": map[string]any{"type": "password", "length": length}}
 }
 
 // unstructuredClient builds a PocketIDClient custom resource for the fake
@@ -185,6 +208,14 @@ func statusOf(t *testing.T, store *platform.Store, kind string) map[string]platf
 		items, err := store.ListPocketIDClients(ctx)
 		if err != nil {
 			t.Fatalf("listing PocketIDClients: %v", err)
+		}
+		for i := range items {
+			out[items[i].Namespace+"/"+items[i].Name] = items[i].Status
+		}
+	case "ManagedCredential":
+		items, err := store.ListManagedCredentials(ctx)
+		if err != nil {
+			t.Fatalf("listing ManagedCredentials: %v", err)
 		}
 		for i := range items {
 			out[items[i].Namespace+"/"+items[i].Name] = items[i].Status
