@@ -95,7 +95,7 @@ binary exists: from `homelabctl/`, build `./cmd/homelabctl` into `../bin/`.
 
 ## CI/CD
 
-- **CI workflow** (`.github/workflows/ci.yml`): driven by `homelabctl`. It checks Go, docs, Ansible, Terraform, gosec and Trivy; retains test/SARIF/SBOM reports; builds changed images on pull requests; and publishes all release images from `main` so Butler and homelabctl share the release version.
+- **CI workflow** (`.github/workflows/ci.yml`): driven by `homelabctl`. It checks Go, docs, cluster manifest API groups, Ansible, Terraform, gosec and Trivy; retains test/SARIF/SBOM reports; builds changed images on pull requests; and publishes all release images from `main` so Butler and homelabctl share the release version.
 - **Auto-assign workflow** (`.github/workflows/auto-assign.yml`): assigns the PR author as a reviewer.
 - Push-model only: there is no in-cluster GitOps controller (no Argo CD / Flux). All deploys are initiated with `homelabctl deploy`.
 

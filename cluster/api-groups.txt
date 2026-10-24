@@ -1,0 +1,20 @@
+# API groups the cluster charts are allowed to use.
+#
+# `homelabctl ci check` fails when a manifest names a group that is not listed
+# here. Helm renders templates without validating them against a cluster, so a
+# mistyped group is otherwise only discovered when `helmfile diff` runs against
+# a live cluster.
+#
+# Add a group when a new chart or custom resource is introduced. The core group
+# is implicit: an apiVersion without a "/" needs no entry.
+apiextensions.k8s.io
+apps
+batch
+cert-manager.io
+networking.k8s.io
+platform.6940469.xyz
+policy
+rbac.authorization.k8s.io
+secrets.hashicorp.com
+storage.k8s.io
+traefik.io
