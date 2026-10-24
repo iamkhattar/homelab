@@ -46,6 +46,7 @@ func newCICommand(s *state) *cobra.Command {
 				{name: "go-format", run: func(cmd *cobra.Command) error { return checkGoFormat(cmd, s) }},
 				{name: "go-test", run: func(cmd *cobra.Command) error { return checkGoTests(cmd, s, reports) }},
 				{name: "docs", run: func(cmd *cobra.Command) error { return s.run(cmd.Context(), s.dir("docs"), "npm", "run", "build") }},
+				{name: "manifests", run: func(cmd *cobra.Command) error { return checkClusterAPIGroups(cmd, s) }},
 				{name: "workflows", run: func(_ *cobra.Command) error { return workflow.ValidateDirectory(s.root) }},
 				{name: "ansible", run: func(cmd *cobra.Command) error { return checkAnsible(cmd, s) }},
 				{name: "terraform", run: func(cmd *cobra.Command) error { return checkTerraform(cmd, s) }},
