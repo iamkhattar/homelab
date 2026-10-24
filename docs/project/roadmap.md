@@ -145,7 +145,8 @@ Acceptance criteria:
 owner ceremony, the Pocket ID login proof for Butler and Vault, and Butler's
 `operational` recovery phase have all passed. Recovery custody — exporting the
 Vault recovery material and the K3s token and snapshot to encrypted off-node
-storage, and rehearsing a restore — remains outstanding and blocks Phase 5.
+storage, and rehearsing a restore — is a later workstream and does not block
+the platform stages. It does gate storing irreplaceable household data.
 
 **Goal:** centralise application sign-in and runtime secrets without creating a
 bootstrap loop.

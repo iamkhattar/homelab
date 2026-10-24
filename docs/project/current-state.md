@@ -125,9 +125,13 @@ Vault/bootstrap ceremony are complete. Continue with:
 6. Record the first-build evidence and resolve the off-cluster alert receiver
    before advancing to the later platform stages.
 
-Do not start the application platform until the recovery export and reboot
-checks are complete. The detailed acceptance criteria for later phases live in
-the [roadmap](/project/roadmap). After the foundation passes, continue with
+The platform stages may proceed without the recovery export and reboot checks.
+Infrastructure and configuration are declared in this repository and can be
+recreated from it, so building a working single-node cluster is the current
+goal. What must wait is storing irreplaceable household data: until an
+off-cluster copy exists, keep PostgreSQL, Garage and the applications
+empty of real documents, credentials and recipes. The detailed acceptance
+criteria for later phases live in the [roadmap](/project/roadmap). Continue with
 the [platform bootstrap runbook](/operations/platform-bootstrap): deploy data,
 observability, CI/CD and applications one stage at a time.
 

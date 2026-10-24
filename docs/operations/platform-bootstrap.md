@@ -1,8 +1,14 @@
 # Bootstrap the cluster platform
 
-Use this runbook only after Titan is healthy, kubeconfig points at Titan, and
-the first K3s recovery export exists off-node. The first deployment runs from
-the Mac; the scale-to-zero runner cannot deploy the platform that creates it.
+Use this runbook only after Titan is healthy and kubeconfig points at Titan.
+The first deployment runs from the Mac; the scale-to-zero runner cannot deploy
+the platform that creates it.
+
+Recovery custody is not a precondition for this runbook. The platform stages
+below are infrastructure and configuration: they are declared in this
+repository and can be recreated from it. The constraint that matters is that
+irreplaceable household data must not be stored in the cluster until an
+off-cluster copy exists — see the [decision log](/project/decisions).
 
 ## Current installation checkpoint
 

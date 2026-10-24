@@ -38,6 +38,7 @@ runbooks so they do not become accidental or get repeatedly reopened.
 | Isolate the Zigbee USB exception | Accepted | Home Assistant and Mosquitto remain under baseline Pod Security in `smart-home`; only the Titan-pinned Zigbee2MQTT pod runs in the privileged `zigbee` namespace with an exact `/dev/serial/by-id` device. |
 | Reconcile Pocket ID users through the API, not a custom resource | Accepted | `ManagedCredential`, `PocketIDClient`, `PocketIDGroup` and `GarageBucket` describe provider state the cluster should converge on, so they are reconciled. A user is a one-time operator action with no steady-state shape Butler should overwrite, so `homelabctl control users` calls the identity domain directly and `PocketIDGroup` supplies the group boundary that membership depends on. |
 | Give every namespace a default-deny baseline | Accepted | A namespace without a `podSelector: {}` policy has no boundary: a new pod there may reach anything until someone writes its policy. Explicit allow policies then document each admitted flow, and a new workload fails closed instead of open. |
+| Build the platform before recovery custody | Accepted | The current goal is a working, repeatable single-node cluster on Titan. Infrastructure and configuration are declared in this repository and can be recreated from it, so recovery must not gate platform deployment or delay it. The limit is data, not infrastructure: until an off-cluster copy exists, the cluster must not hold irreplaceable household data such as documents, credentials or recipes. Recovery custody and the off-cluster target remain an open later workstream. |
 
 ## Open decisions
 
@@ -72,6 +73,17 @@ Explicitly rejected, so the question is not reopened later:
   rehearsed would add risk and remove nothing.
 - **Enabling `--enable-network-policy` or treating a CNI swap as required.** The
   embedded controller is already on.
+
+### Choose the off-cluster recovery target — Open
+
+Recovery custody is deferred, but the target is worth deciding before it is
+needed, because the choice changes how backups are produced and not only where
+they are stored. An S3-compatible object store off Titan is the natural fit:
+Garage already provides an S3 API inside the cluster, so an off-site bucket or a
+second Garage instance could receive encrypted backups. The alternatives are a
+separate provider's bucket, a second always-on machine, or encrypted export to
+an operator-managed store. This decision is deliberately unmade until the
+platform stages are working, and nothing about the platform depends on it.
 
 ## How to change a decision
 
