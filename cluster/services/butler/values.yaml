@@ -138,6 +138,24 @@ config:
           paths:
             - smart-home/mqtt
             - smart-home/zigbee2mqtt
+        # Data namespaces read only their own paths. PostgreSQL and Redis share
+        # the databases namespace and project from two distinct Vault paths.
+        - name: vso-databases
+          namespace: databases
+          serviceAccounts: [default]
+          paths:
+            - databases/postgresql
+            - databases/redis
+        - name: vso-storage
+          namespace: storage
+          serviceAccounts: [default]
+          paths:
+            - storage/garage
+        - name: vso-cicd
+          namespace: cicd
+          serviceAccounts: [default]
+          paths:
+            - cicd/github-actions
   server:
     port: "8080"
   reconcile:
