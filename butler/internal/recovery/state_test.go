@@ -10,15 +10,26 @@ import (
 	"github.com/iamkhattar/homelab/butler/internal/vault"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
 type recoveryVault struct {
-	status  vault.LifecycleStatus
-	secrets map[string]map[string]interface{}
+	status    vault.LifecycleStatus
+	secrets   map[string]map[string]interface{}
+	unseals   int
+	unsealErr error
 }
 
 func (v *recoveryVault) Status(context.Context) (vault.LifecycleStatus, error) { return v.status, nil }
+func (v *recoveryVault) EnsureUnsealed(context.Context, kubernetes.Interface, string) error {
+	v.unseals++
+	if v.unsealErr != nil {
+		return v.unsealErr
+	}
+	v.status.Sealed = false
+	return nil
+}
 func (v *recoveryVault) ReadSecretIfExists(_ context.Context, path string) (map[string]interface{}, error) {
 	data := map[string]interface{}{}
 	for key, value := range v.secrets[path] {

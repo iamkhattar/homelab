@@ -123,3 +123,27 @@ Vault is the source of truth for day-to-day application secrets, but in-cluster 
 cannot be the sole recovery store for the cluster that runs it. Its unseal or
 recovery material and the credentials required to restore its storage belong in
 the off-cluster recovery set.
+
+## After a restart
+
+A restart seals Vault, and a sealed Vault keeps normal Butler unready because
+normal Butler authenticates to Vault through Kubernetes auth.
+
+The recovery workload unseals Vault automatically using the key in
+`butler-vault-init`. No operator action is required, and the unseal does not
+replay the bootstrap ceremony or reopen the identity verification gate.
+
+To confirm it happened:
+
+```bash
+homelabctl control recovery
+```
+
+`vaultSealed: false` with `phase: operational` is the expected result. If the
+recovery workload is also unavailable, unseal manually with the recovery key:
+
+```bash
+KEY=$(kubectl -n security get secret butler-vault-init -o jsonpath='{.data.unseal-key}' | base64 -d)
+kubectl -n security exec vault-0 -- vault operator unseal "$KEY"
+```
+

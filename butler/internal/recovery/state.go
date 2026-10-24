@@ -27,6 +27,9 @@ type Vault interface {
 	Status(context.Context) (vault.LifecycleStatus, error)
 	ReadSecretIfExists(context.Context, string) (map[string]interface{}, error)
 	WriteSecret(context.Context, string, map[string]interface{}) error
+	// EnsureUnsealed unseals an initialized Vault with the stored recovery
+	// key. It never initializes Vault.
+	EnsureUnsealed(context.Context, kubernetes.Interface, string) error
 }
 
 func (s *Service) ImportPocketIDAPIKey(ctx context.Context, apiKey string) error {
@@ -121,6 +124,14 @@ func (s *Service) Advance(ctx context.Context, confirmed bool) error {
 	}
 	status := s.Status(ctx)
 	if status.Phase == "operational" {
+		// A restart seals Vault again. The platform itself is still configured,
+		// so unseal and stop rather than replaying the whole ceremony, which
+		// would reset the phase and demand a new identity verification.
+		if status.VaultSealed {
+			if err := s.vault.EnsureUnsealed(ctx, s.k8s, s.namespace); err != nil {
+				return fmt.Errorf("unsealing vault after a restart: %w", err)
+			}
+		}
 		return nil
 	}
 	if status.VaultInitialized && !status.RecoverySecretFound {
