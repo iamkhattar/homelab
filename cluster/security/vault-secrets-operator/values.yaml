@@ -56,3 +56,12 @@ applicationVaultAuths:
     role: vso-smart-home
   - namespace: zigbee
     role: vso-zigbee
+  # The data namespaces project from their own Vault paths. Without a local
+  # VaultAuth these secrets resolve against the operator-level auth, which
+  # expects a vault-secrets-operator ServiceAccount in the target namespace.
+  - namespace: databases
+    role: vso-databases
+  - namespace: storage
+    role: vso-storage
+  - namespace: cicd
+    role: vso-cicd
