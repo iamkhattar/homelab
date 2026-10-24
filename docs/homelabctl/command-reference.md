@@ -183,6 +183,7 @@ requires `control certificate verify-dns --confirm` and an exact public match.
 | `deploy sync [release] [--stage stage] [--image-tag tag]` | Force reconciliation of all releases, one release or one stage without diff gating | Release/stage are exclusive; selected releases include declared Helmfile dependencies |
 | `deploy sync [--image-tag tag]` | Reconcile every release without diff gating | Mutating; intentionally explicit; image tag must already be published |
 | `deploy platform --through stage --confirm` | Apply stages in the supported dependency order | Defaults through identity and refuses later stages until Butler bootstrap is `operational` |
+| `deploy render [--output path] [--require-network-baselines]` | Render every enabled release offline and report the namespace inventory | Never contacts a cluster; `--require-network-baselines` fails when a declared namespace has no namespace-wide NetworkPolicy baseline |
 | `infra fmt` | Check Terraform formatting | Does not rewrite files |
 | `infra validate` | Backend-free init and validation | May download providers |
 | `infra plan` | Query and plan configured infrastructure | Does not apply; may access backend/provider APIs |
