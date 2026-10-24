@@ -106,6 +106,35 @@ func (c *Client) EnsureInitializedAndUnsealed(ctx context.Context, k8s kubernete
 	return newlyInitialized, nil
 }
 
+// EnsureUnsealed unseals an already-initialized Vault with the recovery key
+// stored in the butler-vault-init Secret. It never initializes Vault:
+// initialization stays a deliberate operator action, while unsealing is
+// routine after a restart.
+//
+// This is safe to call repeatedly. An unsealed Vault is a no-op.
+func (c *Client) EnsureUnsealed(ctx context.Context, k8s kubernetes.Interface, namespace string) error {
+	initStatus, err := c.raw.Sys().InitStatusWithContext(ctx)
+	if err != nil {
+		return fmt.Errorf("checking vault init status: %w", err)
+	}
+	if !initStatus {
+		return fmt.Errorf("vault is not initialized; refusing to unseal")
+	}
+	sealStatus, err := c.raw.Sys().SealStatusWithContext(ctx)
+	if err != nil {
+		return fmt.Errorf("checking vault seal status: %w", err)
+	}
+	if !sealStatus.Sealed {
+		return nil
+	}
+	slog.Info("vault is sealed, unsealing from the recovery secret")
+	if err := c.unseal(ctx, k8s, namespace); err != nil {
+		return err
+	}
+	slog.Info("vault unsealed")
+	return nil
+}
+
 // LoadBootstrapToken loads the recovery root token for the one-time migration
 // path where Butler's Kubernetes auth role does not exist yet.
 func (c *Client) LoadBootstrapToken(ctx context.Context, k8s kubernetes.Interface, namespace string) error {

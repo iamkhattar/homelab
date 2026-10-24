@@ -50,8 +50,10 @@ A roadmap phase or increment is not complete until all of these are true:
 
 ## Phase 1 — Recoverable Titan foundation
 
-**State:** repository automation is ready; execution and recovery evidence on
-Titan remain outstanding.
+**State:** Debian, SSH hardening, the managed baseline and the single K3s server
+are verified on Titan. Recovery evidence remains outstanding: the first off-node
+K3s token and snapshot export, one managed-reboot verification, and one snapshot
+restore rehearsal.
 
 **Goal:** one dependable Debian host and one healthy K3s server.
 
@@ -74,9 +76,10 @@ Acceptance criteria:
 
 ## Phase 2 — Cluster platform
 
-**State:** private-address wildcard DNS is published and verified; public
-DNS-01 automation is ready in Git while off-node backup selection and Titan
-restore testing remain outstanding.
+**State:** the private-address wildcard DNS is published, the permanent acme-dns
+CNAME is verified, and the production apex-and-wildcard certificate is Ready and
+served through Traefik. Off-node backup target selection and Titan restore
+testing remain outstanding.
 
 **Goal:** give applications stable networking, certificates, storage and backup.
 
@@ -93,8 +96,9 @@ Accepted implementation:
 
 Remaining work:
 
-- complete the one-time Namecheap `_acme-challenge` CNAME ceremony on Titan;
 - define off-node application backup targets, schedules and restore tests;
+- rehearse deleting and restoring the disposable HTTPS workload's persistent
+  data;
 - measure the committed resource and retention budgets on Titan and adjust only
   from observed pressure.
 
@@ -137,9 +141,12 @@ Acceptance criteria:
 
 ## Phase 4 — Identity and secrets
 
-**State:** repository implementation complete, including the real Butler and
-Vault login acceptance gate; first-owner bootstrap, recovery export and Titan
-verification remain outstanding.
+**State:** repository implementation complete and verified on Titan: the first
+owner ceremony, the Pocket ID login proof for Butler and Vault, and Butler's
+`operational` recovery phase have all passed. Recovery custody — exporting the
+Vault recovery material and the K3s token and snapshot to encrypted off-node
+storage, and rehearsing a restore — is a later workstream and does not block
+the platform stages. It does gate storing irreplaceable household data.
 
 **Goal:** centralise application sign-in and runtime secrets without creating a
 bootstrap loop.

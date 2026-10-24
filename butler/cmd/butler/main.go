@@ -190,6 +190,12 @@ func main() {
 }
 
 func serveRecovery(ctx context.Context, cfg *config.Config, vc *vault.Client, k8s kubernetes.Interface, bootstrapper, credentialBootstrapper, identityBootstrapper recovery.Bootstrapper, certificateManager *certificates.Manager) {
+	// A restart seals Vault again. Only the recovery workload may unseal it,
+	// because only the recovery workload may read the recovery Secret. Start
+	// the unseal loop first so Vault comes back without waiting for an
+	// operator, and so normal Butler can authenticate as soon as it is unsealed.
+	go unsealVaultOnRestart(ctx, cfg, vc, k8s)
+
 	// This succeeds after the one-time bootstrap has created the narrow
 	// recovery role. It is intentionally best-effort for the pristine-cluster
 	// case, where that role cannot exist yet. Re-authenticating here also makes
@@ -213,6 +219,31 @@ func serveRecovery(ctx context.Context, cfg *config.Config, vc *vault.Client, k8
 	defer cancel()
 	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("recovery server shutdown", "error", err)
+	}
+}
+
+// unsealVaultOnRestart keeps Vault unsealed after a node or pod restart.
+//
+// Vault is manually unsealed: the recovery key lives in the recovery Secret
+// and only the recovery workload may read it. This loop is therefore the
+// recovery workload's responsibility, and it runs for the lifetime of the
+// process so a Vault restart at any moment is handled without an operator.
+//
+// It never initializes Vault. An uninitialized Vault is a pristine-cluster
+// condition that stays an explicit operator action.
+func unsealVaultOnRestart(ctx context.Context, cfg *config.Config, vc *vault.Client, k8s kubernetes.Interface) {
+	const interval = 15 * time.Second
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		if err := vc.EnsureUnsealed(ctx, k8s, cfg.Namespace); err != nil {
+			slog.Info("vault is not unsealed yet", "error", err)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
 	}
 }
 

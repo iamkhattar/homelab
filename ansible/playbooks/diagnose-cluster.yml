@@ -29,3 +29,52 @@
       loop: "{{ homelab_cluster_diagnostics.results }}"
       loop_control:
         label: "{{ item.item }}"
+
+    # K3s ships an embedded network-policy controller (kube-router's netpol
+    # implementation) that is enabled unless a server starts with
+    # --disable-network-policy. Policy objects are meaningless without it, so
+    # record whether this node has the controller active rather than assuming
+    # it. Both probes are read-only.
+    - name: Check whether the node's K3s configuration disables network policy
+      ansible.builtin.command:
+        cmd: grep -n network-policy /etc/rancher/k3s/config.yaml
+      register: homelab_network_policy_config
+      changed_when: false
+      failed_when: false
+
+    - name: Report the network-policy configuration check
+      ansible.builtin.debug:
+        msg:
+          return_code: "{{ homelab_network_policy_config.rc }}"
+          matches: "{{ homelab_network_policy_config.stdout_lines | default([]) }}"
+          note: >-
+            A non-zero return code means the node's own configuration does
+            not disable the network-policy controller. Only lines mentioning
+            network-policy are read, so no other configuration is disclosed.
+
+    - name: Read the NetworkPolicy rules the controller has programmed
+      ansible.builtin.command:
+        cmd: "{{ item }}"
+      loop:
+        - iptables-save
+        - ip6tables-save
+      register: homelab_network_policy_rules
+      changed_when: false
+      failed_when: false
+
+    - name: Report the network-policy enforcement state
+      ansible.builtin.debug:
+        msg:
+          command: "{{ item.item }}"
+          return_code: "{{ item.rc }}"
+          rule_count: >-
+            {{ item.stdout | default('', true) | split('\n')
+               | select('search', 'KUBE-ROUTER') | list | length }}
+          note: >-
+            A rule count above zero proves the embedded controller is
+            programming NetworkPolicy rules on this node. A count of zero
+            means no policy is being enforced here, whatever the manifests
+            declare.
+      loop: "{{ homelab_network_policy_rules.results }}"
+      loop_control:
+        label: "{{ item.item }}"

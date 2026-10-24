@@ -1,8 +1,14 @@
 # Bootstrap the cluster platform
 
-Use this runbook only after Titan is healthy, kubeconfig points at Titan, and
-the first K3s recovery export exists off-node. The first deployment runs from
-the Mac; the scale-to-zero runner cannot deploy the platform that creates it.
+Use this runbook only after Titan is healthy and kubeconfig points at Titan.
+The first deployment runs from the Mac; the scale-to-zero runner cannot deploy
+the platform that creates it.
+
+Recovery custody is not a precondition for this runbook. The platform stages
+below are infrastructure and configuration: they are declared in this
+repository and can be recreated from it. The constraint that matters is that
+irreplaceable household data must not be stored in the cluster until an
+off-cluster copy exists — see the [decision log](/project/decisions).
 
 ## Current installation checkpoint
 
@@ -41,8 +47,16 @@ Vault, recovery Butler, VSO, Pocket ID and the public certificate ceremony have
 since converged. The first owner has enrolled a passkey, belongs to
 `homelab-admin`, Butler-managed identity resources report Ready, Pocket ID PKCE
 login succeeds, and the normal Butler status API succeeds through
-`https://butler.6940469.xyz`. The next action is the human Vault OIDC proof at
-the end of **4. Pocket ID and management handoff**.
+`https://butler.6940469.xyz`.
+
+The identity stage completed on 1 September 2026: `homelabctl control
+verify-identity` proved Pocket ID login to both Butler and Vault, and Butler's
+recovery plane reports `operational`. The next action is **not** another step in
+**4. Pocket ID and management handoff**. It is the recovery custody work recorded
+in [current state](/project/current-state): export the Vault recovery material to
+verified encrypted off-device storage, complete the K3s recovery export and
+restore rehearsal, and only then advance to **5. Shared data and API
+provisioning**.
 
 Do not repeat that checkpoint merely to advance this runbook. Continue to use
 `homelabctl cluster status` as a quick safety check before each apply.
@@ -293,6 +307,10 @@ kubectl -n security wait --for=condition=Ready \
   managedcredential/pocket-id-runtime --timeout=2m
 kubectl -n security wait --for=condition=Ready \
   vaultstaticsecret/pocket-id-credentials --timeout=2m
+kubectl -n security wait --for=condition=Ready \
+  managedcredential/pocket-id-database --timeout=2m
+kubectl -n security wait --for=condition=Ready \
+  vaultstaticsecret/pocket-id-database --timeout=2m
 kubectl -n security rollout status deployment/pocket-id
 ```
 
@@ -300,6 +318,22 @@ Creating the `ManagedCredential` immediately triggers Butler's coalesced
 Kubernetes event watcher. Butler writes both the generated encryption key and
 Pocket ID static machine credential to Vault, VSO projects
 `pocket-id-credentials`, and only then can the Pocket ID container start.
+
+Pocket ID keeps its identity data in PostgreSQL. The PostgreSQL release is a
+declared dependency of the Pocket ID release, so applying the identity stage
+applies the database with it. The chain is:
+
+1. the PostgreSQL chart generates the `pocketid` password into Vault and adds
+   the role and database to its `init.sql`, which runs when the volume is
+   initialised;
+2. the Pocket ID chart copies only that password and the connection string into
+   `security/pocket-id/database`;
+3. VSO projects that path into the `security` namespace as
+   `pocket-id-database`, and the container reads `DB_CONNECTION_STRING` from it.
+
+Uploads such as logos and profile pictures use `FILE_BACKEND=database`, so they
+live in PostgreSQL too. The persistent volume keeps only the re-downloadable
+GeoLite database.
 Butler retains a one-minute drift-repair resync if an event is missed.
 Do not manually create the destination Secret or restart VSO while this chain
 is converging.
@@ -370,6 +404,12 @@ the required `vault-admin` and `k8s-admin` capabilities, revokes that token,
 and submits only the Pocket ID subject, Butler role and Vault policy names to
 the private recovery API. No Vault token enters Butler, a file, or a Kubernetes
 Secret. The recovery phase becomes `operational` only after both proofs pass.
+
+Once recovery is `operational`, treat the bootstrap ceremony as finished.
+The next required work is to export `butler-vault-init` to age-encrypted
+off-cluster storage, verify a disposable decrypt, and complete the K3s
+recovery export and restore rehearsal before relying on any later platform
+stage.
 
 ## 5. Shared data and API provisioning
 

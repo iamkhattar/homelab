@@ -22,6 +22,10 @@ env:
   ALLOW_INSECURE_CALLBACK_URLS: "false"
   ANALYTICS_DISABLED: "true"
   VERSION_CHECK_DISABLED: "true"
+  # The identity data lives in PostgreSQL. Uploads such as logos and profile
+  # pictures go with it, so the persistent volume holds only the re-downloadable
+  # GeoLite database.
+  FILE_BACKEND: "database"
   LOG_LEVEL: "info"
   LOG_JSON: "true"
   # Database query arguments can contain credentials, tokens or personal data.
@@ -48,6 +52,8 @@ networkPolicy:
   # Pocket ID has no required internet egress. DNS stays in-cluster and OTLP
   # is sent only to Alloy once the observability stage exists.
   alloyNamespace: monitoring
+  # The PostgreSQL instance that stores the identity data.
+  databaseNamespace: databases
 
 persistence:
   enabled: true

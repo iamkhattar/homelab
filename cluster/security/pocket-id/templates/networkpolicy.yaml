@@ -48,4 +48,13 @@ spec:
       ports:
         - protocol: TCP
           port: 4318
+    # The identity store lives in PostgreSQL. Only the database port is
+    # reachable, and only the database namespace.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.databaseNamespace }}
+      ports:
+        - protocol: TCP
+          port: 5432
 {{- end }}

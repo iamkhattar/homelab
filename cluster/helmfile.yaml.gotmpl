@@ -101,13 +101,15 @@ releases:
     chart: ./security/pocket-id
     historyMax: 5
     namespace: security
-    # pocket-id needs cert-manager (TLS cert), traefik (ingress), and VSO
-    # (Vault-managed encryption-key Secret).
+    # pocket-id needs cert-manager (TLS cert), traefik (ingress), VSO
+    # (Vault-managed encryption-key Secret), and PostgreSQL (the identity
+    # store). The database release is therefore applied with this one.
     needs:
       - kube-system/namespaces
       - cert-manager/cert-manager
       - networking/traefik
       - security/vault-secrets-operator
+      - databases/postgresql
     labels: {stage: identity, domain: identity, criticality: essential}
     values:
       - ./security/pocket-id/helmfile-values.yaml.gotmpl

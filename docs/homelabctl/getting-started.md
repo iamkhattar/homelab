@@ -130,6 +130,20 @@ different checkout:
 homelabctl --repo-root /path/to/homelab doctor
 ```
 
+The first successful command also records the repository root in the user
+configuration directory. A later command run from an unrelated directory falls
+back to that recorded root, so `homelabctl node connect titan` works from
+anywhere after the CLI has succeeded once. The record is a convenience, never
+authority: it is ignored when the path is no longer a Git worktree, and
+`--repo-root` always wins.
+
+When neither the working directory nor the recorded root resolves, the command
+fails and says so:
+
+```text
+Run the command from the repository root, or pass --repo-root <path>.
+```
+
 `version`, `update`, help and shell-completion generation do not require a repository.
 All other current commands do. Future control-plane API commands will be able to
 run without a checkout.

@@ -62,7 +62,7 @@ func newDeployCommand(s *state) *cobra.Command {
 	}
 	syncCmd.Flags().StringVar(&syncStage, "stage", "", "synchronise releases with this Helmfile stage label")
 
-	cmd.AddCommand(diffCmd, applyCmd, syncCmd, newDeployPlatformCommand(s, &imageTag))
+	cmd.AddCommand(diffCmd, applyCmd, syncCmd, newDeployPlatformCommand(s, &imageTag), newDeployRenderCommand(s, &imageTag))
 	cmd.PersistentFlags().StringVar(&imageTag, "image-tag", "", "shared immutable image tag (default: current full Git commit SHA)")
 	return cmd
 }

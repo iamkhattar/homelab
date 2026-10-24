@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"path/filepath"
 
@@ -50,9 +51,20 @@ without hiding the underlying commands. Mutating operations remain explicit.`,
 			}
 			resolved, err := repository.Root(cmd.Context(), s.repoFlag)
 			if err != nil {
-				return err
+				// The working directory is not inside a repository. Fall back to
+				// the root this CLI used successfully before so an operator can
+				// run a command from anywhere.
+				if remembered := repository.RememberedRoot(); remembered != "" {
+					resolved, err = repository.Root(cmd.Context(), remembered)
+				}
+				if err != nil {
+					return fmt.Errorf("%w\n\nRun the command from the repository root, or pass --repo-root <path>.\nThe path is remembered after the first successful run.", err)
+				}
 			}
 			s.root = resolved
+			// Remembering the root is best effort: a read-only or unusual
+			// environment must not fail a command that already succeeded.
+			_ = repository.SaveRoot(resolved)
 			return nil
 		},
 	}
@@ -94,6 +106,10 @@ func (s *state) runEnv(ctx context.Context, dir string, environment map[string]s
 
 func (s *state) output(ctx context.Context, dir, name string, args ...string) (string, error) {
 	return s.runner.Output(ctx, dir, name, args...)
+}
+
+func (s *state) outputEnv(ctx context.Context, dir string, environment map[string]string, name string, args ...string) (string, error) {
+	return s.runner.OutputEnv(ctx, dir, environment, name, args...)
 }
 
 func (s *state) out() io.Writer { return s.runner.Stdout }

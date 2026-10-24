@@ -136,6 +136,7 @@ function mainSidebar() {
       items: [
         { text: 'Engineering overview', link: '/engineering/' },
         { text: 'Cluster platform and applications', link: '/engineering/cluster-platform' },
+        { text: 'Network policy design', link: '/engineering/network-policies' },
         { text: 'Butler control plane', link: '/engineering/butler-control-plane' },
         { text: 'Documentation system', link: '/documentation/hosting' },
       ],

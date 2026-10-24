@@ -66,6 +66,3 @@ ansible/.ansible/
 ansible/collections/
 ansible/inventory/hosts.yml
 *.retry
-
-# Private working plan; maintained locally and intentionally not versioned
-/plan.md

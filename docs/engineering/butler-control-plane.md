@@ -35,6 +35,26 @@ service accounts, RBAC and HTTP surfaces.
 | Recovery Secret access | none | exact access to `butler-vault-init` |
 | Purpose | reconciliation and management | bootstrap, health and recovery input |
 
+## Unsealing after a restart
+
+Vault is sealed by any node or pod restart, and a sealed Vault takes normal
+Butler down with it because normal Butler authenticates to Vault through
+Kubernetes auth.
+
+Only the recovery workload may read `butler-vault-init`, so unsealing is the
+recovery workload's job. It unseals Vault at startup and whenever it observes a
+sealed Vault, using the recovery key in that Secret. Normal Butler never reads
+the Secret and never unseals Vault.
+
+The recovery workload never *initializes* Vault. Initialization mints the root
+token and the recovery key, so it stays a deliberate operator action on a
+pristine cluster.
+
+`homelabctl control bootstrap --confirm` performs the same unseal when the
+persisted bootstrap phase is already `operational`: a restart does not reset the
+platform configuration, so the ceremony is not replayed and the identity
+verification gate is not reopened.
+
 `homelabctl` creates an audience-bound token using TokenRequest. The recovery
 server submits it to Kubernetes TokenReview and accepts only the exact
 `system:serviceaccount:security:butler-recovery-client` username. A copied
