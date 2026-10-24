@@ -129,12 +129,16 @@ Enforcement is proven, never assumed.
 
 ```bash
 homelabctl cluster status
-sudo iptables-save | grep KUBE-ROUTER
+homelabctl cluster diagnose --ask-become-pass
 ```
 
-The first proves the cluster is healthy. The second must show programmed
-controller rules; an empty result means no policy is being enforced on this
-node. Then, for one namespace at a time:
+`cluster diagnose` now records two read-only probes in its standard evidence
+set: whether the node's own K3s configuration disables the controller, and how
+many `KUBE-ROUTER` rules it has programmed. A rule count above zero proves the
+controller is enforcing on that node; a count of zero means no policy is being
+enforced there, whatever the manifests declare.
+
+Then, for one namespace at a time:
 
 - a disposable pod proves an admitted path still works;
 - a disposable pod in another namespace proves a denied path is refused;
