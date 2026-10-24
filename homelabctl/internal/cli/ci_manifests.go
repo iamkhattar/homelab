@@ -82,6 +82,8 @@ func checkClusterAPIGroups(_ *cobra.Command, s *state) error {
 // scanAPIGroups records every apiVersion group in one manifest file that the
 // allowlist does not contain.
 func scanAPIGroups(path, relative string, allowed map[string]bool, unknown map[string][]string) error {
+	// #nosec G304 -- path comes from walking the repository's own cluster
+	// directory, not from operator input.
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -132,6 +134,8 @@ func apiVersionGroup(version string) string {
 
 // readAPIGroupAllowlist reads the allowed groups, ignoring comments and blanks.
 func readAPIGroupAllowlist(path string) (map[string]bool, error) {
+	// #nosec G304 -- path is the repository's own API group allowlist, joined
+	// from the repository root and a fixed relative name.
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("read API group allowlist: %w", err)
