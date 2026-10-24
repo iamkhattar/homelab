@@ -57,7 +57,7 @@ func (s *Server) routes() {
 	// Unauthenticated.
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
 	s.mux.HandleFunc("GET /readyz", s.handleReadyz)
-	s.mux.HandleFunc("GET /", s.handleRoot)
+	s.mux.HandleFunc("GET /{$}", s.handleRoot)
 
 	// Authenticated.
 	s.mux.Handle("GET /api/v1/me", s.require(access.Viewer, http.HandlerFunc(s.handleMe)))

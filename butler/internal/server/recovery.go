@@ -23,7 +23,7 @@ type RecoveryServer struct {
 func NewRecovery(auth RecoveryAuthorizer, service *recovery.Service) *RecoveryServer {
 	s := &RecoveryServer{mux: http.NewServeMux(), auth: auth, service: service}
 	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
-	s.mux.HandleFunc("GET /", s.handleRoot)
+	s.mux.HandleFunc("GET /{$}", s.handleRoot)
 	s.mux.Handle("GET /api/v1/recovery/status", s.protected(http.HandlerFunc(s.handleStatus)))
 	s.mux.Handle("POST /api/v1/bootstrap/advance", s.protected(http.HandlerFunc(s.handleAdvance)))
 	s.mux.Handle("PUT /api/v1/bootstrap/pocket-id-api-key", s.protected(http.HandlerFunc(s.handlePocketIDAPIKey)))
