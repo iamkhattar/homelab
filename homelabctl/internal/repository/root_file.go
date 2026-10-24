@@ -57,6 +57,8 @@ func RememberedRoot() string {
 }
 
 func rememberedRootFile(path string) string {
+	// #nosec G304 -- path is the fixed repository-root record inside the user's
+	// own configuration directory, not operator input.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return ""
