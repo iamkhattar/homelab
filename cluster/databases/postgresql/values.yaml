@@ -33,7 +33,7 @@ postgresql:
                 matchExpressions:
                   - key: kubernetes.io/metadata.name
                     operator: In
-                    values: [kitchenowl, paperless-ngx, vaultwarden]
+                    values: [kitchenowl, paperless-ngx, vaultwarden, security]
           ports:
             - protocol: TCP
               port: 5432

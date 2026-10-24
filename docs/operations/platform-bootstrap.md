@@ -307,6 +307,10 @@ kubectl -n security wait --for=condition=Ready \
   managedcredential/pocket-id-runtime --timeout=2m
 kubectl -n security wait --for=condition=Ready \
   vaultstaticsecret/pocket-id-credentials --timeout=2m
+kubectl -n security wait --for=condition=Ready \
+  managedcredential/pocket-id-database --timeout=2m
+kubectl -n security wait --for=condition=Ready \
+  vaultstaticsecret/pocket-id-database --timeout=2m
 kubectl -n security rollout status deployment/pocket-id
 ```
 
@@ -314,6 +318,22 @@ Creating the `ManagedCredential` immediately triggers Butler's coalesced
 Kubernetes event watcher. Butler writes both the generated encryption key and
 Pocket ID static machine credential to Vault, VSO projects
 `pocket-id-credentials`, and only then can the Pocket ID container start.
+
+Pocket ID keeps its identity data in PostgreSQL. The PostgreSQL release is a
+declared dependency of the Pocket ID release, so applying the identity stage
+applies the database with it. The chain is:
+
+1. the PostgreSQL chart generates the `pocketid` password into Vault and adds
+   the role and database to its `init.sql`, which runs when the volume is
+   initialised;
+2. the Pocket ID chart copies only that password and the connection string into
+   `security/pocket-id/database`;
+3. VSO projects that path into the `security` namespace as
+   `pocket-id-database`, and the container reads `DB_CONNECTION_STRING` from it.
+
+Uploads such as logos and profile pictures use `FILE_BACKEND=database`, so they
+live in PostgreSQL too. The persistent volume keeps only the re-downloadable
+GeoLite database.
 Butler retains a one-minute drift-repair resync if an event is missed.
 Do not manually create the destination Secret or restart VSO while this chain
 is converging.

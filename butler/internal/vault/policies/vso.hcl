@@ -2,6 +2,10 @@ path "secret/data/security/pocket-id" {
   capabilities = ["read"]
 }
 
+path "secret/data/security/pocket-id/database" {
+  capabilities = ["read"]
+}
+
 path "secret/data/databases/*" {
   capabilities = ["read"]
 }

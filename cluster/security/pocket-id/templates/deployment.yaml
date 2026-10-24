@@ -41,6 +41,13 @@ spec:
                 secretKeyRef:
                   name: pocket-id-credentials
                   key: static-api-key
+            # Pocket ID keeps its identity store in PostgreSQL. The connection
+            # string is projected from Vault by Vault Secrets Operator.
+            - name: DB_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: pocket-id-database
+                  key: url
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- if .Values.persistence.enabled }}
