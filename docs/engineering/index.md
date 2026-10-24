@@ -10,6 +10,7 @@ before changing automation, CLI behavior, CI or documentation structure.
 | `homelabctl/` | Typed operator workflows, validation and CI orchestration | [homelabctl introduction](/homelabctl/) |
 | `ansible/` | Debian baseline and K3s host lifecycle | [Ansible introduction](/ansible/) |
 | `cluster/` | Workload desired state composed with Helmfile | [Cluster platform](/engineering/cluster-platform) |
+| `cluster/` | Network boundary, namespace baselines and policy authoring rules | [Network policy design](/engineering/network-policies) |
 | `butler/` | Vault, identity and provider-API control plane | [Butler control plane](/engineering/butler-control-plane) |
 | `infra/` | Optional future Hetzner infrastructure planning | [Hetzner and Tailscale](/future/hetzner-tailscale) |
 | `docs/` | This isolated VitePress handbook and Nginx image | [Documentation system](/documentation/hosting) |
