@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -74,32 +75,48 @@ func TestReadyz_NoToken(t *testing.T) {
 	}
 }
 
-func TestOperatorConsoleAssetsAndRecoveryBoundary(t *testing.T) {
+func TestRootReturnsPlainTextPointer(t *testing.T) {
 	srv := newTestServer(t, "tok")
 
-	page := httptest.NewRecorder()
-	srv.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/", nil))
-	if page.Code != http.StatusOK {
-		t.Fatalf("page status = %d", page.Code)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
 	}
-	for _, expected := range []string{"Butler operator console", "Exceptional actions", "homelabctl control recovery ui"} {
-		if !bytes.Contains(page.Body.Bytes(), []byte(expected)) {
-			t.Fatalf("operator console omitted %q", expected)
+	if contentType := rec.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/plain") {
+		t.Fatalf("Content-Type = %q, want text/plain", contentType)
+	}
+	if rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("Cache-Control = %q", rec.Header().Get("Cache-Control"))
+	}
+	if rec.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("X-Content-Type-Options = %q", rec.Header().Get("X-Content-Type-Options"))
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "homelabctl control") || !strings.Contains(body, "/api/v1") {
+		t.Fatalf("pointer = %q, want homelabctl and API guidance", body)
+	}
+	for _, forbidden := range []string{"<html", "<script", "<style", "/assets/", "/auth/login"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("pointer contains browser surface %q", forbidden)
 		}
 	}
-	for _, forbidden := range []string{"/api/v1/bootstrap/advance", "pocket-id-api-key"} {
-		if bytes.Contains(page.Body.Bytes(), []byte(forbidden)) {
-			t.Fatalf("normal console contains recovery action %q", forbidden)
-		}
-	}
-	if page.Header().Get("Content-Security-Policy") == "" {
-		t.Fatal("operator console omitted Content-Security-Policy")
-	}
+}
 
-	asset := httptest.NewRecorder()
-	srv.ServeHTTP(asset, httptest.NewRequest(http.MethodGet, "/assets/butler.js", nil))
-	if asset.Code != http.StatusOK || asset.Header().Get("Content-Type") != "text/javascript; charset=utf-8" {
-		t.Fatalf("asset status = %d, content type = %q", asset.Code, asset.Header().Get("Content-Type"))
+func TestBrowserSurfacesAreNotServed(t *testing.T) {
+	srv := newTestServer(t, "tok")
+	for _, path := range []string{"/assets/butler.css", "/assets/butler.js", "/auth/login", "/auth/callback"} {
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		contentType := rec.Header().Get("Content-Type")
+		for _, browserType := range []string{"text/html", "text/css", "text/javascript", "application/javascript"} {
+			if strings.HasPrefix(contentType, browserType) {
+				t.Fatalf("%s served %s", path, contentType)
+			}
+		}
+		if rec.Code == http.StatusOK && !strings.HasPrefix(contentType, "text/plain") {
+			t.Fatalf("%s status = %d, content type = %q", path, rec.Code, contentType)
+		}
 	}
 }
 

@@ -34,6 +34,37 @@ func TestExtractBearer(t *testing.T) {
 	}
 }
 
+func TestExtractBearerIgnoresCookies(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.AddCookie(&http.Cookie{Name: "butler_session", Value: "cookie-token"})
+	if got := extractBearer(r); got != "" {
+		t.Fatalf("extractBearer() = %q, want no cookie fallback", got)
+	}
+}
+
+func TestWrapRejectsCookieOnlyRequest(t *testing.T) {
+	// Regression guard: the API is bearer-only. A request authenticated only by
+	// the removed butler_session cookie must never reach a handler.
+	auth, err := NewAuthMiddleware(t.Context(), "https://issuer.example.test", "butler", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	handler := auth.Wrap(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called = true
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
+	req.AddCookie(&http.Cookie{Name: "butler_session", Value: "cookie-token"})
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", recorder.Code)
+	}
+	if called {
+		t.Fatal("handler ran for a cookie-only request")
+	}
+}
+
 func TestRequireEnforcesRoleHierarchy(t *testing.T) {
 	srv := &Server{auth: nil}
 	handler := srv.require(access.Admin, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

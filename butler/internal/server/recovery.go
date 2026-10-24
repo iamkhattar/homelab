@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	_ "embed"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -21,13 +20,10 @@ type RecoveryServer struct {
 	service *recovery.Service
 }
 
-//go:embed ui/recovery.html
-var recoveryUI []byte
-
 func NewRecovery(auth RecoveryAuthorizer, service *recovery.Service) *RecoveryServer {
 	s := &RecoveryServer{mux: http.NewServeMux(), auth: auth, service: service}
 	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
-	s.mux.HandleFunc("GET /", s.handleUI)
+	s.mux.HandleFunc("GET /", s.handleRoot)
 	s.mux.Handle("GET /api/v1/recovery/status", s.protected(http.HandlerFunc(s.handleStatus)))
 	s.mux.Handle("POST /api/v1/bootstrap/advance", s.protected(http.HandlerFunc(s.handleAdvance)))
 	s.mux.Handle("PUT /api/v1/bootstrap/pocket-id-api-key", s.protected(http.HandlerFunc(s.handlePocketIDAPIKey)))
@@ -109,12 +105,11 @@ func (s *RecoveryServer) protected(next http.Handler) http.Handler {
 	})
 }
 
-func (s *RecoveryServer) handleUI(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	_, _ = w.Write(recoveryUI)
+// handleRoot answers the unauthenticated root path with a plain-text pointer.
+// The recovery runtime serves only its JSON API; any operation that transports
+// secret material stays in homelabctl.
+func (s *RecoveryServer) handleRoot(w http.ResponseWriter, _ *http.Request) {
+	writePlainPointer(w, "butler recovery plane; use homelabctl control recovery; API is under /api/v1")
 }
 
 func (s *RecoveryServer) handleStatus(w http.ResponseWriter, r *http.Request) {

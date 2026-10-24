@@ -186,12 +186,11 @@ kubectl -n security rollout status deployment/butler-recovery
 homelabctl control recovery
 ```
 
-For interactive break-glass inspection, use
-`homelabctl control recovery ui`. It opens the same non-ingressed recovery API
-through a loopback-only proxy and keeps the Kubernetes token in CLI memory.
-Close it with Ctrl-C. Prefer the ordinary command output during routine
-bootstrap; the browser surface exists for deliberate recovery work, not as a
-second daily dashboard.
+The recovery plane is CLI-only: every break-glass action, including Vault
+recovery export and any operation that transports secret material, runs through
+`homelabctl control` and never through a browser surface. Prefer the ordinary
+command output during routine bootstrap; the recovery commands exist for
+deliberate recovery work, not as a second daily dashboard.
 
 The recovery command creates a ten-minute audience-bound token, opens a
 loopback-only port-forward and asks recovery Butler to validate that token with

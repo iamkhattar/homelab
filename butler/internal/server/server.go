@@ -1,7 +1,6 @@
 package server
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,15 +27,6 @@ type Server struct {
 	operations  *operations.Store
 	credentials *access.CredentialService
 }
-
-//go:embed ui/index.html
-var controlPlaneUI []byte
-
-//go:embed ui/app.css
-var controlPlaneCSS []byte
-
-//go:embed ui/app.js
-var controlPlaneJS []byte
 
 // New creates a new Server. If auth is nil, JWT protection is disabled.
 func New(scheduler *reconciler.Scheduler, vc *vault.Client, auth *AuthMiddleware) *Server {
@@ -67,14 +57,7 @@ func (s *Server) routes() {
 	// Unauthenticated.
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
 	s.mux.HandleFunc("GET /readyz", s.handleReadyz)
-	s.mux.HandleFunc("GET /assets/butler.css", s.handleUIAsset("text/css; charset=utf-8", controlPlaneCSS))
-	s.mux.HandleFunc("GET /assets/butler.js", s.handleUIAsset("text/javascript; charset=utf-8", controlPlaneJS))
-	s.mux.HandleFunc("GET /", s.handleUI)
-	if s.auth != nil {
-		s.mux.HandleFunc("GET /auth/login", s.auth.Login)
-		s.mux.HandleFunc("GET /auth/callback", s.auth.Callback)
-		s.mux.HandleFunc("POST /auth/logout", s.auth.Logout)
-	}
+	s.mux.HandleFunc("GET /", s.handleRoot)
 
 	// Authenticated.
 	s.mux.Handle("GET /api/v1/me", s.require(access.Viewer, http.HandlerFunc(s.handleMe)))
@@ -118,21 +101,20 @@ func (s *Server) handleKubernetesCredential(w http.ResponseWriter, r *http.Reque
 	respondCode(w, http.StatusCreated, credential, err)
 }
 
-func (s *Server) handleUI(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	_, _ = w.Write(controlPlaneUI)
+// handleRoot answers the unauthenticated root path with a plain-text pointer.
+// Butler serves no browser application; the JSON API and homelabctl are the
+// only control surfaces.
+func (s *Server) handleRoot(w http.ResponseWriter, _ *http.Request) {
+	writePlainPointer(w, "butler control plane; use homelabctl control; API is under /api/v1")
 }
 
-func (s *Server) handleUIAsset(contentType string, content []byte) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", contentType)
-		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		_, _ = w.Write(content)
-	}
+// writePlainPointer writes a non-HTML pointer response with no executable or
+// stylable content.
+func writePlainPointer(w http.ResponseWriter, message string) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	_, _ = w.Write([]byte(message + "\n"))
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

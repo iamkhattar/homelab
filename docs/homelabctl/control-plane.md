@@ -51,27 +51,23 @@ datastore or redeploy the service itself.
 ```text
 homelabctl control
 ├── login|logout
-├── bootstrap|verify-identity|recovery [ui|export]
-├── status|operations|events
+├── bootstrap|verify-identity|recovery [export]
+├── status|operations|events|reconcile
 ├── users|groups|clients
 └── credentials issue
 ```
 
 Use `homelabctl control --help` for the executable reference.
 
-### Browser surfaces
+### API-only control surface
 
-`https://butler.6940469.xyz` is a Pocket ID-authenticated operator console for
-control posture, reconciler drift repair, confidential OIDC client rotation,
-and audit-safe activity. It links to the applications that own routine work;
-it does not duplicate Grafana, Pocket ID, Vault, or Homepage.
-
-`homelabctl control recovery ui` is the separate break-glass surface. The CLI
-mints and retains the Kubernetes recovery token, opens the private recovery
-Service through a port-forward, and injects authentication through a random
-loopback-only proxy. The browser never handles the token. The command ends on
-Ctrl-C or after ten minutes. Recovery export and any operation that transports
-secret material remain CLI-only.
+`https://butler.6940469.xyz` exposes only the Pocket ID-authenticated JSON API
+that `homelabctl control` calls. Butler serves no browser application: there is
+no operator console, no HTML, CSS or JavaScript, and no browser session. The
+break-glass browser console no longer exists, so every recovery action, including
+`homelabctl control recovery`, `control recovery export` and
+`control bootstrap`, is CLI-only. Kubernetes recovery tokens therefore never
+leave CLI memory.
 
 ## Context model
 
