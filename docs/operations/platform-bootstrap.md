@@ -434,6 +434,25 @@ A `403` from Vault naming `kubernetes/creds/k8sadmin` means your Pocket ID
 account is not in `k8sadmin`; it is not a Butler or Vault availability
 problem.
 
+The Vault CLI needs its own token, which `homelabctl credentials` does not
+provide. The auth method is mounted at `auth/jwt`, not at the conventional
+`oidc` path, so the mount must be named explicitly:
+
+```bash
+export VAULT_ADDR=https://vault.6940469.xyz
+vault login -method=oidc -path=jwt role=vaultadmin
+```
+
+Omitting `-path` targets a mount called `oidc`, which does not exist, and Vault
+answers `403 permission denied` for that unknown path rather than a helpful
+error. The role is the Pocket ID group name, exactly as `homelabctl credentials`
+takes it. In the Vault UI the same flow is the `JWT` method. Set **Mount path** to
+`jwt` explicitly: it defaults to `oidc`, a mount that does not exist here, and
+Vault reports that as `Error fetching role: permission denied` rather than a
+missing-mount error. The registered redirect URI is
+`/ui/vault/auth/jwt/oidc/callback`, so the default path would also fail at
+Pocket ID. Select the role that matches a group you belong to.
+
 Once recovery is `operational`, treat the bootstrap ceremony as finished.
 The next required work is to export `butler-vault-init` to age-encrypted
 off-cluster storage, verify a disposable decrypt, and complete the K3s

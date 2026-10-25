@@ -183,7 +183,7 @@ group, so `butleradmin` does not imply cluster access.
 | Flag | Default | Boundary |
 | --- | --- | --- |
 | `--role` | `k8sviewer` | Exactly `k8sadmin`, `k8soperator` or `k8sviewer`; anything else is rejected before the browser opens |
-| `--namespace` | `security` | Kubernetes namespace for the minted credential |
+| `--namespace` | `kube-system` | Namespace holding the Vault-managed service account the credential is minted for; the credential itself is cluster-wide |
 | `--ttl` | `1h` | Positive and at most `8h`; Vault enforces the engine role's own maximum |
 | `--format` | `kubeconfig` | `kubeconfig` or `token` |
 | `--output` | stdout | Writes a mode-0600 file instead; nothing is written to disk otherwise |
