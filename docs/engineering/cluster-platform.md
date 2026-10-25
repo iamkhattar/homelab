@@ -86,9 +86,14 @@ consumer's chart declares a `VaultDatabaseRole`. Butler configures Vault's
 `database/` secrets engine from the PostgreSQL admin credential, then writes
 `database/static-roles/<consumer>`. Vault imports the role, rotates the
 password once to learn it, and leaves it alone for the declared period. VSO
-reads `database/static-creds/<consumer>`, projects `username` and `password`,
-and composes the connection string in a template, so no `*-url` key exists in
-Vault.
+reads `database/static-creds/<consumer>` through a `VaultDynamicSecret` that
+sets `allowStaticCreds: true` — without it VSO waits for a lease that a static
+role never returns — and `refreshAfter` re-reads the same credential on a timer
+instead of leasing it. The destination is a projected Secret whose template
+composes the whole connection string into a single key,
+`DB_CONNECTION_STRING`; the transformation excludes the raw `username` and
+`password`, so no `url` key exists in Vault or in the Secret. Read
+`.data.DB_CONNECTION_STRING`, not `.data.url`.
 
 The only database credential in KV is therefore `postgres-password`, which
 Vault itself needs to open the connection. Pocket ID is currently the only
@@ -103,11 +108,23 @@ same password; it does not rotate. Rotation is a deliberate operator action:
 vault write -f database/rotate-role/pocketid
 ```
 
+Butler owns the rotation statement, so a chart cannot inject SQL. Two details
+each cost a failed bootstrap when forgotten. PostgreSQL takes
+`PASSWORD 'value'` with no equals sign — `PASSWORD='value'` fails with SQLSTATE
+42601 — and Vault's `rotation_statements` parameter is a comma-separated string,
+not a JSON array; sending a list serialises into malformed SQL and PostgreSQL
+answers `syntax error at or near "="`. Butler always writes the literal
+`ALTER USER "{{name}}" WITH PASSWORD '{{password}}'` and repairs a static role
+whose stored statement differs.
+
 VSO observes the new password and restarts Pocket ID through its
 `rolloutRestartTargets`. Rotation is also required after restoring or rebuilding
 the PostgreSQL volume: the recreated role has no password, while Vault still
 holds the old one. Break-glass access is host access, then `psql` on
-`postgresql-0` in the `databases` namespace.
+`postgresql-0` in the `databases` namespace. The instance requires
+`scram-sha-256` even on the local socket, so every `psql` check must carry
+`PGPASSWORD` read from `postgresql-credentials`; see
+[reading PostgreSQL directly](/operations/platform-bootstrap#reading-postgresql-directly).
 
 The provisioning Job is idempotent and runs on install and upgrade: it checks
 `pg_roles` and `pg_database` before creating anything and never sets a
@@ -132,9 +149,24 @@ is not an off-node backup.
 
 These contracts are Kubernetes APIs, not entries in Butler's ConfigMap. Each
 chart owns its `ManagedCredential` and `PocketIDClient` resources beside the
-`VaultStaticSecret` that consumes the resulting path. The separate
-`butler-crds` foundation release makes the types available before any consumer
-release is rendered or applied.
+VSO resource that consumes the result: `VaultStaticSecret` for a KV path,
+`VaultDynamicSecret` for a database static role. The separate `butler-crds`
+foundation release makes the types available, and because `helmfile diff`
+renders the whole selection before anything syncs, that release must be applied
+before a stage that adds or consumes a new kind.
+
+### Known follow-up: application database declarations
+
+The `kitchenowl`, `paperless-ngx` and `vaultwarden` charts still declare a
+`ManagedCredential` whose `sourceRef` reads a key that the PostgreSQL prune
+deleted from `databases/postgresql`: `kitchenowl-password`,
+`paperless-password` and `vaultwarden-url` no longer exist. Butler reports
+`source databases/postgresql is missing key ...` and leaves those credentials
+`Ready=False`, so none of the three can be deployed as written. Each must adopt
+the static-role pattern above — a provisioning entry, a `VaultDatabaseRole` and
+a `VaultDynamicSecret` that composes its own connection string — before its
+stage is applied. Restoring the deleted keys to make the declarations converge
+would bring back the shared-password design this change removed.
 
 ## Identity and cluster access
 
@@ -194,6 +226,12 @@ path; see [the decisions log](/project/decisions).
 Services remain `ClusterIP`. A DNS name in values is an intended canonical URL,
 not permission to expose the service. Add ingress only after TLS, Pocket ID and
 the application's callback/logout behaviour pass an end-to-end test.
+
+The KitchenOwl, Vaultwarden and Paperless-ngx database entries above are intent,
+not working declarations: their `ManagedCredential`s still read pruned KV keys
+and do not converge. See
+[the static-role follow-up](#known-follow-up-application-database-declarations)
+before deploying any of them.
 
 ## Network boundaries
 

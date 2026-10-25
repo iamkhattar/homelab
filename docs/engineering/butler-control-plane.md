@@ -353,11 +353,16 @@ separately from `missing` declarations, because a reconcile that never ran looks
 identical to a rename from the operator's seat. The report is strictly
 read-only: it never deletes, repairs or writes provider state, returns names and
 kinds rather than secret values, and marks only the provider that failed as
-`unavailable` instead of failing the whole comparison.
+`unavailable` instead of failing the whole comparison. `homelabctl control
+orphans` exits `3` when either list is non-empty and `1` when the report itself
+could not be produced, so a script can gate on drift without treating it as an
+execution failure.
 
 There is deliberately no `ApplicationIntegration`. It duplicated chart
 metadata without driving a provider. A chart now declares only the concrete
-capabilities it consumes, next to its deployment and `VaultStaticSecret`.
+capabilities it consumes beside the Vault resource that consumes them:
+`VaultStaticSecret` for a KV path and `VaultDynamicSecret` for a database static
+role.
 
 ### Ownership and examples
 
