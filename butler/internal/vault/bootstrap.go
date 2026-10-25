@@ -145,13 +145,18 @@ func (c *Client) Bootstrap(ctx context.Context, in BootstrapInput) error {
 	if err := c.ensureKVv2(ctx); err != nil {
 		return err
 	}
-	if err := c.ensureDatabaseEngine(ctx, in.Database); err != nil {
-		return err
-	}
+	// The database engine is configured last of the foundations, because
+	// configuring it needs the butler policy that ensureButlerAuth writes.
+	// Ordering it before that step deadlocks an upgrade: the write is denied,
+	// Bootstrap aborts, and the policy that would have permitted it is never
+	// written. A fresh bootstrap uses the root token and hides the problem.
 	if err := c.ensureKubernetesAuth(ctx); err != nil {
 		return err
 	}
 	if err := c.ensureButlerAuth(ctx, in); err != nil {
+		return err
+	}
+	if err := c.ensureDatabaseEngine(ctx, in.Database); err != nil {
 		return err
 	}
 	if err := c.ensurePolicy(ctx); err != nil {
