@@ -54,10 +54,14 @@ datastore or redeploy the service itself.
 ```text
 homelabctl control
 ├── login|logout
-├── bootstrap|verify-identity|recovery [export]
-├── status|operations|events|reconcile
+├── bootstrap|verify-identity
+├── recovery [export]|certificate [status|verify-dns]
+├── status|operations|events|reconcile|orphans
 └── users|groups|clients
 ```
+
+`control orphans` is a read-only provider-drift report; it exits `3` when
+anything is orphaned or missing and never repairs what it finds.
 
 `homelabctl credentials` is a top-level command because it talks to Vault, not
 to Butler.

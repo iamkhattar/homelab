@@ -101,6 +101,34 @@ the safe default. Later stages are refused until Butler records successful
 Pocket ID authentication to both Butler and Vault. The individual stage
 commands below remain useful for inspection and recovery.
 
+### Apply the CRD-bearing release before the diff
+
+`helmfile diff` renders every selected release before any release syncs. When a
+selection pairs a release that introduces a CRD with a release that uses that
+kind, the render fails before anything is applied:
+
+```text
+no matches for kind "ManagedCredential" in version "platform.6940469.xyz/v1alpha1"
+ensure CRDs are installed first
+```
+
+This is not an apply-order bug and re-running the same command does not fix it.
+`--skip-diff-validation-on-install` does not cover it either: that relaxation
+exempts a *new* release, while this failure comes from rendering an installed
+release against a kind the API server does not have yet. Apply the CRD-bearing
+release by name first, then diff and apply the stage:
+
+```bash
+homelabctl deploy apply butler-crds
+homelabctl deploy diff --stage identity
+homelabctl deploy apply --stage identity
+```
+
+The same ordering applies to `cert-manager` before `public-certificates`, and to
+any later chart that adds a `platform.6940469.xyz` kind. This has already caused
+three separate failed deployments; treat it as the opening step of any stage
+that introduces a CRD rather than as a workaround.
+
 ## 1. Foundation
 
 ```bash
@@ -361,10 +389,28 @@ vault write -f database/rotate-role/pocketid
 ```
 
 A pod restart re-reads the same password. Only `rotate-role` changes it, and
-VSO restarts Pocket ID through `rolloutRestartTargets`. If Pocket ID cannot
-start and the credential is suspect, break-glass is host access and then
-`psql` on `postgresql-0` in the `databases` namespace; do not edit the shared
-KV document.
+VSO restarts Pocket ID through `rolloutRestartTargets`. Do not edit the shared
+KV document to repair a credential.
+
+### Reading PostgreSQL directly
+
+Break-glass is host access, then `psql` on `postgresql-0` in the `databases`
+namespace. The instance requires `scram-sha-256` even on the local socket, so an
+unqualified `psql -U postgres` prompts for a password and fails
+non-interactively. Every check needs `PGPASSWORD`:
+
+```bash
+PGPW=$(kubectl -n databases get secret postgresql-credentials \
+  -o jsonpath='{.data.postgres-password}' | base64 -d)
+kubectl -n databases exec postgresql-0 -c postgresql -- \
+  env PGPASSWORD="$PGPW" psql -U postgres -c '\dt'
+```
+
+Replace the query, never the wrapper: `\l`, `\du` and an ad-hoc `-c` query all
+need the same `env PGPASSWORD=... psql` invocation, and `pg_dump` needs the same
+`PGPASSWORD` in its environment. Without it `psql` either prompts and fails
+non-interactively or rejects the connection with an authentication error that
+wrongly suggests the stored password is wrong.
 
 Uploads such as logos and profile pictures use `FILE_BACKEND=database`, so they
 live in PostgreSQL too. The persistent volume keeps only the re-downloadable
@@ -527,6 +573,40 @@ Vault reports that as `Error fetching role: permission denied` rather than a
 missing-mount error. The registered redirect URI is
 `/ui/vault/auth/jwt/oidc/callback`, so the default path would also fail at
 Pocket ID. Select the role that matches a group you belong to.
+
+### Vault access when Pocket ID is down
+
+Every Vault login above depends on Pocket ID, so an identity outage is also a
+Vault login outage: the browser flow cannot redirect, and `vault login
+-method=oidc` fails at discovery. The path that does not touch Pocket ID is
+Kubernetes auth with a ServiceAccount token:
+
+```bash
+export VAULT_ADDR=https://vault.6940469.xyz
+export VAULT_TOKEN=$(vault write -field=token auth/kubernetes/login \
+  role=butler \
+  jwt="$(kubectl -n security create token butler --duration=30m --audience=vault)")
+```
+
+The `butler` auth role binds `bound_audiences: ["vault"]`, the same audience
+Butler's own projected token requests, so the token must ask for it; a default
+`kubectl create token` token carries the API-server audience and Vault rejects
+the login.
+
+This needs cluster access, and that is the intended break-glass boundary rather
+than a way around it. If `kubectl` works you already hold cluster authority, so
+the login adds Vault visibility to authority you have, and it is bounded by the
+`butler` policy. It is a diagnostic path for an identity outage, not a second
+daily login.
+
+Do **not** use `role=butler-recovery` for routine reads. That role exists only
+for the recovery runtime's bootstrap writes: its policy covers four KV documents
+(`security/pocket-id`, `infrastructure/acme-dns`, `oauth/homelabctl`,
+`oauth/vault`), `auth/jwt/role/*` and `sys/health`, and its role TTL is ten
+minutes. Using it for general inspection destroys the distinction between normal
+and recovery authority. If a read is not permitted with `role=butler`, the answer
+is to wait for Pocket ID to return or to use the documented recovery command, not
+to escalate the role.
 
 Once recovery is `operational`, treat the bootstrap ceremony as finished.
 The next required work is to export `butler-vault-init` to age-encrypted

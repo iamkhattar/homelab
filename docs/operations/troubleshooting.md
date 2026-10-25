@@ -170,6 +170,33 @@ Deploy the reviewed Vault chart if the Ingress is absent, then repeat
 wildcard certificate and the existing Vault Service. Do not delete Vault's PVC
 or modify `auth/jwt` to repair an ingress-routing failure.
 
+## Vault login fails while Pocket ID is down
+
+Vault's browser flow and `vault login -method=oidc` both resolve through Pocket
+ID, so an identity outage is also a Vault login outage. The path that does not
+depend on Pocket ID is Kubernetes auth with a ServiceAccount token; the exact
+commands, the required `vault` audience and the `butler-recovery` warning are in
+[Vault access when Pocket ID is down](/operations/platform-bootstrap#vault-access-when-pocket-id-is-down).
+
+Do not treat this as a reason to disable Vault's OIDC mount or to add a second
+network path to the Vault UI. Restore Pocket ID, then log in normally.
+
+## Diff fails with `no matches for kind`
+
+A diff that stops with `no matches for kind ... ensure CRDs are installed first`
+means the selected releases pair a CRD with a consumer of that kind, and
+`helmfile diff` renders the whole selection before anything syncs. Apply the
+CRD-bearing release first, then the stage:
+
+```bash
+homelabctl deploy apply butler-crds
+homelabctl deploy diff --stage identity
+```
+
+See [apply the CRD-bearing release before the diff](/operations/platform-bootstrap#apply-the-crd-bearing-release-before-the-diff).
+Re-running the original command cannot clear it, and nothing was applied, so
+there is no partial release to uninstall.
+
 ## Upgrade fails
 
 Stop and preserve evidence. Do not repeatedly reset or reinstall K3s. Record:
