@@ -446,8 +446,12 @@ vault login -method=oidc -path=jwt role=vaultadmin
 Omitting `-path` targets a mount called `oidc`, which does not exist, and Vault
 answers `403 permission denied` for that unknown path rather than a helpful
 error. The role is the Pocket ID group name, exactly as `homelabctl credentials`
-takes it. In the Vault UI the same flow is the `JWT` method, and the role
-selected there must match a group you belong to.
+takes it. In the Vault UI the same flow is the `JWT` method. Set **Mount path** to
+`jwt` explicitly: it defaults to `oidc`, a mount that does not exist here, and
+Vault reports that as `Error fetching role: permission denied` rather than a
+missing-mount error. The registered redirect URI is
+`/ui/vault/auth/jwt/oidc/callback`, so the default path would also fail at
+Pocket ID. Select the role that matches a group you belong to.
 
 Once recovery is `operational`, treat the bootstrap ceremony as finished.
 The next required work is to export `butler-vault-init` to age-encrypted
