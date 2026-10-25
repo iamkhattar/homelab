@@ -15,10 +15,11 @@ import (
 )
 
 // databaseRotationStatement is the SQL Vault runs when it learns or rotates a
-// static role's password. Vault's database engine takes rotation_statements as
+// static role's password. PostgreSQL takes PASSWORD 'value' with no equals
+// sign; PASSWORD='value' is a syntax error (SQLSTATE 42601). Vault's database engine takes rotation_statements as
 // a comma-separated string, not a JSON array: sending a slice serialises into
 // malformed SQL and PostgreSQL rejects it with `syntax error at or near "="`.
-const databaseRotationStatement = `ALTER USER "{{name}}" WITH PASSWORD='{{password}}'`
+const databaseRotationStatement = `ALTER USER "{{name}}" WITH PASSWORD '{{password}}'`
 
 const (
 	// databaseConnectionName is the Vault database connection Butler writes at

@@ -59,7 +59,7 @@ func TestVaultDatabaseRolesWritesDeclaredStaticRole(t *testing.T) {
 	// Vault's database engine takes rotation_statements as a comma-separated
 	// string. A JSON array serialises into malformed SQL that PostgreSQL
 	// rejects with `syntax error at or near "="`.
-	wantStatements := `ALTER USER "{{name}}" WITH PASSWORD='{{password}}'`
+	wantStatements := `ALTER USER "{{name}}" WITH PASSWORD '{{password}}'`
 	if got, _ := body["rotation_statements"].(string); got != wantStatements {
 		t.Errorf("rotation_statements = %q, want %q", got, wantStatements)
 	}
@@ -110,7 +110,7 @@ func TestVaultDatabaseRolesLeavesMatchingRoleAlone(t *testing.T) {
 		case method == http.MethodGet && path == "database/static-roles/example-app":
 			// Vault reports the period in seconds. A converged role must not be
 			// rewritten on every reconcile pass.
-			return http.StatusOK, []byte(`{"data":{"db_name":"postgresql","username":"example-app","rotation_statements":["ALTER USER \"{{name}}\" WITH PASSWORD='{{password}}'"],"rotation_period":315360000}}`)
+			return http.StatusOK, []byte(`{"data":{"db_name":"postgresql","username":"example-app","rotation_statements":["ALTER USER \"{{name}}\" WITH PASSWORD '{{password}}'"],"rotation_period":315360000}}`)
 		}
 		return http.StatusOK, []byte(`{}`)
 	}, log)
