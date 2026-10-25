@@ -233,6 +233,50 @@ func TestManagedCredentialsRequiresPathAndFields(t *testing.T) {
 	}
 }
 
+func TestManagedCredentialsPrunesUndeclaredFieldsOnlyWhenDeclared(t *testing.T) {
+	t.Parallel()
+	vault := newVaultFixture()
+	// The legacy shared document contained every application password and an
+	// init script. Prune must delete those while preserving the admin value.
+	vault.secrets["databases/postgresql"] = map[string]any{
+		"postgres-password": "keep-this",
+		"legacy-password":   "remove-this",
+		"init.sql":          "remove-this-too",
+	}
+	credential := credentialCR("databases", "postgresql", "databases/postgresql", map[string]any{
+		"postgres-password": generatedField(32),
+	})
+	credential.Object["spec"].(map[string]interface{})["prune"] = true
+
+	store := newPlatformStore(credential)
+	vc := newVaultServer(t, vault.handler, &callLog{})
+	if err := NewManagedCredentials(vc, store).Reconcile(context.Background()); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+
+	written := vault.secrets["databases/postgresql"]
+	if got, _ := written["postgres-password"].(string); got != "keep-this" {
+		t.Fatalf("declared value was rotated: %q", got)
+	}
+	for _, key := range []string{"legacy-password", "init.sql"} {
+		if _, ok := written[key]; ok {
+			t.Errorf("undeclared key %q survived a pruning reconcile", key)
+		}
+	}
+
+	// Without prune, the same declaration preserves the old keys.
+	vault.secrets["databases/postgresql"] = map[string]any{"postgres-password": "keep-this", "legacy-password": "still-here"}
+	store = newPlatformStore(credentialCR("databases", "postgresql", "databases/postgresql", map[string]any{
+		"postgres-password": generatedField(32),
+	}))
+	if err := NewManagedCredentials(vc, store).Reconcile(context.Background()); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if _, ok := vault.secrets["databases/postgresql"]["legacy-password"]; !ok {
+		t.Fatal("an undeclared key was pruned without prune: true")
+	}
+}
+
 func TestManagedCredentialsNeverPersistsValuesIntoStatus(t *testing.T) {
 	t.Parallel()
 	vault := newVaultFixture()

@@ -1,0 +1,19 @@
+# Pocket ID is the only database consumer with a stable schema it migrates
+# itself. A dynamic role would create the tables as an ephemeral user, so
+# revocation would fail or drop the schema. The static role learns the password
+# once on import and then keeps it; rotation is deliberate:
+#   vault write -f database/rotate-role/pocketid
+#
+# The passwordless PostgreSQL role and database are created by the PostgreSQL
+# chart's provisioning Job.
+apiVersion: platform.6940469.xyz/v1alpha1
+kind: VaultDatabaseRole
+metadata:
+  name: pocketid
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  database: pocketid
+  rotationPeriod: 87600h

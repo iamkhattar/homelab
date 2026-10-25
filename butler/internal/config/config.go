@@ -46,6 +46,39 @@ type Config struct {
 type VaultConfig struct {
 	Address        string                    `yaml:"address"`
 	KubernetesAuth VaultKubernetesAuthConfig `yaml:"kubernetesAuth"`
+	Database       DatabaseConfig            `yaml:"database"`
+}
+
+// DatabaseConfig configures the Vault database secrets engine for the shared
+// PostgreSQL instance. The admin credential stays in KV because Vault needs it
+// to connect; application credentials are static roles with a long rotation
+// period.
+type DatabaseConfig struct {
+	Enabled         bool   `yaml:"enabled"`
+	Mount           string `yaml:"mount"`
+	ConnectionName  string `yaml:"connectionName"`
+	Address         string `yaml:"address"`
+	AdminUsername   string `yaml:"adminUsername"`
+	AdminSecretPath string `yaml:"adminSecretPath"`
+	AdminSecretKey  string `yaml:"adminSecretKey"`
+}
+
+func (d *DatabaseConfig) applyDefaults() {
+	if d.Mount == "" {
+		d.Mount = "database"
+	}
+	if d.ConnectionName == "" {
+		d.ConnectionName = "postgresql"
+	}
+	if d.AdminUsername == "" {
+		d.AdminUsername = "postgres"
+	}
+	if d.AdminSecretPath == "" {
+		d.AdminSecretPath = "databases/postgresql"
+	}
+	if d.AdminSecretKey == "" {
+		d.AdminSecretKey = "postgres-password"
+	}
 }
 
 // VaultKubernetesAuthConfig controls Butler's post-bootstrap identity and the
@@ -158,6 +191,7 @@ func Load() (*Config, error) {
 	}
 
 	cfg.Vault.Address = envOr("VAULT_ADDR", cfg.Vault.Address)
+	cfg.Vault.Database.applyDefaults()
 	cfg.Server.Port = envOr("SERVER_PORT", cfg.Server.Port)
 	cfg.OIDC.Issuer = envOr("OIDC_ISSUER", cfg.OIDC.Issuer)
 	cfg.Namespace = envOr("NAMESPACE", "security")
@@ -182,6 +216,17 @@ func Load() (*Config, error) {
 // Validate rejects incomplete API-managed declarations before Butler starts a
 // reconciliation loop that can never converge.
 func (c *Config) Validate() error {
+	if c.Vault.Database.Enabled {
+		if c.Vault.Database.Address == "" {
+			return fmt.Errorf("vault.database.address is required when the database engine is enabled")
+		}
+		if c.Vault.Database.AdminUsername == "" || c.Vault.Database.AdminSecretPath == "" || c.Vault.Database.AdminSecretKey == "" {
+			return fmt.Errorf("vault.database admin username, secret path, and secret key are required when the database engine is enabled")
+		}
+		if c.Vault.Database.Mount == "" || c.Vault.Database.ConnectionName == "" {
+			return fmt.Errorf("vault.database mount and connectionName must not be empty")
+		}
+	}
 	if c.Certificates.Domain == "" || c.Certificates.CredentialPath == "" || c.Certificates.Namespace == "" || c.Certificates.CertificateName == "" || c.Certificates.TLSSecretName == "" {
 		return fmt.Errorf("certificates domain, credentialPath, namespace, certificateName, and tlsSecretName are required")
 	}

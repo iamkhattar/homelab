@@ -1,0 +1,83 @@
+{{- if and .Values.provisioning.enabled .Values.provisioning.consumers }}
+# Idempotent role and database provisioning for database consumers. It runs on
+# install and upgrade, waits for the Vault-projected admin credential, and
+# creates only passwordless roles/databases. Vault's static role owns the
+# password.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-database-provisioning
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: database-provisioning
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 10
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: database-provisioning
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: provision
+          image: "docker.io/bitnami/postgresql@{{ .Values.postgresql.image.digest }}"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+          command: ["/bin/bash", "-ec"]
+          args:
+            - |
+              until [ -s /vault-credentials/postgres-password ]; do
+                echo "waiting for the Vault-projected admin credential"
+                sleep 2
+              done
+              export PGPASSWORD="$(cat /vault-credentials/postgres-password)"
+              export PGHOST="{{ .Release.Name }}.{{ .Release.Namespace }}.svc.cluster.local"
+              export PGUSER="{{ .Values.provisioning.adminUsername }}"
+              export PGDATABASE="{{ .Values.provisioning.adminDatabase }}"
+              until /opt/bitnami/postgresql/bin/psql -c 'SELECT 1' >/dev/null 2>&1; do
+                echo "waiting for PostgreSQL"
+                sleep 5
+              done
+              for db in {{ join " " .Values.provisioning.consumers | quote }}; do
+                echo "provisioning role and database $db"
+                /opt/bitnami/postgresql/bin/psql -v ON_ERROR_STOP=1 -v db="$db" <<'SQL'
+              SELECT format('CREATE ROLE %I LOGIN', :'db')
+              WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'db')\gexec
+              SELECT format('CREATE DATABASE %I OWNER %I', :'db', :'db')
+              WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'db')\gexec
+              SQL
+              done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: credentials
+              mountPath: /vault-credentials
+              readOnly: true
+      volumes:
+        - name: credentials
+          secret:
+            secretName: postgresql-credentials
+            optional: true
+{{- end }}

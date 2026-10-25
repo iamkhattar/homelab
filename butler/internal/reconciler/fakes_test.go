@@ -142,11 +142,12 @@ func newPlatformStoreClient(objs ...runtime.Object) (*platform.Store, *dynamicfa
 	client := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(
 		runtime.NewScheme(),
 		map[schema.GroupVersionResource]string{
-			platform.PocketIDClientGVR: "PocketIDClientList",
-			platform.PocketIDGroupGVR:  "PocketIDGroupList",
-			platform.CredentialGVR:     "ManagedCredentialList",
-			platform.GarageBucketGVR:   "GarageBucketList",
-			platform.VaultOIDCRoleGVR:  "VaultOIDCRoleList",
+			platform.PocketIDClientGVR:    "PocketIDClientList",
+			platform.PocketIDGroupGVR:     "PocketIDGroupList",
+			platform.CredentialGVR:        "ManagedCredentialList",
+			platform.GarageBucketGVR:      "GarageBucketList",
+			platform.VaultOIDCRoleGVR:     "VaultOIDCRoleList",
+			platform.VaultDatabaseRoleGVR: "VaultDatabaseRoleList",
 		},
 		objs...,
 	)

@@ -315,7 +315,7 @@ Timer-driven and operator-triggered reconciliations are serialized because
 provider creation and one-time secret responses are unsafe to race.
 
 Butler also watches `PocketIDClient`, `PocketIDGroup`, `ManagedCredential`,
-`GarageBucket` and `VaultOIDCRole` resources. Creates, deletes and spec-generation changes send a
+`GarageBucket`, `VaultOIDCRole` and `VaultDatabaseRole` resources. Creates, deletes and spec-generation changes send a
 coalesced immediate trigger to that same serialized scheduler; Butler's own
 status updates do not retrigger it. The one-minute timer is a drift-repair
 resync for missed events rather than the normal convergence path. Garage is
@@ -334,6 +334,7 @@ The `platform.6940469.xyz/v1alpha1` API group is installed by the standalone
 | `ManagedCredential` | Namespaced | Generate immutable values, render dependent values, or project selected Vault fields into a consumer-specific path |
 | `GarageBucket` | Namespaced | Create a Garage bucket, key and least-privilege grants, with credentials written directly to Vault |
 | `VaultOIDCRole` | Namespaced | Converge one Vault `auth/jwt/role/<group>` from a declared group and policy set |
+| `VaultDatabaseRole` | Namespaced | Converge one `database/static-roles/<name>` on Vault's database engine, with a long rotation period |
 | `ButlerOperation` | Namespaced | Durable secret-free operation and event journal used by the Butler API |
 
 No secret value is stored in a custom resource or status. Status contains only
@@ -359,17 +360,13 @@ output of a `PocketIDClient` or `GarageBucket`.
 apiVersion: platform.6940469.xyz/v1alpha1
 kind: ManagedCredential
 metadata:
-  name: paperless-database
-  namespace: paperless-ngx
+  name: example-app
+  namespace: example
 spec:
-  vaultPath: applications/paperless-ngx/database
+  vaultPath: applications/example-app
   fields:
-    username:
-      value: paperless
-    password:
-      sourceRef:
-        path: databases/postgresql
-        key: paperless-password
+    app-key:
+      generate: {type: password, length: 32}
 ---
 apiVersion: platform.6940469.xyz/v1alpha1
 kind: PocketIDClient
@@ -386,7 +383,9 @@ spec:
 `ManagedCredential` fields accept exactly one of `generate`, `value`,
 `template`, or `sourceRef`. Generated fields are created only when missing;
 explicit values and projections converge without rotating unrelated fields.
-Templates reference sibling keys as `{{key-name}}`; dependency ordering is
+`prune: true` makes the field list authoritative: keys removed from the
+declaration are deleted from Vault on the next write. Templates reference
+sibling keys as `{{key-name}}`; dependency ordering is
 deterministic and unknown references or cycles fail reconciliation rather than
 being written literally. `PocketIDClient` writes
 `client_id` and, for confidential clients, `client_secret` directly to its
@@ -409,6 +408,7 @@ Inspect reconciliation without reading any secret value:
 ```bash
 kubectl get managedcredentials,pocketidclients,garagebuckets -A
 kubectl get vaultoidcroles -n security
+kubectl get vaultdatabaseroles -A
 kubectl get pocketidgroups
 kubectl describe managedcredential paperless-database -n paperless-ngx
 kubectl get butleroperations -n security
@@ -433,6 +433,31 @@ roles remain, but they configure the *Kubernetes secrets engine* only - the
 `kubernetes/roles/<name>` entry and the ServiceAccount whose token it mints.
 They no longer carry a group or policy list, so human authorization has exactly
 one source of truth.
+
+### Vault owning database static roles
+
+`VaultDatabaseRole` is declared by the consuming chart and names one database
+created without a password by the PostgreSQL chart's provisioning Job. Butler
+configures the `database/` secrets engine from `secret/databases/postgresql`
+and converges the declaration into `database/static-roles/<metadata.name>` with
+`username` equal to that name, a generated rotation statement, and
+`rotationPeriod` (default `87600h`). The rotation statement is
+`ALTER USER "{{name}}" WITH PASSWORD='{{password}}'`; charts cannot supply raw
+SQL.
+
+Butler deliberately does not set `skip_import_rotation`. Vault therefore
+rotates once on import to learn the password, then not again until the period
+elapses. This is not a lease: a pod restart re-reads the same credential. To
+rotate deliberately, run:
+
+```bash
+vault write -f database/rotate-role/<name>
+```
+
+Static roles are used instead of dynamic roles because consumers own their
+migrations. A dynamic user would own the tables it creates, so revocation would
+fail or drop the application schema. The trade accepted is that a leaked static
+password remains valid until an operator rotates it.
 
 CRD schemas are upgraded through the `butler-crds` foundation chart. Do not
 hand-apply copies of the definitions, and do not put provider declarations in

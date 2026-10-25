@@ -115,11 +115,11 @@ func (r *VaultOIDCRoles) ensureRole(ctx context.Context, role *platform.VaultOID
 			return fmt.Errorf("policy %q is not a valid Vault policy name", policy)
 		}
 	}
-	ttl, err := oidcRoleDuration(role.Spec.TTL, defaultOIDCRoleTTL)
+	ttl, err := roleDuration(role.Spec.TTL, defaultOIDCRoleTTL)
 	if err != nil {
 		return fmt.Errorf("ttl: %w", err)
 	}
-	maxTTL, err := oidcRoleDuration(role.Spec.MaxTTL, defaultOIDCRoleMaxTTL)
+	maxTTL, err := roleDuration(role.Spec.MaxTTL, defaultOIDCRoleMaxTTL)
 	if err != nil {
 		return fmt.Errorf("maxTTL: %w", err)
 	}
@@ -247,7 +247,7 @@ func vaultSeconds(raw interface{}) int64 {
 	return -1
 }
 
-func oidcRoleDuration(value, fallback string) (string, error) {
+func roleDuration(value, fallback string) (string, error) {
 	if strings.TrimSpace(value) == "" {
 		value = fallback
 	}

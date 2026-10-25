@@ -10,21 +10,3 @@ spec:
       generate: {type: password, length: 32}
     static-api-key:
       generate: {type: password, length: 48}
----
-# Pocket ID keeps its identity store in PostgreSQL. The password is generated
-# by the PostgreSQL chart, which also creates the role and database, and only
-# this service's own credential is copied into the security namespace.
-apiVersion: platform.6940469.xyz/v1alpha1
-kind: ManagedCredential
-metadata:
-  name: pocket-id-database
-  namespace: {{ .Release.Namespace }}
-spec:
-  vaultPath: security/pocket-id/database
-  fields:
-    username:
-      value: pocketid
-    password:
-      sourceRef: {path: databases/postgresql, key: pocketid-password}
-    url:
-      template: {{ printf "postgresql://pocketid:{{password}}@postgresql.databases.svc.cluster.local:5432/pocketid" | quote }}

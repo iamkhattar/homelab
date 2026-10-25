@@ -5,23 +5,20 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   vaultPath: databases/postgresql
+  # This document used to hold every application password plus init.sql.
+  # Prune makes the declaration authoritative so those removed fields are
+  # deleted on the next reconcile instead of being preserved forever.
+  prune: true
   fields:
+    # Vault needs the PostgreSQL superuser password to open its database
+    # secrets-engine connection and to set or rotate the password on a static
+    # role. This is the only credential that stays in KV.
+    #
+    # Application credentials are no longer generated here. Pocket ID, the only
+    # deployed database consumer, receives a Vault static role declared beside
+    # its own chart; its passwordless PostgreSQL role and database are created
+    # by this chart's provisioning Job. If another consumer is added it must
+    # declare its own VaultDatabaseRole and provisioning entry rather than a
+    # password in this document.
     postgres-password:
       generate: {type: password, length: 32}
-    kitchenowl-password:
-      generate: {type: password, length: 32}
-    paperless-password:
-      generate: {type: password, length: 32}
-    vaultwarden-password:
-      generate: {type: password, length: 32}
-    # Pocket ID keeps its identity store in PostgreSQL rather than SQLite, so
-    # its role and database are created here with the same generated password
-    # every other consumer receives.
-    pocketid-password:
-      generate: {type: password, length: 32}
-    vaultwarden-url:
-      template: {{ printf "postgresql://vaultwarden:{{vaultwarden-password}}@postgresql.databases.svc.cluster.local:5432/vaultwarden" | quote }}
-    pocketid-url:
-      template: {{ printf "postgresql://pocketid:{{pocketid-password}}@postgresql.databases.svc.cluster.local:5432/pocketid" | quote }}
-    init.sql:
-      template: {{ printf "CREATE ROLE kitchenowl LOGIN PASSWORD '{{kitchenowl-password}}';\nCREATE DATABASE kitchenowl OWNER kitchenowl;\nCREATE ROLE paperless LOGIN PASSWORD '{{paperless-password}}';\nCREATE DATABASE paperless OWNER paperless;\nCREATE ROLE vaultwarden LOGIN PASSWORD '{{vaultwarden-password}}';\nCREATE DATABASE vaultwarden OWNER vaultwarden;\nCREATE ROLE pocketid LOGIN PASSWORD '{{pocketid-password}}';\nCREATE DATABASE pocketid OWNER pocketid;" | quote }}
