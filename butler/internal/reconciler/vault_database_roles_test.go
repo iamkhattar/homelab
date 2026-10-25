@@ -3,7 +3,6 @@ package reconciler
 import (
 	"encoding/json"
 	"net/http"
-	"reflect"
 	"testing"
 
 	"github.com/iamkhattar/homelab/butler/internal/platform"
@@ -57,9 +56,12 @@ func TestVaultDatabaseRolesWritesDeclaredStaticRole(t *testing.T) {
 	if got, _ := body["username"].(string); got != "example-app" {
 		t.Errorf("username = %q, want the resource name", got)
 	}
-	wantStatements := []string{`ALTER USER "{{name}}" WITH PASSWORD='{{password}}'`}
-	if got := vaultStringSlice(body["rotation_statements"]); !reflect.DeepEqual(got, wantStatements) {
-		t.Errorf("rotation_statements = %v, want %v", got, wantStatements)
+	// Vault's database engine takes rotation_statements as a comma-separated
+	// string. A JSON array serialises into malformed SQL that PostgreSQL
+	// rejects with `syntax error at or near "="`.
+	wantStatements := `ALTER USER "{{name}}" WITH PASSWORD='{{password}}'`
+	if got, _ := body["rotation_statements"].(string); got != wantStatements {
+		t.Errorf("rotation_statements = %q, want %q", got, wantStatements)
 	}
 	if got, _ := body["rotation_period"].(string); got != "87600h" {
 		t.Errorf("rotation_period = %q, want 87600h", got)

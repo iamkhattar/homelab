@@ -14,6 +14,12 @@ import (
 	"github.com/iamkhattar/homelab/butler/internal/vault"
 )
 
+// databaseRotationStatement is the SQL Vault runs when it learns or rotates a
+// static role's password. Vault's database engine takes rotation_statements as
+// a comma-separated string, not a JSON array: sending a slice serialises into
+// malformed SQL and PostgreSQL rejects it with `syntax error at or near "="`.
+const databaseRotationStatement = `ALTER USER "{{name}}" WITH PASSWORD='{{password}}'`
+
 const (
 	// databaseConnectionName is the Vault database connection Butler writes at
 	// database/config/<name> for the shared PostgreSQL instance.
@@ -97,9 +103,7 @@ func (r *VaultDatabaseRoles) ensureRole(ctx context.Context, role *platform.Vaul
 	// password. The PostgreSQL role and database are created without a password
 	// by the consumer's provisioning job, so this statement is the only place a
 	// password is ever set.
-	rotationStatements := []string{
-		`ALTER USER "{{name}}" WITH PASSWORD='{{password}}'`,
-	}
+	rotationStatements := databaseRotationStatement
 
 	desired := map[string]interface{}{
 		"db_name":             databaseConnectionName,
@@ -138,7 +142,7 @@ func databaseRoleMatches(desired map[string]interface{}, actual map[string]inter
 	if value, _ := actual["username"].(string); value != desired["username"] {
 		return false
 	}
-	if !reflect.DeepEqual(vaultStringSlice(actual["rotation_statements"]), desired["rotation_statements"]) {
+	if !reflect.DeepEqual(vaultStringSlice(actual["rotation_statements"]), []string{databaseRotationStatement}) {
 		return false
 	}
 	period, _ := time.ParseDuration(desired["rotation_period"].(string))
