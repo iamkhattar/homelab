@@ -79,16 +79,19 @@ func TestAdvanceRequiresExplicitConfirmation(t *testing.T) {
 	}
 }
 
-func TestConfirmIdentityRequiresBothRealLoginPolicySets(t *testing.T) {
+func TestConfirmIdentityRequiresTheVaultAdministratorPolicy(t *testing.T) {
 	client := fake.NewSimpleClientset(&corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: stateConfigMapName, Namespace: "security"},
 		Data:       map[string]string{"phase": "awaiting-identity-verification"},
 	})
 	service := &Service{k8s: client, namespace: "security"}
-	if err := service.ConfirmIdentity(t.Context(), IdentityEvidence{PocketIDSubject: "owner", ButlerRole: "admin", VaultPolicies: []string{"vault-admin"}}); err == nil {
-		t.Fatal("accepted Vault login without Kubernetes administrator policy")
+	// A metadata- or secret-read-only login does not prove Vault ownership.
+	if err := service.ConfirmIdentity(t.Context(), IdentityEvidence{PocketIDSubject: "owner", ButlerRole: "admin", VaultPolicies: []string{"vault-read"}}); err == nil {
+		t.Fatal("accepted Vault login without the vault-admin policy")
 	}
-	evidence := IdentityEvidence{PocketIDSubject: "owner", ButlerRole: "admin", VaultPolicies: []string{"default", "vault-admin", "k8s-admin"}}
+	// Kubernetes authority is proven separately by minting a k8s* credential,
+	// so one role carrying only vault-admin is sufficient evidence here.
+	evidence := IdentityEvidence{PocketIDSubject: "owner", ButlerRole: "admin", VaultPolicies: []string{"default", "vault-admin"}}
 	if err := service.ConfirmIdentity(t.Context(), evidence); err != nil {
 		t.Fatal(err)
 	}

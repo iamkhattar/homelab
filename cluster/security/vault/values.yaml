@@ -46,3 +46,33 @@ ingress:
   enabled: true
   className: traefik
   host: vault.6940469.xyz
+
+# Vault owns the groups that may hold its policies. Each entry becomes a
+# VaultOIDCRole resource that Butler reconciles into an auth/jwt role: the group
+# is both the OIDC role name and the bound groups claim. Vault's OIDC client
+# restricts sign-in to these groups plus the two Butler groups.
+oidcRoles:
+  - group: vaultadmin
+    policies: [vault-admin]
+    ttl: 1h
+    maxTTL: 8h
+  - group: vaultread
+    policies: [vault-read]
+    ttl: 1h
+    maxTTL: 8h
+  - group: vaultmeta
+    policies: [vault-metadata]
+    ttl: 1h
+    maxTTL: 8h
+  - group: k8sadmin
+    policies: [k8s-admin]
+    ttl: 1h
+    maxTTL: 8h
+  - group: k8soperator
+    policies: [k8s-operator]
+    ttl: 1h
+    maxTTL: 8h
+  - group: k8sviewer
+    policies: [k8s-viewer]
+    ttl: 1h
+    maxTTL: 4h

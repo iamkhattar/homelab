@@ -30,9 +30,9 @@ type clientFixture struct {
 // fixture serves the same names the chart provisions.
 func platformGroups() []pocketid.UserGroup {
 	return []pocketid.UserGroup{
-		{ID: "group-homelab-admin", Name: "homelab-admin", FriendlyName: "Homelab administrators"},
-		{ID: "group-homelab-operator", Name: "homelab-operator", FriendlyName: "Homelab operators"},
-		{ID: "group-homelab-viewer", Name: "homelab-viewer", FriendlyName: "Homelab viewers"},
+		{ID: "group-butleradmin", Name: "butleradmin", FriendlyName: "Homelab administrators"},
+		{ID: "group-vaultadmin", Name: "vaultadmin", FriendlyName: "Homelab operators"},
+		{ID: "group-butlerviewer", Name: "butlerviewer", FriendlyName: "Homelab viewers"},
 		{ID: "group-household", Name: "household", FriendlyName: "Household members who use the shared applications"},
 	}
 }
@@ -269,10 +269,10 @@ func (f *accessFixture) allowedGroupCalls() []providerCall {
 func TestPocketIDClientsPushesAllowedUserGroupsWhenTheyDrift(t *testing.T) {
 	t.Parallel()
 	f := newAccessFixture(t,
-		[]pocketid.UserGroup{{ID: "group-homelab-admin", Name: "homelab-admin", FriendlyName: "Homelab administrators"}},
+		[]pocketid.UserGroup{{ID: "group-butleradmin", Name: "butleradmin", FriendlyName: "Homelab administrators"}},
 		platformGroups(),
 		clientCRWithAccess("homepage", "homepage", "public", "oauth/homepage",
-			[]string{"homelab-admin", "homelab-viewer"}, "https://home.6940469.xyz/callback"))
+			[]string{"butleradmin", "butlerviewer"}, "https://home.6940469.xyz/callback"))
 
 	if err := f.reconcile(); err != nil {
 		t.Fatalf("Reconcile: %v", err)
@@ -285,7 +285,7 @@ func TestPocketIDClientsPushesAllowedUserGroupsWhenTheyDrift(t *testing.T) {
 	if calls[0].Method != http.MethodPut || calls[0].Path != "/api/oidc/clients/client-1/allowed-user-groups" {
 		t.Fatalf("unexpected request: %#v", calls[0])
 	}
-	if want := `{"userGroupIds":["group-homelab-admin","group-homelab-viewer"]}`; calls[0].Body != want {
+	if want := `{"userGroupIds":["group-butleradmin","group-butlerviewer"]}`; calls[0].Body != want {
 		t.Fatalf("body = %s, want %s", calls[0].Body, want)
 	}
 	if reason := conditionReason(statusOf(t, f.store, "PocketIDClient")["homepage/homepage"]); reason != "Reconciled" {
@@ -299,12 +299,12 @@ func TestPocketIDClientsSkipsAllowedUserGroupsWhenIDsMatchInAnyOrder(t *testing.
 		// Provider order differs from the declared order; the comparison is
 		// set-based, so nothing may be written.
 		[]pocketid.UserGroup{
-			{ID: "group-homelab-viewer", Name: "homelab-viewer", FriendlyName: "Homelab viewers"},
-			{ID: "group-homelab-admin", Name: "homelab-admin", FriendlyName: "Homelab administrators"},
+			{ID: "group-butlerviewer", Name: "butlerviewer", FriendlyName: "Homelab viewers"},
+			{ID: "group-butleradmin", Name: "butleradmin", FriendlyName: "Homelab administrators"},
 		},
 		platformGroups(),
 		clientCRWithAccess("homepage", "homepage", "public", "oauth/homepage",
-			[]string{"homelab-admin", "homelab-viewer"}, "https://home.6940469.xyz/callback"))
+			[]string{"butleradmin", "butlerviewer"}, "https://home.6940469.xyz/callback"))
 
 	if err := f.reconcile(); err != nil {
 		t.Fatalf("Reconcile: %v", err)
@@ -324,7 +324,7 @@ func TestPocketIDClientsFailsClosedOnUnknownAllowedGroup(t *testing.T) {
 		platformGroups(),
 		clientCRWithAccess("homepage", "homepage", "public", "oauth/homepage",
 			// The typo must not remove or widen the existing restriction.
-			[]string{"homelab-admin", "householdd"}, "https://home.6940469.xyz/callback"))
+			[]string{"butleradmin", "householdd"}, "https://home.6940469.xyz/callback"))
 
 	err := f.reconcile()
 	if err == nil {

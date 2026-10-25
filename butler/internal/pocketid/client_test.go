@@ -100,7 +100,7 @@ func TestListClientsDecodesAllowedUserGroups(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"data": []map[string]any{{
 				"id": "grafana-id", "name": "grafana",
-				"allowedUserGroups": []UserGroup{{ID: "g1", Name: "homelab-admin", FriendlyName: "Homelab administrators"}},
+				"allowedUserGroups": []UserGroup{{ID: "g1", Name: "butleradmin", FriendlyName: "Homelab administrators"}},
 			}},
 		})
 	}))
@@ -189,7 +189,7 @@ func TestUserGroupLifecycleUsesV2Endpoints(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/user-groups":
-			_ = json.NewEncoder(w).Encode(map[string]any{"data": []UserGroup{{ID: "g1", Name: "homelab-admin", FriendlyName: "Old"}}})
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": []UserGroup{{ID: "g1", Name: "butleradmin", FriendlyName: "Old"}}})
 		case r.Method == http.MethodPut && r.URL.Path == "/api/user-groups/g1":
 			if err := json.NewDecoder(r.Body).Decode(&updated); err != nil {
 				t.Fatal(err)

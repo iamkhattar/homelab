@@ -55,7 +55,15 @@ homelabctl control recovery
 homelabctl control bootstrap --confirm
 homelabctl control status
 homelabctl control users list
-kubectl get pocketidclients,managedcredentials,garagebuckets -A
+kubectl get pocketidclients,pocketidgroups,vaultoidcroles,managedcredentials,garagebuckets -A
+```
+
+Cluster access is minted from Vault as the requesting identity, not brokered by
+Butler. Authorization comes from the group bound to the Vault role:
+
+```
+homelabctl credentials --role k8sviewer --ttl 1h > /tmp/homelab.kubeconfig
+homelabctl credentials --role k8sadmin --format token
 ```
 
 ### Deployments and optional infrastructure

@@ -2,6 +2,8 @@ package vault
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -97,6 +99,20 @@ func TestRecoveryPolicyCanManageOnlyBootstrapIdentityCredentials(t *testing.T) {
 	}
 }
 
+func TestRecoveryPolicyCanCompleteOIDCRolesButNotPolicies(t *testing.T) {
+	// The recovery ceremony writes the chart-declared auth/jwt roles after the
+	// Pocket ID client exists. It must not be able to author policy bodies or
+	// reconfigure the auth method.
+	if !strings.Contains(butlerRecoveryPolicy, `path "auth/jwt/role/*"`) {
+		t.Fatal("recovery must be able to converge declared auth/jwt roles")
+	}
+	for _, forbidden := range []string{`path "sys/policies`, `path "sys/auth`, `path "auth/jwt/config`} {
+		if strings.Contains(butlerRecoveryPolicy, forbidden) {
+			t.Errorf("recovery policy must not grant %q", forbidden)
+		}
+	}
+}
+
 func TestMetadataPolicyCannotReadSecretValues(t *testing.T) {
 	// Match a real stanza, not the explanatory comment.
 	if strings.Contains(vaultMetadataPolicy, `path "secret/data`) {
@@ -109,13 +125,43 @@ func TestMetadataPolicyCannotReadSecretValues(t *testing.T) {
 	}
 }
 
-func TestAdminPolicyRemainsTheOnlySecretReader(t *testing.T) {
-	// vault-admin is a wildcard policy; the two non-admin tiers must not be able
-	// to read values. Reaching them requires an explicit secret/data stanza.
+func TestSecretValueReadsAreScopedToVaultReadAndAdmin(t *testing.T) {
+	// vault-read is the explicit secret-value grant; vault-admin is the
+	// wildcard administrator. vault-metadata must never carry a data stanza.
 	if !strings.Contains(vaultAdminPolicy, `path "*"`) {
 		t.Fatal("vault-admin is expected to remain a wildcard policy")
 	}
+	if !strings.Contains(vaultReadPolicy, `path "secret/data/*"`) {
+		t.Fatal("vault-read must grant read on secret values")
+	}
 	if strings.Contains(vaultMetadataPolicy, `path "secret/data`) {
-		t.Fatal("non-admin tier must not read secret values")
+		t.Fatal("vault-metadata must not read secret values")
+	}
+}
+
+func TestEnsureJWTPoliciesWritesTheFullPlatformPolicySet(t *testing.T) {
+	written := map[string]string{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var payload struct {
+			Policy string `json:"policy"`
+		}
+		_ = json.Unmarshal(body, &payload)
+		written[strings.TrimPrefix(r.URL.Path, "/v1/sys/policies/acl/")] = payload.Policy
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.ensureJWTPolicies(context.Background(), "https://id.example.test"); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"vault-admin", "vault-read", "vault-metadata"} {
+		if written[name] == "" {
+			t.Errorf("policy %s was not written", name)
+		}
 	}
 }

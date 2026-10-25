@@ -81,6 +81,7 @@ without hiding the underlying commands. Mutating operations remain explicit.`,
 	root.AddCommand(newNodeCommand(s))
 	root.AddCommand(newClusterCommand(s))
 	root.AddCommand(newControlCommand(s))
+	root.AddCommand(newCredentialsCommand(s))
 	root.AddCommand(newDeployCommand(s))
 	root.AddCommand(newInfraCommand(s))
 	root.AddCommand(newBuildCommand(s))

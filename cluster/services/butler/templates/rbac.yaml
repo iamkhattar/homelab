@@ -13,7 +13,7 @@ metadata:
   name: {{ .Release.Name }}-platform-controller
 rules:
   - apiGroups: ["platform.6940469.xyz"]
-    resources: ["pocketidclients", "pocketidgroups", "managedcredentials", "garagebuckets"]
+    resources: ["pocketidclients", "pocketidgroups", "managedcredentials", "garagebuckets", "vaultoidcroles"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["platform.6940469.xyz"]
     resources: ["pocketidclients/status", "pocketidgroups/status", "managedcredentials/status", "garagebuckets/status"]
@@ -86,7 +86,7 @@ rules:
   - apiGroups: ["platform.6940469.xyz"]
     # GarageBucket is read-only here because cross-kind Vault output-path
     # ownership must also be safe during bootstrap reconciliation.
-    resources: ["pocketidclients", "pocketidgroups", "managedcredentials", "garagebuckets"]
+    resources: ["pocketidclients", "pocketidgroups", "managedcredentials", "garagebuckets", "vaultoidcroles"]
     verbs: ["get", "list"]
   - apiGroups: ["platform.6940469.xyz"]
     resources: ["pocketidclients/status", "pocketidgroups/status", "managedcredentials/status"]

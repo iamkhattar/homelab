@@ -54,7 +54,6 @@ func newControlCommand(s *state) *cobra.Command {
 	cmd.AddCommand(newControlUsersCommand(s, options))
 	cmd.AddCommand(newControlGetCommand(s, options, "groups", "List Pocket ID groups", "/api/v1/identity/groups"))
 	cmd.AddCommand(newControlClientsCommand(s, options))
-	cmd.AddCommand(newControlCredentialsCommand(s, options))
 	return cmd
 }
 
@@ -166,54 +165,9 @@ func newControlVerifyIdentityCommand(s *state, options *controlOptions) *cobra.C
 		defaultVaultAddress = "https://vault.6940469.xyz"
 	}
 	command.Flags().StringVar(&vaultAddress, "vault-address", defaultVaultAddress, "Vault HTTPS address")
-	command.Flags().StringVar(&vaultRole, "vault-role", "homelab-admin", "Vault OIDC role expected to grant administrator policies")
+	command.Flags().StringVar(&vaultRole, "vault-role", "vaultadmin", "Vault OIDC role expected to grant administrator policies")
 	command.Flags().BoolVar(&confirm, "confirm", false, "confirm final identity acceptance and bootstrap completion")
 	return command
-}
-
-func newControlCredentialsCommand(s *state, options *controlOptions) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "credentials",
-		Short: "Issue bounded credentials through Butler",
-		Long:  "Issue credentials only from Butler's server-side allowlist. The CLI cannot widen the role, namespace, or maximum lifetime.",
-	}
-	var role, ttl, format string
-	issue := &cobra.Command{Use: "issue", Short: "Issue a short-lived Vault-backed Kubernetes token", Long: "Ask Butler to use an approved Vault Kubernetes secrets-engine role and return a short-lived token without persisting it.", Example: "  homelabctl control credentials issue --role homelab-viewer --ttl 15m\n  homelabctl control credentials issue --role homelab-operator --format json", Args: cobra.NoArgs, RunE: func(command *cobra.Command, _ []string) error {
-		if err := validateReleaseName(role); err != nil {
-			return fmt.Errorf("credential role: %w", err)
-		}
-		if _, err := time.ParseDuration(ttl); err != nil {
-			return fmt.Errorf("invalid credential TTL: %w", err)
-		}
-		return withNormalClient(command.Context(), s, options, func(client *controlapi.Client) error {
-			var credential struct {
-				Role, ServiceAccount, Namespace, Token, LeaseID string
-				TTLSeconds                                      int64
-				ExpiresAt                                       time.Time
-			}
-			if err := client.Do(command.Context(), http.MethodPost, "/api/v1/access/kubernetes-credentials", map[string]string{"role": role, "ttl": ttl}, &credential); err != nil {
-				return err
-			}
-			if format == "json" {
-				return printJSON(s, credential)
-			}
-			return printJSON(s, map[string]interface{}{
-				"apiVersion": "client.authentication.k8s.io/v1", "kind": "ExecCredential",
-				"status": map[string]interface{}{"expirationTimestamp": credential.ExpiresAt, "token": credential.Token},
-			})
-		})
-	}}
-	issue.Flags().StringVar(&role, "role", "homelab-viewer", "approved Vault Kubernetes role")
-	issue.Flags().StringVar(&ttl, "ttl", "15m", "requested token lifetime")
-	issue.Flags().StringVar(&format, "format", "exec-credential", "exec-credential or json")
-	issue.PreRunE = func(_ *cobra.Command, _ []string) error {
-		if format != "exec-credential" && format != "json" {
-			return fmt.Errorf("format must be exec-credential or json")
-		}
-		return nil
-	}
-	cmd.AddCommand(issue)
-	return cmd
 }
 
 func newControlLoginCommand(s *state, options *controlOptions) *cobra.Command {

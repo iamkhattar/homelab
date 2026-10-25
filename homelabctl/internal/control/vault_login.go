@@ -31,6 +31,14 @@ type VaultIdentityEvidence struct {
 	Policies []string
 }
 
+// VaultLogin is the result of a successful browser OIDC login. The token is
+// live: callers that only need policy evidence must use VerifyVaultOIDCLogin,
+// which revokes it.
+type VaultLogin struct {
+	Token    string
+	Policies []string
+}
+
 type vaultSecret struct {
 	Data map[string]interface{} `json:"data"`
 	Auth *struct {
@@ -45,9 +53,34 @@ type vaultSecret struct {
 // resulting token with lookup-self, and revokes it before returning non-secret
 // policy evidence. It never writes the Vault token to disk or Butler.
 func VerifyVaultOIDCLogin(ctx context.Context, options VaultOIDCOptions) (VaultIdentityEvidence, error) {
-	if options.Address == "" || options.Role == "" {
-		return VaultIdentityEvidence{}, fmt.Errorf("Vault address and OIDC role are required")
+	options = normalizeVaultOIDCOptions(options)
+	login, err := completeVaultOIDCLogin(ctx, options)
+	if err != nil {
+		return VaultIdentityEvidence{}, err
 	}
+	return verifyAndRevokeVaultToken(ctx, options, login)
+}
+
+// LoginVaultOIDC completes the same browser flow and returns the resulting
+// token without revoking it. The caller owns the token and must not persist it.
+// Credential minting needs it: revoking the login token would also revoke the
+// leases it created, including the credential just issued.
+func LoginVaultOIDC(ctx context.Context, options VaultOIDCOptions) (VaultLogin, error) {
+	options = normalizeVaultOIDCOptions(options)
+	login, err := completeVaultOIDCLogin(ctx, options)
+	if err != nil {
+		return VaultLogin{}, err
+	}
+	if login.Auth == nil || login.Auth.ClientToken == "" {
+		return VaultLogin{}, fmt.Errorf("Vault OIDC callback returned no client token")
+	}
+	return VaultLogin{
+		Token:    login.Auth.ClientToken,
+		Policies: append([]string(nil), login.Auth.Policies...),
+	}, nil
+}
+
+func normalizeVaultOIDCOptions(options VaultOIDCOptions) VaultOIDCOptions {
 	if options.Mount == "" {
 		options.Mount = "jwt"
 	}
@@ -63,20 +96,27 @@ func VerifyVaultOIDCLogin(ctx context.Context, options VaultOIDCOptions) (VaultI
 	if options.HTTPClient == nil {
 		options.HTTPClient = &http.Client{Timeout: 30 * time.Second}
 	}
+	return options
+}
+
+func completeVaultOIDCLogin(ctx context.Context, options VaultOIDCOptions) (vaultSecret, error) {
+	if options.Address == "" || options.Role == "" {
+		return vaultSecret{}, fmt.Errorf("Vault address and OIDC role are required")
+	}
 	listener, err := net.Listen("tcp", options.ListenAddress)
 	if err != nil {
-		return VaultIdentityEvidence{}, fmt.Errorf("opening Vault OIDC callback: %w", err)
+		return vaultSecret{}, fmt.Errorf("opening Vault OIDC callback: %w", err)
 	}
 	defer listener.Close()
 	port := listener.Addr().(*net.TCPAddr).Port
 	redirectURI := fmt.Sprintf("http://%s:%d/oidc/callback", options.CallbackHost, port)
 	clientNonce, err := randomVaultNonce(20)
 	if err != nil {
-		return VaultIdentityEvidence{}, err
+		return vaultSecret{}, err
 	}
 	authURL, err := vaultAuthURL(ctx, options, redirectURI, clientNonce)
 	if err != nil {
-		return VaultIdentityEvidence{}, err
+		return vaultSecret{}, err
 	}
 
 	type result struct {
@@ -117,7 +157,7 @@ func VerifyVaultOIDCLogin(ctx context.Context, options VaultOIDCOptions) (VaultI
 	}()
 	if options.OpenURL != nil {
 		if err := options.OpenURL(authURL); err != nil {
-			return VaultIdentityEvidence{}, fmt.Errorf("opening Vault OIDC login: %w", err)
+			return vaultSecret{}, fmt.Errorf("opening Vault OIDC login: %w", err)
 		}
 	}
 	waitCtx, cancel := context.WithTimeout(ctx, options.Timeout)
@@ -125,11 +165,11 @@ func VerifyVaultOIDCLogin(ctx context.Context, options VaultOIDCOptions) (VaultI
 	select {
 	case completed := <-results:
 		if completed.err != nil {
-			return VaultIdentityEvidence{}, completed.err
+			return vaultSecret{}, completed.err
 		}
-		return verifyAndRevokeVaultToken(waitCtx, options, completed.secret)
+		return completed.secret, nil
 	case <-waitCtx.Done():
-		return VaultIdentityEvidence{}, fmt.Errorf("waiting for Vault OIDC login: %w", waitCtx.Err())
+		return vaultSecret{}, fmt.Errorf("waiting for Vault OIDC login: %w", waitCtx.Err())
 	}
 }
 
@@ -171,8 +211,10 @@ func verifyAndRevokeVaultToken(ctx context.Context, options VaultOIDCOptions, lo
 			}
 		}
 	}
-	if !slices.Contains(policies, "vault-admin") || !slices.Contains(policies, "k8s-admin") {
-		return VaultIdentityEvidence{}, fmt.Errorf("Vault OIDC role omitted required policies")
+	// Vault proves the administrator path. The Kubernetes path is a separate
+	// decision, proven by minting a credential with the relevant k8s* group.
+	if !slices.Contains(policies, "vault-admin") {
+		return VaultIdentityEvidence{}, fmt.Errorf("Vault OIDC role omitted the vault-admin policy")
 	}
 	return VaultIdentityEvidence{Policies: policies}, nil
 }

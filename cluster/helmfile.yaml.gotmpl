@@ -81,7 +81,9 @@ releases:
     chart: ./security/vault
     historyMax: 5
     namespace: security
-    needs: [kube-system/namespaces, kube-system/rbac-policies]
+    # The chart declares its own VaultOIDCRole resources, so the platform API
+    # group must exist before this release renders.
+    needs: [kube-system/namespaces, kube-system/rbac-policies, kube-system/butler-crds]
     labels: {stage: secrets, domain: platform, criticality: essential}
   - name: butler
     chart: ./services/butler

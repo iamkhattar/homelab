@@ -3,11 +3,8 @@
 package integration
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -89,49 +86,44 @@ func TestKubernetesAPI(t *testing.T) {
 	}
 }
 
-func TestButlerIssuedKubernetesCredential(t *testing.T) {
+// TestVaultKubernetesCredential proves the human-facing path: a Vault token
+// carrying the group's policy mints a short-lived Kubernetes credential. Butler
+// is not involved; its brokered endpoint no longer exists.
+func TestVaultKubernetesCredential(t *testing.T) {
 	requireIntegration(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	body := bytes.NewBufferString(`{"role":"homelab-viewer","ttl":"5m"}`)
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, requiredEnv(t, "BUTLER_URL")+"/api/v1/access/kubernetes-credentials", body)
+	client, err := vault.NewClient(requiredEnv(t, "VAULT_ADDR"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	request.Header.Set("Authorization", "Bearer "+requiredEnv(t, "BUTLER_TOKEN"))
-	request.Header.Set("Content-Type", "application/json")
-	response, err := http.DefaultClient.Do(request)
+	client.SetToken(requiredEnv(t, "VAULT_TOKEN"))
+	secret, err := client.Raw().Logical().ReadWithContext(ctx, "kubernetes/creds/k8sviewer")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("reading Vault Kubernetes credentials: %v", err)
 	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusCreated {
-		t.Fatalf("credential issuance status = %s", response.Status)
+	if secret == nil || secret.Data == nil {
+		t.Fatal("Vault returned no Kubernetes credential")
 	}
-	var credential struct {
-		Token string `json:"token"`
-	}
-	if err := json.NewDecoder(response.Body).Decode(&credential); err != nil {
-		t.Fatal(err)
-	}
-	if credential.Token == "" {
-		t.Fatal("Butler returned an empty Kubernetes token")
+	token, _ := secret.Data["service_account_token"].(string)
+	if token == "" {
+		t.Fatal("Vault returned an empty Kubernetes token")
 	}
 	config, err := clientcmd.BuildConfigFromFlags("", requiredEnv(t, "KUBECONFIG"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	config.BearerToken = credential.Token
+	config.BearerToken = token
 	config.BearerTokenFile = ""
 	config.Username, config.Password = "", ""
 	config.ExecProvider, config.AuthProvider = nil, nil
 	config.TLSClientConfig.CertData, config.TLSClientConfig.KeyData = nil, nil
 	config.TLSClientConfig.CertFile, config.TLSClientConfig.KeyFile = "", ""
-	client, err := kubernetes.NewForConfig(config)
+	kube, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	review, err := client.AuthorizationV1().SelfSubjectAccessReviews().Create(ctx, &authorizationv1.SelfSubjectAccessReview{
+	review, err := kube.AuthorizationV1().SelfSubjectAccessReviews().Create(ctx, &authorizationv1.SelfSubjectAccessReview{
 		Spec: authorizationv1.SelfSubjectAccessReviewSpec{ResourceAttributes: &authorizationv1.ResourceAttributes{Verb: "get", Resource: "pods"}},
 	}, metav1.CreateOptions{})
 	if err != nil {

@@ -27,12 +27,15 @@ an authenticated Kubernetes tunnel.
 ## Short-lived Kubernetes access
 
 ```sh
-homelabctl control credentials issue --role homelab-viewer --ttl 15m
-homelabctl control credentials issue --role homelab-operator --ttl 30m --format json
+homelabctl credentials --role k8sviewer --ttl 15m > /tmp/homelab.kubeconfig
+homelabctl credentials --role k8sadmin --format token
 ```
 
-The default response is a Kubernetes `ExecCredential`. Butler enforces the
-role, namespace and maximum TTL server-side and never persists the token.
+Credentials are minted by Vault as the requesting identity, not by Butler. The
+command completes Vault's browser OIDC login with the group-named role, calls
+`kubernetes/creds/<role>` and prints a kubeconfig by default. Authorization is
+the Vault policy bound to the Pocket ID group, so Butler admin does not imply
+cluster access and no Butler credential endpoint exists.
 
 ## Two operating planes
 
@@ -53,9 +56,11 @@ homelabctl control
 ├── login|logout
 ├── bootstrap|verify-identity|recovery [export]
 ├── status|operations|events|reconcile
-├── users|groups|clients
-└── credentials issue
+└── users|groups|clients
 ```
+
+`homelabctl credentials` is a top-level command because it talks to Vault, not
+to Butler.
 
 Use `homelabctl control --help` for the executable reference.
 
@@ -117,7 +122,6 @@ POST /api/v1/reconcile
 GET  /api/v1/events
 GET  /api/v1/bootstrap/certificate
 POST /api/v1/bootstrap/certificate/verify-dns
-POST /api/v1/access/kubernetes-credentials
 POST /api/v1/bootstrap/identity-verification
 ```
 
@@ -157,8 +161,8 @@ and submits only non-secret acceptance evidence through the recovery API.
 ## Current boundary
 
 The typed client, Pocket ID browser login, role-aware API, Kubernetes-persisted
-operation history, declarative provider resources, bounded credential issuance
-and recovery workflow are implemented. Titan has verified first-owner
+operation history, declarative provider resources, Vault-minted cluster
+credentials and recovery workflow are implemented. Titan has verified first-owner
 enrollment, Pocket ID login, and authenticated access to normal Butler through
 its HTTPS ingress. Vault's human OIDC proof, real integration execution and
 restore rehearsal remain operational checkpoints. See

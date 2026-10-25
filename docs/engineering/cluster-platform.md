@@ -107,6 +107,51 @@ chart owns its `ManagedCredential` and `PocketIDClient` resources beside the
 `butler-crds` foundation release makes the types available before any consumer
 release is rendered or applied.
 
+## Identity and cluster access
+
+Nine authorization groups form the shared vocabulary. Butler enforces
+`butleradmin` and `butlerviewer`; the Vault chart declares the six
+Vault/Kubernetes groups as `VaultOIDCRole` resources, so Vault enforces them;
+`household` is only an application sign-in restriction.
+
+| Group | Owner | What membership grants |
+| --- | --- | --- |
+| `butleradmin` / `butlerviewer` | Butler | admin / viewer on the control-plane API |
+| `vaultadmin` | Vault | `vault-admin`, the wildcard administrator |
+| `vaultread` | Vault | `vault-read`: read stored secret values |
+| `vaultmeta` | Vault | `vault-metadata`: enumerate paths and versions only |
+| `k8sadmin` / `k8soperator` / `k8sviewer` | Vault | request a Kubernetes credential for the matching engine role |
+| `household` | Pocket ID client restrictions | sign in to the shared applications |
+
+Butler has two active tiers. The middle operator tier is disabled
+(`oidc.groups.operator: ""`): reconcile endpoints therefore require
+`butleradmin`, and cluster operations are delegated to the `k8s*` groups
+instead of inventing a Butler middle tier.
+
+The Vault chart owns its roles. Each `VaultOIDCRole` declares one group and its
+policy list, and Butler converges it into `auth/jwt/role/<group>`. The
+`k8sIssuance` block in Butler's configuration no longer declares groups or
+policies: it configures the Kubernetes secrets engine (`kubernetes/roles/<name>`
+and the `vault-managed-*` ServiceAccounts) only. This separation is what keeps
+one source of truth for human authority.
+
+Cluster credentials are minted by Vault as the requesting user:
+
+```bash
+homelabctl credentials --role k8sviewer
+KUBECONFIG=/tmp/homelab.kubeconfig kubectl get nodes
+```
+
+The CLI completes a Vault OIDC login with the group-named role, calls
+`kubernetes/creds/<role>` and prints a kubeconfig. Butler is not in the path, so
+`butleradmin` does not imply `cluster-admin` and there is no Butler credential
+endpoint to disable or bypass. A denied mint returns Vault's permission error
+unchanged, because that is the authorization decision.
+
+Vault itself does not trust Pocket ID as the only entry point. Pocket ID and
+Vault share a failure domain on Titan, so host access remains the break-glass
+path; see [the decisions log](/project/decisions).
+
 ## Application credentials and authentication
 
 | Application | Vault material | Data dependency | Pocket ID state |

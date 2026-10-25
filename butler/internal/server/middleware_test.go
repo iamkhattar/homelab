@@ -45,7 +45,7 @@ func TestExtractBearerIgnoresCookies(t *testing.T) {
 func TestWrapRejectsCookieOnlyRequest(t *testing.T) {
 	// Regression guard: the API is bearer-only. A request authenticated only by
 	// the removed butler_session cookie must never reach a handler.
-	auth, err := NewAuthMiddleware(t.Context(), "https://issuer.example.test", []string{"homelabctl"}, nil)
+	auth, err := NewAuthMiddleware(t.Context(), "https://issuer.example.test", []string{"homelabctl"}, access.Roles{Admin: "butleradmin", Viewer: "butlerviewer"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestAuthMiddleware_NilPassesThrough(t *testing.T) {
 }
 
 func TestAuthMiddlewareClientAllowlist(t *testing.T) {
-	auth, err := NewAuthMiddleware(t.Context(), "https://issuer.example.test", []string{"homelabctl"}, nil)
+	auth, err := NewAuthMiddleware(t.Context(), "https://issuer.example.test", []string{"homelabctl"}, access.Roles{Admin: "butleradmin", Viewer: "butlerviewer"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestAuthMiddlewareClientAllowlist(t *testing.T) {
 }
 
 func TestAuthMiddlewareRequiresAtLeastOneClient(t *testing.T) {
-	if _, err := NewAuthMiddleware(t.Context(), "https://issuer.example.test", nil, nil); err == nil {
+	if _, err := NewAuthMiddleware(t.Context(), "https://issuer.example.test", nil, access.Roles{}, nil); err == nil {
 		t.Fatal("expected an error when no client is configured")
 	}
 }

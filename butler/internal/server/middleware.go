@@ -19,6 +19,7 @@ import (
 type AuthMiddleware struct {
 	issuer   string
 	allowed  map[string]struct{}
+	roles    access.Roles
 	mu       sync.Mutex
 	verifier *oidc.IDTokenVerifier
 	caChain  func(context.Context) (string, error)
@@ -31,7 +32,7 @@ type AuthMiddleware struct {
 // Pocket ID stamps the requesting client's ID as the ID token audience, so the
 // allowlist names clients, not resources. Vault's OIDC login uses the same
 // model: it accepts only tokens minted for its own client ID.
-func NewAuthMiddleware(ctx context.Context, issuer string, allowedClients []string, caChain func(context.Context) (string, error)) (*AuthMiddleware, error) {
+func NewAuthMiddleware(ctx context.Context, issuer string, allowedClients []string, roles access.Roles, caChain func(context.Context) (string, error)) (*AuthMiddleware, error) {
 	_ = ctx
 	if issuer == "" {
 		return nil, nil
@@ -47,7 +48,7 @@ func NewAuthMiddleware(ctx context.Context, issuer string, allowedClients []stri
 	if len(allowed) == 0 {
 		return nil, fmt.Errorf("at least one OIDC client is required when issuer is configured")
 	}
-	return &AuthMiddleware{issuer: issuer, allowed: allowed, caChain: caChain}, nil
+	return &AuthMiddleware{issuer: issuer, allowed: allowed, roles: roles, caChain: caChain}, nil
 }
 
 func (a *AuthMiddleware) verifierFor(ctx context.Context) (*oidc.IDTokenVerifier, error) {
@@ -115,7 +116,7 @@ func (a *AuthMiddleware) Wrap(next http.Handler) http.Handler {
 			http.Error(w, "invalid identity claims", http.StatusUnauthorized)
 			return
 		}
-		principal := access.FromClaims(claims.Subject, claims.Email, claims.Groups)
+		principal := a.roles.FromClaims(claims.Subject, claims.Email, claims.Groups)
 		next.ServeHTTP(w, r.WithContext(access.WithPrincipal(r.Context(), principal)))
 	})
 }

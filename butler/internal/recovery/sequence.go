@@ -15,7 +15,7 @@ func (s Sequence) Reconcile(ctx context.Context) error {
 			continue
 		}
 		if err := step.Reconcile(ctx); err != nil {
-			return fmt.Errorf("identity bootstrap step %d: %w", index+1, err)
+			return fmt.Errorf("bootstrap step %d: %w", index+1, err)
 		}
 	}
 	return nil

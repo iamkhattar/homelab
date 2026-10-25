@@ -27,6 +27,9 @@ var butlerRecoveryPolicy string
 //go:embed policies/vault_admin.hcl
 var vaultAdminPolicy string
 
+//go:embed policies/vault_read.hcl
+var vaultReadPolicy string
+
 //go:embed policies/vault_metadata.hcl
 var vaultMetadataPolicy string
 
@@ -50,12 +53,6 @@ type BootstrapInput struct {
 	OIDCIssuer       string
 	OIDCClientID     string
 	OIDCClientSecret string
-	PublicDomain     string
-
-	// JWT roles — bind Pocket-ID groups to Vault policies. Reused from
-	// the K8sIssuance role specs so a single source of truth describes
-	// 'homelab-admin' across auth/jwt and kubernetes/.
-	JWTRoles []JWTRoleSpec
 
 	// Kubernetes secrets engine config. Disabled when
 	// K8sEngine.Enabled is false.
@@ -84,16 +81,6 @@ type PKIConfig struct {
 	Organization   string
 	AllowedDomains []string
 	RoleMaxTTL     string
-}
-
-// JWTRoleSpec is the subset of role config Bootstrap needs to create a
-// Vault auth/jwt role.
-type JWTRoleSpec struct {
-	Name          string
-	PocketIDGroup string
-	Policies      []string
-	TTL           string // default 1h if empty
-	MaxTTL        string // default 8h if empty
 }
 
 // K8sEngineConfig configures the Vault Kubernetes secrets engine.
@@ -167,9 +154,6 @@ func (c *Client) Bootstrap(ctx context.Context, in BootstrapInput) error {
 			return err
 		}
 		if err := c.ensureJWTPolicies(ctx, in.OIDCIssuer); err != nil {
-			return err
-		}
-		if err := c.ensureJWTRoles(ctx, in); err != nil {
 			return err
 		}
 	}
@@ -426,64 +410,16 @@ func (c *Client) ensureJWTPolicies(ctx context.Context, oidcIssuer string) error
 	}
 	slog.Info("wrote vault-admin policy")
 
+	if err := c.raw.Sys().PutPolicyWithContext(ctx, "vault-read", vaultReadPolicy); err != nil {
+		return fmt.Errorf("writing vault-read policy: %w", err)
+	}
+	slog.Info("wrote vault-read policy")
+
 	if err := c.raw.Sys().PutPolicyWithContext(ctx, "vault-metadata", vaultMetadataPolicy); err != nil {
 		return fmt.Errorf("writing vault-metadata policy: %w", err)
 	}
 	slog.Info("wrote vault-metadata policy")
 
-	return nil
-}
-
-// ensureJWTRoles creates or updates jwt roles mapping Pocket-ID groups to
-// Vault policies. Roles come from BootstrapInput.JWTRoles (driven by the
-// chart's k8sIssuance.roles list — they share a name/group/policy schema).
-//
-// If JWTRoles is empty or OIDC isn't configured, this is a no-op.
-//
-// Each role binds:
-//   - audience = the Vault OAuth client ID.
-//   - groups claim = "groups" (Pocket-ID's standard claim name).
-//   - bound_claims.groups = [<spec.PocketIDGroup>].
-func (c *Client) ensureJWTRoles(ctx context.Context, in BootstrapInput) error {
-	if in.OIDCIssuer == "" || len(in.JWTRoles) == 0 {
-		return nil
-	}
-
-	audience := in.OIDCClientID
-
-	for _, spec := range in.JWTRoles {
-		ttl := spec.TTL
-		if ttl == "" {
-			ttl = "1h"
-		}
-		maxTTL := spec.MaxTTL
-		if maxTTL == "" {
-			maxTTL = "8h"
-		}
-		path := "auth/jwt/role/" + spec.Name
-		_, err := c.raw.Logical().WriteWithContext(ctx, path, map[string]interface{}{
-			"role_type":       "oidc",
-			"user_claim":      "sub",
-			"groups_claim":    "groups",
-			"oidc_scopes":     []string{"openid", "profile", "email", "groups"},
-			"bound_audiences": []string{audience},
-			"bound_claims": map[string]interface{}{
-				"groups": []string{spec.PocketIDGroup},
-			},
-			"policies": spec.Policies,
-			"ttl":      ttl,
-			"max_ttl":  maxTTL,
-			"allowed_redirect_uris": []string{
-				// Loopback for vault CLI; UI callback path for the Vault UI.
-				"http://localhost:8250/oidc/callback",
-				"https://vault." + firstDomain(in) + "/ui/vault/auth/jwt/oidc/callback",
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("writing jwt role %s: %w", spec.Name, err)
-		}
-		slog.Info("wrote jwt role", "role", spec.Name, "group", spec.PocketIDGroup)
-	}
 	return nil
 }
 
@@ -505,23 +441,13 @@ func (c *Client) ensureK8sPolicies(ctx context.Context, _ K8sEngineConfig) error
 	return nil
 }
 
-// firstDomain pulls the first allowed PKI domain to use in role redirect
-// URIs. Falls back to "shivlab.com" as a sane default when nothing is set.
-//
-// (We don't have direct access to PKIConfig here; the redirect URI is
-// best-effort and harmless if it's slightly wrong since Vault checks the
-// list on login.)
-func firstDomain(in BootstrapInput) string {
-	if in.PublicDomain != "" {
-		return in.PublicDomain
-	}
-	return "6940469.xyz"
-}
-
 // BootstrapK8sEngine enables and configures Vault's kubernetes/ secrets
 // engine. Vault becomes the broker that mints short-lived ServiceAccount
 // tokens for the vault-managed-{admin,operator,viewer} SAs, fronted by the
-// homelab-{admin,operator,viewer} roles.
+// k8s{admin,operator,viewer} engine roles. The auth/jwt roles that let a human
+// request those credentials are declared by the Vault chart as VaultOIDCRole
+// resources and reconciled by the vault-oidc-roles reconciler, so this
+// function owns engine roles only.
 //
 // Soft-fails (returns nil with a warning log) when:
 //   - K8sEngine.Enabled is false for disabled or local-development deployments.

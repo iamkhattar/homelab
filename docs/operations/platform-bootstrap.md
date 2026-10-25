@@ -45,7 +45,7 @@ The networking stage passed its pre-secrets checkpoint on 1 September 2026:
 
 Vault, recovery Butler, VSO, Pocket ID and the public certificate ceremony have
 since converged. The first owner has enrolled a passkey, belongs to
-`homelab-admin`, Butler-managed identity resources report Ready, Pocket ID PKCE
+`butleradmin`, Butler-managed identity resources report Ready, Pocket ID PKCE
 login succeeds, and the normal Butler status API succeeds through
 `https://butler.6940469.xyz`.
 
@@ -367,10 +367,29 @@ of the generated machine credential. It replaces `static-api-key` in the same
 Vault document without changing `encryption-key`; it is not part of normal
 installation.
 
-Butler reconciles `homelab-admin`, `homelab-operator` and `homelab-viewer`, plus
-stable OIDC clients for Butler, Vault, Grafana, Homepage and Vaultwarden. Assign the first
-owner to `homelab-admin`. Bootstrap now pauses at
+Butler reconciles nine groups: `butleradmin` and `butlerviewer` for the control
+plane (the Butler operator tier is disabled, so `control reconcile` needs
+`butleradmin`); `vaultadmin`, `vaultread`, `vaultmeta`, `k8sadmin`, `k8soperator` and
+`k8sviewer` for Vault; and `household` for the shared applications. It also
+reconciles stable OIDC clients for `homelabctl`, Vault, Grafana, Homepage and
+Vaultwarden. The Vault chart declares its own six `VaultOIDCRole` resources
+beside the Vault release; Butler converges them into `auth/jwt/role/<group>` and
+repairs drift on the normal resync. The `homelabctl` client is restricted to `butleradmin` and
+`butlerviewer`; the Vault client is restricted to every platform identity
+(`butleradmin`, `butlerviewer` and the six Vault/Kubernetes groups) so anyone
+with platform authority can reach the Vault UI. Bootstrap now pauses at
 `awaiting-identity-verification`.
+
+> **Migration warning.** Membership of the old `homelab-admin`,
+> `homelab-operator` and `homelab-viewer` groups grants nothing after this
+> change. An identity must be in `butleradmin` or `butlerviewer` for Butler, and
+> in the relevant `vault*`/`k8s*` group for Vault, before authorization works.
+> After the new groups exist in Pocket ID and **before** expecting Butler or
+> Vault to authorize you, add your own account to those groups in Pocket ID. If
+> you skip this step both surfaces deny you, and the failure looks like a broken
+> token rather than a missing membership. The first owner is the only account
+> that can perform the update, so do it immediately after the groups are
+> reconciled.
 
 Complete both real login paths from the operator workstation:
 
@@ -384,7 +403,7 @@ homelabctl control recovery
 Vault's browser flow and OIDC API use the private
 `https://vault.6940469.xyz` Traefik ingress. A plain `404 page not found` while
 requesting Vault's OIDC authorization URL means Traefik has no matching Vault
-Ingress; it is not evidence that `auth/jwt` or the `homelab-admin` role is
+Ingress; it is not evidence that `auth/jwt` or the `vaultadmin` role is
 missing. Deploy the current Vault chart and confirm its HTTPS health endpoint
 before repeating the identity proof. Do not reset Vault, recreate its PVC, or
 reconfigure the auth mount for this routing failure.
@@ -397,12 +416,23 @@ Butler provider administration continues to use its separately configured
 internal Pocket ID API URL.
 
 `verify-identity` first proves the cached Pocket ID session reaches normal
-Butler as an administrator. It then opens Vault's Pocket ID OIDC flow on a
-loopback callback, verifies that the resulting short-lived token has exactly
-the required `vault-admin` and `k8s-admin` capabilities, revokes that token,
-and submits only the Pocket ID subject, Butler role and Vault policy names to
+Butler as an administrator. It then opens Vault's Pocket ID OIDC flow against
+the `vaultadmin` role on a loopback callback, verifies that the resulting
+short-lived token carries `vault-admin`, revokes that token, and submits only
+the Pocket ID subject, Butler role and Vault policy names to
 the private recovery API. No Vault token enters Butler, a file, or a Kubernetes
 Secret. The recovery phase becomes `operational` only after both proofs pass.
+Kubernetes authority is deliberately a separate proof: mint a credential with
+the group that carries the cluster role you expect.
+
+```bash
+homelabctl credentials --role k8sadmin --ttl 15m > /tmp/admin.kubeconfig
+KUBECONFIG=/tmp/admin.kubeconfig kubectl get nodes
+```
+
+A `403` from Vault naming `kubernetes/creds/k8sadmin` means your Pocket ID
+account is not in `k8sadmin`; it is not a Butler or Vault availability
+problem.
 
 Once recovery is `operational`, treat the bootstrap ceremony as finished.
 The next required work is to export `butler-vault-init` to age-encrypted

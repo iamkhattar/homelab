@@ -13,4 +13,10 @@ path "secret/data/infrastructure/acme-dns" { capabilities = ["create", "read", "
 path "secret/data/oauth/homelabctl" { capabilities = ["create", "read", "update"] }
 path "secret/data/oauth/vault" { capabilities = ["create", "read", "update"] }
 
+# Recovery completes the identity handoff: the Vault chart's VaultOIDCRole
+# declarations are converged into auth/jwt roles while the recovery ceremony is
+# the actor. This is role state only. Recovery cannot read or write policy
+# bodies, auth method configuration, or any other mount.
+path "auth/jwt/role/*" { capabilities = ["create", "read", "update"] }
+
 path "sys/health" { capabilities = ["read"] }

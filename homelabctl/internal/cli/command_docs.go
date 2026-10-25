@@ -152,6 +152,10 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 		long:    "Rotate one confidential Pocket ID OIDC client secret and write the one-time value directly to its Vault oauth path. The CLI receives only a success status.",
 		example: "  BUTLER_TOKEN=... homelabctl control clients rotate grafana",
 	},
+	"homelabctl credentials": {
+		long:    "Authenticate to Vault with browser OIDC and mint a short-lived Kubernetes credential as yourself. Authority comes from the Vault policy bound to your Pocket ID group; Butler is not involved. The default output is a kubeconfig on stdout, and nothing touches disk unless --output is given with mode 0600.",
+		example: "  homelabctl credentials > /tmp/homelab.kubeconfig\n  KUBECONFIG=/tmp/homelab.kubeconfig kubectl get nodes\n  homelabctl credentials --role k8sadmin --ttl 2h\n  homelabctl credentials --format token --output /secure/token",
+	},
 	"homelabctl deploy": {long: "Preview or reconcile Helmfile desired state. Deployment remains separate from image publication and CI. The shared image tag defaults to the full committed Git SHA and must already exist in the registry."},
 	"homelabctl deploy diff": {
 		long:    "Run Helmfile diff from cluster/ without applying releases. Select either one validated release name or one dependency stage for a bounded preview.",

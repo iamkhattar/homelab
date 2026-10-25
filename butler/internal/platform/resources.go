@@ -26,6 +26,7 @@ var (
 	PocketIDGroupGVR   = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "pocketidgroups"}
 	CredentialGVR      = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "managedcredentials"}
 	GarageBucketGVR    = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "garagebuckets"}
+	VaultOIDCRoleGVR   = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "vaultoidcroles"}
 	ButlerOperationGVR = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "butleroperations"}
 )
 
@@ -113,6 +114,24 @@ type BucketPermissions struct {
 	Owner bool `json:"owner"`
 }
 
+// VaultOIDCRole declares one Vault auth/jwt role. The Vault chart owns these
+// resources because Vault owns the policy set; Butler only converges provider
+// state. There is no status subresource: a role either matches its declaration
+// or it is rewritten on the next pass.
+type VaultOIDCRole struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              VaultOIDCRoleSpec `json:"spec"`
+}
+
+type VaultOIDCRoleSpec struct {
+	// Group is the Pocket ID group name and the Vault role name.
+	Group    string   `json:"group"`
+	Policies []string `json:"policies"`
+	TTL      string   `json:"ttl,omitempty"`
+	MaxTTL   string   `json:"maxTTL,omitempty"`
+}
+
 type Resources interface {
 	ListPocketIDClients(context.Context) ([]PocketIDClient, error)
 	UpdatePocketIDClientStatus(context.Context, *PocketIDClient) error
@@ -122,6 +141,7 @@ type Resources interface {
 	UpdateManagedCredentialStatus(context.Context, *ManagedCredential) error
 	ListGarageBuckets(context.Context) ([]GarageBucket, error)
 	UpdateGarageBucketStatus(context.Context, *GarageBucket) error
+	ListVaultOIDCRoles(context.Context) ([]VaultOIDCRole, error)
 }
 
 type Store struct{ dynamic dynamic.Interface }
@@ -141,6 +161,7 @@ func (s *Store) WatchChanges(ctx context.Context) (<-chan struct{}, error) {
 		PocketIDGroupGVR,
 		CredentialGVR,
 		GarageBucketGVR,
+		VaultOIDCRoleGVR,
 	} {
 		informer := factory.ForResource(gvr)
 		if _, err := informer.Informer().AddEventHandler(newChangeHandler(events)); err != nil {
@@ -222,6 +243,9 @@ func (s *Store) ListGarageBuckets(ctx context.Context) ([]GarageBucket, error) {
 }
 func (s *Store) UpdateGarageBucketStatus(ctx context.Context, item *GarageBucket) error {
 	return updateNamespacedStatus(ctx, s.dynamic, GarageBucketGVR, item.Namespace, item)
+}
+func (s *Store) ListVaultOIDCRoles(ctx context.Context) ([]VaultOIDCRole, error) {
+	return listNamespaced[VaultOIDCRole](ctx, s.dynamic, VaultOIDCRoleGVR)
 }
 
 func Ready(generation int64, providerID string) ResourceStatus {

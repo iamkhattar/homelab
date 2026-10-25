@@ -56,7 +56,7 @@ they do not block the first recoverable Titan installation.
 | Ingress and private-address DNS | Verified | Namecheap publishes `*.6940469.xyz` and the apex to Titan's reserved `192.168.1.163`, with no AAAA record or router port-forward. The permanent acme-dns CNAME is verified, the production wildcard certificate is Ready, and an authenticated Butler request succeeds through Traefik at `https://butler.6940469.xyz`. |
 | Persistent storage | Ready for testing | K3s local-path with bounded PVCs is the accepted single-node starting point. Select the encrypted off-node backup target and rehearse restores before storing important data. |
 | Prometheus, Grafana, Loki, Tempo and Alloy | Ready in repo | Pinned bounded charts, seven-day retention, kube-state-metrics, node-exporter, OTLP receivers, log collection, Butler metrics/logs/traces, Grafana correlation, reusable all-workload dashboards and workload/Job/PVC/OOM alerts render. Choose and test the final off-cluster Alertmanager receiver before relying on alerts. |
-| Pocket ID | Verified | The first human owner and passkey are enrolled, the owner belongs to `homelab-admin`, Butler-managed groups and clients report Ready, and `homelabctl control login` succeeds against the public issuer. Moving the identity store from SQLite to PostgreSQL is `Ready in repo`: the credential chain, the role, the database and the network rules are declared, and the change needs the new Butler image plus a redeploy before it is verified on Titan. |
+| Pocket ID | Verified | The first human owner and passkey are enrolled, the owner belongs to `butleradmin`, Butler-managed groups and clients report Ready, and `homelabctl control login` succeeds against the public issuer. The group vocabulary is the nine-name set: `butleradmin`, `butlerviewer`, `vaultadmin`, `vaultread`, `vaultmeta`, `k8sadmin`, `k8soperator`, `k8sviewer` and `household`; the old `homelab-*` names grant nothing. Moving the identity store from SQLite to PostgreSQL is `Ready in repo`: the credential chain, the role, the database and the network rules are declared, and the change needs the new Butler image plus a redeploy before it is verified on Titan. |
 | Vault and Butler | Operational | Vault is initialized and unsealed, normal Butler reconciliation reports success through its authenticated HTTPS ingress, and recovery now reports `operational`. The Pocket ID and Vault browser proofs have both passed on Titan. Export the recovery Secret to an age-encrypted off-cluster bundle and restore-test it before relying on later stages. A restart seals Vault again; the recovery workload now unseals it automatically from the recovery Secret, which is `Ready in repo` until the image is published and deployed. |
 | Shared PostgreSQL, Redis and Garage | Ready in repo | PostgreSQL 18.6 (chart 18.8.13), Redis 8.10 (chart 28.0.12), least-privilege consumer projections, persistence, NetworkPolicies and Garage v2 API reconciliation render successfully. Mutable Bitnami community tags are pinned by multi-architecture digest; deploy and restore-test on Titan. |
 | Actions Runner Controller | Ready in repo | Controller and one scale-to-zero runner set render successfully; create/import a least-privilege GitHub App and prove a read-only job before deployment authority |
@@ -71,8 +71,11 @@ they do not block the first recoverable Titan installation.
 
 - `homelabctl control login` uses Pocket ID Authorization Code with PKCE and a
   loopback callback; logout removes the private cached session.
-- Butler issues only configured short-lived Kubernetes roles from Vault and
-  never records the returned bearer token.
+- Butler does not broker cluster credentials. `homelabctl credentials` logs in
+  to Vault as the requesting identity, mints a `k8sadmin`/`k8soperator`/
+  `k8sviewer` credential through the group-bound policy, and prints a
+  kubeconfig; the former Butler credential endpoint and `control credentials`
+  command are removed, so `butleradmin` no longer implies `cluster-admin`.
 - Butler is stateless. Operations and audit-safe events survive pod restarts as
   bounded, secret-free `ButlerOperation` Kubernetes resources; there is no
   Butler PVC.
@@ -102,6 +105,11 @@ they do not block the first recoverable Titan installation.
   dashboards are represented in Helmfile.
 - Real Vault, Pocket ID and Kubernetes integration tests exist behind the
   explicit `integration` build tag and `BUTLER_INTEGRATION=1` guard.
+- Butler's operator tier is disabled (`oidc.groups.operator: ""`): two active
+  Butler roles remain, and cluster authority is delegated to Vault groups.
+- The Vault chart declares its own authority groups as `VaultOIDCRole`
+  resources; Butler converges them into `auth/jwt/role/<group>` with drift
+  repair, while `k8sIssuance` configures only the Kubernetes secrets engine.
 - Butler exposes no browser surface. Its normal and recovery runtimes serve
   only their JSON APIs, and `homelabctl control` is the sole operator interface,
   including `control reconcile` for one serialized reconciliation pass.

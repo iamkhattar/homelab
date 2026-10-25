@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,18 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iamkhattar/homelab/butler/internal/access"
-	"github.com/iamkhattar/homelab/butler/internal/config"
 	"github.com/iamkhattar/homelab/butler/internal/operations"
 	"github.com/iamkhattar/homelab/butler/internal/reconciler"
 	"github.com/iamkhattar/homelab/butler/internal/vault"
 )
-
-type serverCredentialIssuer struct{}
-
-func (serverCredentialIssuer) IssueKubernetesCredential(_ context.Context, role, namespace string, ttl time.Duration) (vault.KubernetesCredential, error) {
-	return vault.KubernetesCredential{Role: role, Namespace: namespace, ServiceAccount: "issued", Token: "secret-token", TTLSeconds: int64(ttl.Seconds()), ExpiresAt: time.Now().Add(ttl)}, nil
-}
 
 func newTestServer(t *testing.T, token string) *Server {
 	t.Helper()
@@ -161,28 +152,14 @@ func TestReconcile_Success(t *testing.T) {
 	}
 }
 
-func TestKubernetesCredentialEndpointDoesNotAuditToken(t *testing.T) {
+func TestKubernetesCredentialEndpointIsRemoved(t *testing.T) {
+	// Cluster credentials are minted by Vault as the requesting user. Butler
+	// must not expose a brokered credential route at all: a missing route is
+	// the desired 404/405, never an authorization decision.
 	srv := newTestServer(t, "tok")
-	service, err := access.NewCredentialService(serverCredentialIssuer{}, config.K8sIssuanceConfig{
-		HostNamespace: "kube-system",
-		Roles:         []config.K8sIssuanceRoleSpec{{Name: "homelab-viewer", MaxTTL: "1h"}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	srv.ConfigureControlPlane(nil, service)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/access/kubernetes-credentials", bytes.NewBufferString(`{"role":"homelab-viewer","ttl":"15m"}`))
 	rec := httptest.NewRecorder()
-	srv.ServeHTTP(rec, req)
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-	if rec.Header().Get("Cache-Control") != "no-store" {
-		t.Fatalf("Cache-Control = %q", rec.Header().Get("Cache-Control"))
-	}
-	for _, event := range srv.operations.Events() {
-		if bytes.Contains([]byte(event.Message), []byte("secret-token")) {
-			t.Fatalf("credential leaked into event: %#v", event)
-		}
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/access/kubernetes-credentials", bytes.NewBufferString(`{"role":"k8sviewer","ttl":"15m"}`)))
+	if rec.Code != http.StatusNotFound && rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want 404/405 for the removed credential endpoint", rec.Code)
 	}
 }

@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/iamkhattar/homelab/butler/internal/access"
 	"github.com/iamkhattar/homelab/butler/internal/identity"
@@ -19,13 +18,12 @@ import (
 
 // Server is the Butler HTTP server.
 type Server struct {
-	mux         *http.ServeMux
-	scheduler   *reconciler.Scheduler
-	vault       *vault.Client
-	auth        *AuthMiddleware
-	identity    *identity.Service
-	operations  *operations.Store
-	credentials *access.CredentialService
+	mux        *http.ServeMux
+	scheduler  *reconciler.Scheduler
+	vault      *vault.Client
+	auth       *AuthMiddleware
+	identity   *identity.Service
+	operations *operations.Store
 }
 
 // New creates a new Server. If auth is nil, JWT protection is disabled.
@@ -41,10 +39,11 @@ func New(scheduler *reconciler.Scheduler, vc *vault.Client, auth *AuthMiddleware
 	return s
 }
 
-// ConfigureControlPlane wires the normal-mode services exposed by /api/v1.
-func (s *Server) ConfigureControlPlane(identityService *identity.Service, credentialService *access.CredentialService) {
+// ConfigureControlPlane wires the normal-mode identity service exposed by
+// /api/v1. Butler does not broker cluster credentials: Vault mints them as the
+// requesting user, so no credential service exists here.
+func (s *Server) ConfigureControlPlane(identityService *identity.Service) {
 	s.identity = identityService
-	s.credentials = credentialService
 }
 
 func (s *Server) UseOperationsStore(store *operations.Store) {
@@ -72,33 +71,6 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /api/v1/identity/groups", s.require(access.Viewer, http.HandlerFunc(s.handleGroups)))
 	s.mux.Handle("GET /api/v1/identity/clients", s.require(access.Viewer, http.HandlerFunc(s.handleClients)))
 	s.mux.Handle("POST /api/v1/identity/clients/{id}/rotate", s.require(access.Admin, http.HandlerFunc(s.handleRotateClient)))
-	s.mux.Handle("POST /api/v1/access/kubernetes-credentials", s.require(access.Admin, http.HandlerFunc(s.handleKubernetesCredential)))
-}
-
-func (s *Server) handleKubernetesCredential(w http.ResponseWriter, r *http.Request) {
-	if s.credentials == nil {
-		http.Error(w, "credential issuance unavailable", http.StatusServiceUnavailable)
-		return
-	}
-	var body struct {
-		Role string `json:"role"`
-		TTL  string `json:"ttl"`
-	}
-	if !decodeJSON(w, r, &body) {
-		return
-	}
-	ttl, err := time.ParseDuration(body.TTL)
-	if err != nil {
-		http.Error(w, "invalid credential TTL", http.StatusBadRequest)
-		return
-	}
-	principal, _ := access.PrincipalFrom(r.Context())
-	credential, err := s.credentials.Issue(r.Context(), principal, body.Role, ttl)
-	if err == nil {
-		s.operations.Record("access.kubernetes-credential.issued", actorFrom(r), "Short-lived Kubernetes credential issued for approved role "+body.Role)
-	}
-	w.Header().Set("Cache-Control", "no-store")
-	respondCode(w, http.StatusCreated, credential, err)
 }
 
 // handleRoot answers the unauthenticated root path with a plain-text pointer.

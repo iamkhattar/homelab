@@ -45,7 +45,7 @@ func TestVerifyVaultOIDCLoginUsesAndRevokesTemporaryToken(t *testing.T) {
 
 	evidence, err := VerifyVaultOIDCLogin(t.Context(), VaultOIDCOptions{
 		Address:       server.URL,
-		Role:          "homelab-admin",
+		Role:          "vaultadmin",
 		ListenAddress: "127.0.0.1:0",
 		Timeout:       10 * time.Second,
 		OpenURL: func(string) error {
@@ -80,5 +80,61 @@ func TestVerifyAndRevokeVaultTokenRejectsUnderprivilegedOIDCLogin(t *testing.T) 
 	}{ClientToken: "viewer", Policies: []string{"vault-read"}}}
 	if _, err := verifyAndRevokeVaultToken(t.Context(), VaultOIDCOptions{Address: server.URL, HTTPClient: server.Client()}, login); err == nil {
 		t.Fatal("underprivileged Vault login accepted")
+	}
+}
+
+func TestLoginVaultOIDCReturnsTheLiveTokenWithoutRevoking(t *testing.T) {
+	var redirectURI string
+	var revoked atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/auth/jwt/oidc/auth_url":
+			var body map[string]string
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["role"] != "k8sviewer" {
+				t.Errorf("role = %q, want k8sviewer", body["role"])
+			}
+			redirectURI = body["redirect_uri"]
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": map[string]string{"auth_url": "https://identity.example.test/authorize"}})
+		case "/v1/auth/jwt/oidc/callback":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"auth": map[string]interface{}{
+				"client_token": "live-vault-token",
+				"policies":     []string{"default", "k8s-viewer"},
+			}})
+		case "/v1/auth/token/revoke-self":
+			revoked.Store(true)
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	login, err := LoginVaultOIDC(t.Context(), VaultOIDCOptions{
+		Address:       server.URL,
+		Role:          "k8sviewer",
+		ListenAddress: "127.0.0.1:0",
+		Timeout:       10 * time.Second,
+		OpenURL: func(string) error {
+			response, err := http.Get(redirectURI + "?state=test&code=code") // #nosec G107 -- test-only loopback URL.
+			if err == nil {
+				_ = response.Body.Close()
+			}
+			return err
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if login.Token != "live-vault-token" {
+		t.Fatalf("token = %q", login.Token)
+	}
+	if len(login.Policies) != 2 || login.Policies[1] != "k8s-viewer" {
+		t.Fatalf("policies = %v", login.Policies)
+	}
+	if revoked.Load() {
+		t.Fatal("a credential-minting login must keep its token: revoking it also revokes the issued lease")
 	}
 }

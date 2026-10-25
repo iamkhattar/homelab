@@ -19,7 +19,7 @@ spec:
   redirectURIs:
     - http://127.0.0.1:17654/callback
   vaultPath: oauth/homelabctl
-  allowedUserGroups: [homelab-admin, homelab-operator, homelab-viewer]
+  allowedUserGroups: [butleradmin, butlerviewer]
 ---
 apiVersion: platform.6940469.xyz/v1alpha1
 kind: PocketIDClient
@@ -32,4 +32,8 @@ spec:
     - http://localhost:8250/oidc/callback
     - https://vault.6940469.xyz/ui/vault/auth/jwt/oidc/callback
   vaultPath: oauth/vault
-  allowedUserGroups: [homelab-admin, homelab-operator, homelab-viewer]
+  # Vault's OIDC client admits every platform identity: Butler users reach the
+  # Vault UI, and each Vault/k8s group logs in with the role carrying its own
+  # policy. The group list is the sign-in allowlist, not the authorization
+  # grant; VaultOIDCRole declares what each group may do.
+  allowedUserGroups: [butleradmin, butlerviewer, vaultadmin, vaultread, vaultmeta, k8sadmin, k8soperator, k8sviewer]

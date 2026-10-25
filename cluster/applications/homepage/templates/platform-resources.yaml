@@ -19,4 +19,4 @@ spec:
   redirectURIs:
     - https://home.6940469.xyz/api/auth/callback/homepage-oidc
   vaultPath: oauth/homepage
-  allowedUserGroups: [household, homelab-admin, homelab-operator, homelab-viewer]
+  allowedUserGroups: [household, butleradmin, butlerviewer]
