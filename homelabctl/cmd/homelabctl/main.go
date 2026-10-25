@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -26,6 +27,12 @@ func main() {
 
 	if err := root.ExecuteContext(context.Background()); err != nil {
 		ui.New(os.Stderr).Error(fmt.Sprint(err))
+		// Commands that must distinguish a negative result from a failed run
+		// (for example provider drift) carry their own exit status.
+		var exitCoder interface{ ExitCode() int }
+		if errors.As(err, &exitCoder) {
+			os.Exit(exitCoder.ExitCode())
+		}
 		os.Exit(1)
 	}
 }

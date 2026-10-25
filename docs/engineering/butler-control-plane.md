@@ -265,6 +265,7 @@ The current API is under `/api/v1`:
 | Endpoint | Minimum role | Behaviour |
 | --- | --- | --- |
 | `GET /me`, `/status`, `/operations`, `/events` | viewer | Inspect control-plane state |
+| `GET /orphans` | viewer | Read-only comparison of declarations with Pocket ID and Vault objects |
 | `POST /reconcile` | operator (admin while the operator tier is disabled) | Queue an asynchronous reconciliation |
 | `GET/POST /identity/users` | viewer/admin | List or create users |
 | `PUT /identity/users/{id}` | admin | Update or disable a user |
@@ -341,6 +342,17 @@ the observed generation, provider identifier and a standard `Ready` condition.
 Deleting a declaration does not delete provider data in this initial API; that
 retain-by-default rule prevents an accidental Helm removal destroying an OIDC
 client, Vault material, or bucket.
+
+Retain-by-default means every rename leaves the previous Pocket ID client or
+group, Vault auth role, Kubernetes secrets-engine role or policy behind, and
+nothing in the repository references it any more. `GET /api/v1/orphans` (and
+`homelabctl control orphans`) is the supported way to find that debris. It
+compares declarations with the live provider and reports `orphaned` objects
+separately from `missing` declarations, because a reconcile that never ran looks
+identical to a rename from the operator's seat. The report is strictly
+read-only: it never deletes, repairs or writes provider state, returns names and
+kinds rather than secret values, and marks only the provider that failed as
+`unavailable` instead of failing the whole comparison.
 
 There is deliberately no `ApplicationIntegration`. It duplicated chart
 metadata without driving a provider. A chart now declares only the concrete

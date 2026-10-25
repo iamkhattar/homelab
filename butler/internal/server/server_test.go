@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,7 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iamkhattar/homelab/butler/internal/config"
 	"github.com/iamkhattar/homelab/butler/internal/operations"
+	"github.com/iamkhattar/homelab/butler/internal/orphans"
+	"github.com/iamkhattar/homelab/butler/internal/platform"
+	"github.com/iamkhattar/homelab/butler/internal/pocketid"
 	"github.com/iamkhattar/homelab/butler/internal/reconciler"
 	"github.com/iamkhattar/homelab/butler/internal/vault"
 )
@@ -150,6 +155,97 @@ func TestReconcile_Success(t *testing.T) {
 	if resp.Kind != "reconcile" {
 		t.Errorf("expected reconcile operation, got %#v", resp)
 	}
+}
+
+func TestOrphansReportsUnavailableWhenNotConfigured(t *testing.T) {
+	srv := newTestServer(t, "tok")
+	rec := httptest.NewRecorder()
+
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/orphans", nil))
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", rec.Code)
+	}
+}
+
+func TestOrphansReturnsProviderDriftJSON(t *testing.T) {
+	srv := newTestServer(t, "tok")
+	srv.ConfigureOrphans(orphans.New(stubDeclarations{}, stubPocketID{
+		clients: []pocketid.OIDCClient{{Name: "retired-client"}},
+	}, stubVault{
+		policies: []string{"default", "root", "butler", "vso"},
+	}, &config.Config{
+		Namespace:   "security",
+		OIDC:        config.OIDCConfig{Issuer: "https://auth.example.com"},
+		K8sIssuance: config.K8sIssuanceConfig{Roles: []config.K8sIssuanceRoleSpec{{Name: "k8sadmin"}}},
+	}))
+
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/orphans", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf("Content-Type = %q, want application/json", got)
+	}
+	var report orphans.Report
+	if err := json.NewDecoder(rec.Body).Decode(&report); err != nil {
+		t.Fatalf("decoding report: %v", err)
+	}
+	if len(report.Orphaned) != 1 || report.Orphaned[0].Name != "retired-client" {
+		t.Fatalf("orphaned = %+v, want the retired client only", report.Orphaned)
+	}
+	for _, entry := range report.Orphaned {
+		if entry.Kind != orphans.KindPocketIDClient {
+			t.Fatalf("kind = %q", entry.Kind)
+		}
+	}
+}
+
+type stubDeclarations struct{}
+
+func (stubDeclarations) ListPocketIDClients(context.Context) ([]platform.PocketIDClient, error) {
+	return nil, nil
+}
+
+func (stubDeclarations) ListPocketIDGroups(context.Context) ([]platform.PocketIDGroup, error) {
+	return nil, nil
+}
+
+func (stubDeclarations) ListVaultOIDCRoles(context.Context) ([]platform.VaultOIDCRole, error) {
+	return nil, nil
+}
+
+type stubPocketID struct {
+	clients []pocketid.OIDCClient
+	groups  []pocketid.UserGroup
+}
+
+func (s stubPocketID) ListClients(context.Context) ([]pocketid.OIDCClient, error) {
+	return s.clients, nil
+}
+
+func (s stubPocketID) ListGroups(context.Context) ([]pocketid.UserGroup, error) {
+	return s.groups, nil
+}
+
+type stubVault struct {
+	jwtRoles        []string
+	kubernetesRoles []string
+	policies        []string
+}
+
+func (s stubVault) ListJWTRoleNames(context.Context) ([]string, error) {
+	return s.jwtRoles, nil
+}
+
+func (s stubVault) ListKubernetesRoleNames(context.Context) ([]string, error) {
+	return s.kubernetesRoles, nil
+}
+
+func (s stubVault) ListACLPolicyNames(context.Context) ([]string, error) {
+	return s.policies, nil
 }
 
 func TestKubernetesCredentialEndpointIsRemoved(t *testing.T) {

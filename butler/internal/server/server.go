@@ -11,6 +11,7 @@ import (
 	"github.com/iamkhattar/homelab/butler/internal/access"
 	"github.com/iamkhattar/homelab/butler/internal/identity"
 	"github.com/iamkhattar/homelab/butler/internal/operations"
+	"github.com/iamkhattar/homelab/butler/internal/orphans"
 	"github.com/iamkhattar/homelab/butler/internal/pocketid"
 	"github.com/iamkhattar/homelab/butler/internal/reconciler"
 	"github.com/iamkhattar/homelab/butler/internal/vault"
@@ -24,6 +25,7 @@ type Server struct {
 	auth       *AuthMiddleware
 	identity   *identity.Service
 	operations *operations.Store
+	orphans    *orphans.Service
 }
 
 // New creates a new Server. If auth is nil, JWT protection is disabled.
@@ -52,6 +54,12 @@ func (s *Server) UseOperationsStore(store *operations.Store) {
 	}
 }
 
+// ConfigureOrphans wires the read-only provider drift report. Without it the
+// endpoint reports that the domain is unavailable rather than panicking.
+func (s *Server) ConfigureOrphans(service *orphans.Service) {
+	s.orphans = service
+}
+
 func (s *Server) routes() {
 	// Unauthenticated.
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
@@ -64,6 +72,7 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /api/v1/status", s.require(access.Viewer, http.HandlerFunc(s.handleStatus)))
 	s.mux.Handle("GET /api/v1/operations", s.require(access.Viewer, http.HandlerFunc(s.handleOperations)))
 	s.mux.Handle("GET /api/v1/events", s.require(access.Viewer, http.HandlerFunc(s.handleEvents)))
+	s.mux.Handle("GET /api/v1/orphans", s.require(access.Viewer, http.HandlerFunc(s.handleOrphans)))
 	s.mux.Handle("GET /api/v1/identity/users", s.require(access.Viewer, http.HandlerFunc(s.handleUsers)))
 	s.mux.Handle("POST /api/v1/identity/users", s.require(access.Admin, http.HandlerFunc(s.handleUsers)))
 	s.mux.Handle("PUT /api/v1/identity/users/{id}", s.require(access.Admin, http.HandlerFunc(s.handleUser)))
@@ -150,6 +159,17 @@ func (s *Server) handleOperations(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) handleEvents(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.operations.Events())
+}
+
+// handleOrphans returns the read-only provider drift report. Individual source
+// failures are represented inside the report, so a downed Vault or Pocket ID
+// does not turn the whole request into an error.
+func (s *Server) handleOrphans(w http.ResponseWriter, r *http.Request) {
+	if s.orphans == nil {
+		http.Error(w, "orphans domain unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	writeJSON(w, http.StatusOK, s.orphans.Report(r.Context()))
 }
 
 func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {

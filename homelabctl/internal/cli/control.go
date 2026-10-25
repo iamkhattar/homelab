@@ -50,6 +50,7 @@ func newControlCommand(s *state) *cobra.Command {
 	cmd.AddCommand(newControlGetCommand(s, options, "status", "Show reconciler status", "/api/v1/status"))
 	cmd.AddCommand(newControlGetCommand(s, options, "operations", "List recent control-plane operations", "/api/v1/operations"))
 	cmd.AddCommand(newControlGetCommand(s, options, "events", "List recent audit-safe events", "/api/v1/events"))
+	cmd.AddCommand(newControlOrphansCommand(s, options))
 	cmd.AddCommand(newControlReconcileCommand(s, options))
 	cmd.AddCommand(newControlUsersCommand(s, options))
 	cmd.AddCommand(newControlGetCommand(s, options, "groups", "List Pocket ID groups", "/api/v1/identity/groups"))
@@ -373,6 +374,68 @@ func newControlGetCommand(s *state, options *controlOptions, use, short, path st
 			return printJSON(s, result)
 		})
 	}}
+}
+
+// driftExitCode is returned when the orphans report ran successfully but found
+// provider objects that no longer match the repository. It is deliberately
+// distinct from the generic failure status so scripts can tell drift from a
+// command that could not run.
+const driftExitCode = 3
+
+// driftFoundError carries the drift exit status through Cobra to main.
+type driftFoundError struct{ message string }
+
+func (e driftFoundError) Error() string { return e.message }
+
+func (e driftFoundError) ExitCode() int { return driftExitCode }
+
+// newControlOrphansCommand prints the read-only provider drift report. It
+// never deletes or repairs anything; exiting non-zero is the only signal.
+func newControlOrphansCommand(s *state, options *controlOptions) *cobra.Command {
+	return &cobra.Command{
+		Use:   "orphans",
+		Short: "Report provider objects that no longer match the repository",
+		Long: "Compare the objects declared in this repository with the objects that exist in Pocket ID and Vault. " +
+			"Butler retains provider data by default, so a renamed or removed declaration leaves debris behind; " +
+			"the inverse, a declaration whose provider object never appeared, is reported separately as missing. " +
+			"This command is strictly read-only and prints JSON. It exits 3 when anything is orphaned or missing " +
+			"and 1 when the report itself could not be completed.",
+		Example: "  homelabctl control orphans\n  homelabctl control orphans --port-forward",
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return withNormalClient(cmd.Context(), s, options, func(client *controlapi.Client) error {
+				var report struct {
+					Orphaned []struct {
+						Kind string `json:"kind"`
+						Name string `json:"name"`
+						Why  string `json:"why"`
+					} `json:"orphaned"`
+					Missing []struct {
+						Kind string `json:"kind"`
+						Name string `json:"name"`
+						Why  string `json:"why"`
+					} `json:"missing"`
+					Sources []struct {
+						Name   string `json:"name"`
+						Status string `json:"status"`
+						Error  string `json:"error"`
+					} `json:"sources"`
+				}
+				if err := client.Do(cmd.Context(), http.MethodGet, "/api/v1/orphans", nil, &report); err != nil {
+					return err
+				}
+				if err := printJSON(s, report); err != nil {
+					return err
+				}
+				if len(report.Orphaned) == 0 && len(report.Missing) == 0 {
+					return nil
+				}
+				return driftFoundError{message: fmt.Sprintf(
+					"provider drift detected: %d orphaned, %d missing; the read-only report above makes no changes",
+					len(report.Orphaned), len(report.Missing))}
+			})
+		},
+	}
 }
 
 func newControlUsersCommand(s *state, options *controlOptions) *cobra.Command {

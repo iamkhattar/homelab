@@ -15,6 +15,7 @@ import (
 	"github.com/iamkhattar/homelab/butler/internal/identity"
 	"github.com/iamkhattar/homelab/butler/internal/observability"
 	"github.com/iamkhattar/homelab/butler/internal/operations"
+	"github.com/iamkhattar/homelab/butler/internal/orphans"
 	"github.com/iamkhattar/homelab/butler/internal/platform"
 	"github.com/iamkhattar/homelab/butler/internal/reconciler"
 	"github.com/iamkhattar/homelab/butler/internal/recovery"
@@ -165,7 +166,9 @@ func main() {
 		os.Exit(1)
 	}
 	srv.UseOperationsStore(operationsStore)
-	srv.ConfigureControlPlane(identity.NewService(vc, cfg.OIDC.AdminURL, platformResources))
+	identityService := identity.NewService(vc, cfg.OIDC.AdminURL, platformResources)
+	srv.ConfigureControlPlane(identityService)
+	srv.ConfigureOrphans(orphans.New(platformResources, identityService, vc, cfg))
 
 	// Start reconciliation loop in background.
 	go sched.Start(ctx, platformChanges)
