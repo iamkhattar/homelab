@@ -17,8 +17,13 @@ import (
 )
 
 const (
-	defaultCredentialRole      = "k8sviewer"
-	defaultCredentialNamespace = "security"
+	defaultCredentialRole = "k8sviewer"
+	// Vault's Kubernetes secrets engine issues a token for a service account
+	// that must exist in the requested namespace. The vault-managed-<tier>
+	// accounts live in kube-system, so that is the namespace the request names.
+	// The resulting credential is cluster-wide: the service account's
+	// ClusterRoleBinding, not this namespace, decides what it can reach.
+	defaultCredentialNamespace = "kube-system"
 	defaultCredentialTTL       = "1h"
 	maximumCredentialTTL       = 8 * time.Hour
 )
@@ -122,7 +127,7 @@ sliced straight into a temporary file. Nothing is written to disk unless
 		},
 	}
 	command.Flags().StringVar(&role, "role", defaultCredentialRole, "Vault Kubernetes role: k8sadmin, k8soperator or k8sviewer")
-	command.Flags().StringVar(&namespace, "namespace", defaultCredentialNamespace, "Kubernetes namespace for the credential")
+	command.Flags().StringVar(&namespace, "namespace", defaultCredentialNamespace, "namespace holding the Vault-managed service account (not the workload namespace)")
 	command.Flags().StringVar(&ttl, "ttl", defaultCredentialTTL, "credential lifetime (maximum 8h)")
 	command.Flags().StringVar(&format, "format", "kubeconfig", "kubeconfig or token")
 	command.Flags().StringVar(&output, "output", "", "write to this path with mode 0600 instead of stdout")
