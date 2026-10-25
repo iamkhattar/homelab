@@ -11,9 +11,18 @@ reconcile:
 # validate tokens hitting Butler's normal API.
 oidc:
   issuer: ""        # e.g. https://auth.shivlab.com — set via chart values
-  audience: butler
-  allowedAudiences:
+  # Pocket ID stamps the requesting client's ID as the ID token audience, so
+  # this lists the clients whose tokens Butler accepts. homelabctl is the CLI.
+  allowedClients:
     - homelabctl
+  # Group names are configuration, not constants: renaming a group must not
+  # require a code change. An empty name disables that tier. The operator tier
+  # is disabled: cluster operations belong to Vault and Kubernetes groups, not
+  # to a Butler middle tier.
+  groups:
+    admin: butleradmin
+    operator: ""
+    viewer: butlerviewer
   adminURL: http://pocket-id.security.svc.cluster.local
 
 certificates:
@@ -26,6 +35,12 @@ certificates:
 
 # Vault Kubernetes secrets engine — Vault as the universal credential broker
 # for K8s. The embedded local-development fallback leaves it disabled.
+#
+# These roles configure the kubernetes/ secrets engine only: the
+# kubernetes/roles/<name> entry and the ServiceAccount whose token it mints.
+# The auth/jwt roles that map Pocket ID groups to Vault policies are declared
+# separately by the Vault chart as VaultOIDCRole resources, so there is exactly
+# one source of truth for authorization.
 k8sIssuance:
   enabled: false
   hostNamespace: kube-system
@@ -33,27 +48,15 @@ k8sIssuance:
   tokenReviewerSA: vault-k8s-token-reviewer
   tokenReviewerRef: vault-k8s-token-reviewer-token
   roles:
-    - name: homelab-admin
+    - name: k8sadmin
       serviceAccountName: vault-managed-admin
       ttl: 1h
       maxTTL: 8h
-      pocketIdGroup: homelab-admin
-      vaultPolicies:
-        - vault-admin
-        - k8s-admin
-    - name: homelab-operator
+    - name: k8soperator
       serviceAccountName: vault-managed-operator
       ttl: 1h
       maxTTL: 8h
-      pocketIdGroup: homelab-operator
-      vaultPolicies:
-        - vault-read
-        - k8s-operator
-    - name: homelab-viewer
+    - name: k8sviewer
       serviceAccountName: vault-managed-viewer
       ttl: 1h
       maxTTL: 4h
-      pocketIdGroup: homelab-viewer
-      vaultPolicies:
-        - vault-read
-        - k8s-viewer

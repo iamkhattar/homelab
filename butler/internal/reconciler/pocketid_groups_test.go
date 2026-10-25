@@ -87,7 +87,7 @@ func TestPocketIDGroupsCreatesMissingGroup(t *testing.T) {
 		return http.StatusNotFound, nil
 	}, log)
 
-	store := newPlatformStore(newGroup("homelab-admin", "Homelab Admin"))
+	store := newPlatformStore(newGroup("butleradmin", "Homelab Admin"))
 	r := NewPocketIDGroups(vc, store, server.URL)
 	if err := r.Reconcile(context.Background()); err != nil {
 		t.Fatalf("Reconcile: %v", err)
@@ -96,11 +96,11 @@ func TestPocketIDGroupsCreatesMissingGroup(t *testing.T) {
 	if got := log.mutations(); len(got) != 1 || got[0].Method != http.MethodPost || got[0].Path != "/api/user-groups" {
 		t.Fatalf("expected exactly one group creation, got:%v", log)
 	}
-	status := statusOf(t, store, "PocketIDGroup")["homelab-admin"]
+	status := statusOf(t, store, "PocketIDGroup")["butleradmin"]
 	if reason := conditionReason(status); reason != "Reconciled" {
 		t.Fatalf("expected Reconciled, got %q", reason)
 	}
-	if status.ProviderID != "group-homelab-admin" {
+	if status.ProviderID != "group-butleradmin" {
 		t.Fatalf("expected the provider ID in status, got %q", status.ProviderID)
 	}
 }
@@ -108,7 +108,7 @@ func TestPocketIDGroupsCreatesMissingGroup(t *testing.T) {
 func TestPocketIDGroupsUpdatesChangedFriendlyName(t *testing.T) {
 	t.Parallel()
 	log := &callLog{}
-	server := newGroupServer(t, log, pocketid.UserGroup{ID: "gid-1", Name: "homelab-admin", FriendlyName: "Old Name"})
+	server := newGroupServer(t, log, pocketid.UserGroup{ID: "gid-1", Name: "butleradmin", FriendlyName: "Old Name"})
 	vc := newVaultServer(t, func(method, path string, _ []byte) (int, []byte) {
 		if method == http.MethodGet && path == "security/pocket-id" {
 			return http.StatusOK, kvSecret(map[string]any{"static-api-key": "machine-key"})
@@ -116,7 +116,7 @@ func TestPocketIDGroupsUpdatesChangedFriendlyName(t *testing.T) {
 		return http.StatusNotFound, nil
 	}, log)
 
-	store := newPlatformStore(newGroup("homelab-admin", "New Name"))
+	store := newPlatformStore(newGroup("butleradmin", "New Name"))
 	r := NewPocketIDGroups(vc, store, server.URL)
 	if err := r.Reconcile(context.Background()); err != nil {
 		t.Fatalf("Reconcile: %v", err)
@@ -133,7 +133,7 @@ func TestPocketIDGroupsUpdatesChangedFriendlyName(t *testing.T) {
 func TestPocketIDGroupsIsIdempotent(t *testing.T) {
 	t.Parallel()
 	log := &callLog{}
-	server := newGroupServer(t, log, pocketid.UserGroup{ID: "gid-1", Name: "homelab-admin", FriendlyName: "Homelab Admin"})
+	server := newGroupServer(t, log, pocketid.UserGroup{ID: "gid-1", Name: "butleradmin", FriendlyName: "Homelab Admin"})
 	vc := newVaultServer(t, func(method, path string, _ []byte) (int, []byte) {
 		if method == http.MethodGet && path == "security/pocket-id" {
 			return http.StatusOK, kvSecret(map[string]any{"static-api-key": "machine-key"})
@@ -141,7 +141,7 @@ func TestPocketIDGroupsIsIdempotent(t *testing.T) {
 		return http.StatusNotFound, nil
 	}, log)
 
-	r := NewPocketIDGroups(vc, newPlatformStore(newGroup("homelab-admin", "Homelab Admin")), server.URL)
+	r := NewPocketIDGroups(vc, newPlatformStore(newGroup("butleradmin", "Homelab Admin")), server.URL)
 	if err := r.Reconcile(context.Background()); err != nil {
 		t.Fatalf("Reconcile: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestPocketIDGroupsWaitsForMachineCredential(t *testing.T) {
 		return http.StatusNotFound, nil
 	}, log)
 
-	store := newPlatformStore(newGroup("homelab-admin", "Homelab Admin"))
+	store := newPlatformStore(newGroup("butleradmin", "Homelab Admin"))
 	r := NewPocketIDGroups(vc, store, server.URL)
 	if err := r.Reconcile(context.Background()); err != nil {
 		t.Fatalf("a missing machine credential must not fail the run: %v", err)
@@ -191,7 +191,7 @@ func TestPocketIDGroupsWaitsForMachineCredential(t *testing.T) {
 	if log.indexOf(http.MethodGet, "/api/user-groups") >= 0 {
 		t.Fatalf("the provider must not be called without a machine credential, got:%v", log)
 	}
-	if reason := conditionReason(statusOf(t, store, "PocketIDGroup")["homelab-admin"]); reason != "AwaitingAPIKey" {
+	if reason := conditionReason(statusOf(t, store, "PocketIDGroup")["butleradmin"]); reason != "AwaitingAPIKey" {
 		t.Fatalf("expected AwaitingAPIKey, got %q", reason)
 	}
 }
@@ -200,7 +200,7 @@ func TestPocketIDGroupsSkipsProviderWithoutItemsOrURL(t *testing.T) {
 	t.Parallel()
 	for name, store := range map[string]*platform.Store{
 		"no items": newPlatformStore(),
-		"no url":   newPlatformStore(newGroup("homelab-admin", "Homelab Admin")),
+		"no url":   newPlatformStore(newGroup("butleradmin", "Homelab Admin")),
 	} {
 		t.Run(name, func(t *testing.T) {
 			log := &callLog{}

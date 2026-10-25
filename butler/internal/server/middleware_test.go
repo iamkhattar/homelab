@@ -34,6 +34,37 @@ func TestExtractBearer(t *testing.T) {
 	}
 }
 
+func TestExtractBearerIgnoresCookies(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.AddCookie(&http.Cookie{Name: "butler_session", Value: "cookie-token"})
+	if got := extractBearer(r); got != "" {
+		t.Fatalf("extractBearer() = %q, want no cookie fallback", got)
+	}
+}
+
+func TestWrapRejectsCookieOnlyRequest(t *testing.T) {
+	// Regression guard: the API is bearer-only. A request authenticated only by
+	// the removed butler_session cookie must never reach a handler.
+	auth, err := NewAuthMiddleware(t.Context(), "https://issuer.example.test", []string{"homelabctl"}, access.Roles{Admin: "butleradmin", Viewer: "butlerviewer"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	handler := auth.Wrap(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called = true
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
+	req.AddCookie(&http.Cookie{Name: "butler_session", Value: "cookie-token"})
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", recorder.Code)
+	}
+	if called {
+		t.Fatal("handler ran for a cookie-only request")
+	}
+}
+
 func TestRequireEnforcesRoleHierarchy(t *testing.T) {
 	srv := &Server{auth: nil}
 	handler := srv.require(access.Admin, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -65,16 +96,25 @@ func TestAuthMiddleware_NilPassesThrough(t *testing.T) {
 	}
 }
 
-func TestAuthMiddlewareAudienceAllowlist(t *testing.T) {
-	auth, err := NewAuthMiddleware(t.Context(), "https://issuer.example.test", "butler", nil)
+func TestAuthMiddlewareClientAllowlist(t *testing.T) {
+	auth, err := NewAuthMiddleware(t.Context(), "https://issuer.example.test", []string{"homelabctl"}, access.Roles{Admin: "butleradmin", Viewer: "butlerviewer"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	auth.AllowAudiences("homelabctl")
-	if !auth.allowsAudience([]string{"homelabctl"}) || !auth.allowsAudience([]string{"butler"}) {
-		t.Fatal("configured first-party audience rejected")
+	if !auth.allowsAudience([]string{"homelabctl"}) {
+		t.Fatal("configured client audience rejected")
 	}
-	if auth.allowsAudience([]string{"untrusted-client"}) {
-		t.Fatal("unconfigured audience accepted")
+	// The butler client no longer exists. A token minted for any other client -
+	// including one named after this service - must not authenticate here.
+	for _, audience := range []string{"butler", "vault", "grafana", "untrusted-client"} {
+		if auth.allowsAudience([]string{audience}) {
+			t.Fatalf("audience %q accepted but not configured", audience)
+		}
+	}
+}
+
+func TestAuthMiddlewareRequiresAtLeastOneClient(t *testing.T) {
+	if _, err := NewAuthMiddleware(t.Context(), "https://issuer.example.test", nil, access.Roles{}, nil); err == nil {
+		t.Fatal("expected an error when no client is configured")
 	}
 }

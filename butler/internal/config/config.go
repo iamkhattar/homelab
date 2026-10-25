@@ -78,10 +78,18 @@ type ReconcileConfig struct {
 // butler's own API authz (verifies tokens from this issuer) and as the
 // upstream issuer for Vault's auth/jwt mount.
 type OIDCConfig struct {
-	Issuer           string   `yaml:"issuer"`
-	Audience         string   `yaml:"audience"`
-	AllowedAudiences []string `yaml:"allowedAudiences"`
-	AdminURL         string   `yaml:"adminURL"`
+	Issuer         string           `yaml:"issuer"`
+	AllowedClients []string         `yaml:"allowedClients"`
+	Groups         OIDCGroupsConfig `yaml:"groups"`
+	AdminURL       string           `yaml:"adminURL"`
+}
+
+// OIDCGroupsConfig names the identity-provider groups that grant each Butler
+// role. Empty names disable a tier.
+type OIDCGroupsConfig struct {
+	Admin    string `yaml:"admin"`
+	Operator string `yaml:"operator"`
+	Viewer   string `yaml:"viewer"`
 }
 
 type GarageConfig struct {
@@ -120,15 +128,15 @@ type K8sIssuanceConfig struct {
 	Roles                  []K8sIssuanceRoleSpec `yaml:"roles"`
 }
 
-// K8sIssuanceRoleSpec maps one Vault kubernetes/roles/<name> entry plus
-// the matching JWT role and policy set.
+// K8sIssuanceRoleSpec maps one Vault kubernetes/roles/<name> engine entry to
+// the ServiceAccount whose token it mints. It deliberately carries no group
+// or policy information: authorization groups are declared by the Vault chart
+// as VaultOIDCRole resources and reconciled separately.
 type K8sIssuanceRoleSpec struct {
-	Name               string   `yaml:"name"`               // homelab-admin / operator / viewer
-	ServiceAccountName string   `yaml:"serviceAccountName"` // vault-managed-admin etc.
-	TTL                string   `yaml:"ttl"`
-	MaxTTL             string   `yaml:"maxTTL"`
-	PocketIDGroup      string   `yaml:"pocketIdGroup"` // group claim that selects this role
-	VaultPolicies      []string `yaml:"vaultPolicies"` // attached to the Vault token issued from auth/jwt
+	Name               string `yaml:"name"`               // k8sadmin / k8soperator / k8sviewer
+	ServiceAccountName string `yaml:"serviceAccountName"` // vault-managed-admin etc.
+	TTL                string `yaml:"ttl"`
+	MaxTTL             string `yaml:"maxTTL"`
 }
 
 // Load resolves butler's config. Resolution order:
@@ -152,7 +160,6 @@ func Load() (*Config, error) {
 	cfg.Vault.Address = envOr("VAULT_ADDR", cfg.Vault.Address)
 	cfg.Server.Port = envOr("SERVER_PORT", cfg.Server.Port)
 	cfg.OIDC.Issuer = envOr("OIDC_ISSUER", cfg.OIDC.Issuer)
-	cfg.OIDC.Audience = envOr("OIDC_AUDIENCE", cfg.OIDC.Audience)
 	cfg.Namespace = envOr("NAMESPACE", "security")
 	cfg.LogLevel = envOr("LOG_LEVEL", "info")
 
@@ -183,8 +190,25 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("certificates.acmeDNSURL must be an absolute HTTPS URL")
 	}
 	if c.OIDC.Issuer != "" {
-		if c.OIDC.Audience == "" {
-			return fmt.Errorf("oidc.audience is required when oidc.issuer is configured")
+		if len(c.OIDC.AllowedClients) == 0 {
+			return fmt.Errorf("oidc.allowedClients is required when oidc.issuer is configured")
+		}
+		if c.OIDC.Groups.Admin == "" {
+			return fmt.Errorf("oidc.groups.admin is required when oidc.issuer is configured")
+		}
+		seen := map[string]string{}
+		for tier, name := range map[string]string{
+			"admin":    c.OIDC.Groups.Admin,
+			"operator": c.OIDC.Groups.Operator,
+			"viewer":   c.OIDC.Groups.Viewer,
+		} {
+			if name == "" {
+				continue
+			}
+			if other, ok := seen[name]; ok {
+				return fmt.Errorf("oidc.groups.%s and oidc.groups.%s must name different groups", other, tier)
+			}
+			seen[name] = tier
 		}
 		if _, err := absoluteHTTPURL(c.OIDC.Issuer); err != nil {
 			return fmt.Errorf("oidc.issuer: %w", err)

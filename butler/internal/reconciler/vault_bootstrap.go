@@ -78,8 +78,6 @@ func (r *VaultBootstrap) Reconcile(ctx context.Context) error {
 func (r *VaultBootstrap) configure(ctx context.Context) error {
 	in := vault.BootstrapInput{
 		OIDCIssuer:             r.cfg.OIDC.Issuer,
-		OIDCAudience:           r.cfg.OIDC.Audience,
-		JWTRoles:               buildJWTRoles(r.cfg),
 		K8sEngine:              buildK8sEngineConfig(r.cfg),
 		ButlerRole:             r.cfg.Vault.KubernetesAuth.Role,
 		ButlerServiceAccount:   "butler",
@@ -87,7 +85,6 @@ func (r *VaultBootstrap) configure(ctx context.Context) error {
 		RecoveryRole:           "butler-recovery",
 		RecoveryServiceAccount: "butler-recovery",
 		ConsumerRoles:          buildConsumerRoles(r.cfg),
-		PublicDomain:           r.cfg.Certificates.Domain,
 	}
 
 	// Best-effort: read OAuth client creds for Vault from KV. If they have not
@@ -129,20 +126,6 @@ func buildConsumerRoles(cfg *config.Config) []vault.ConsumerRoleSpec {
 		out = append(out, vault.ConsumerRoleSpec{
 			Name: role.Name, Namespace: role.Namespace,
 			ServiceAccounts: role.ServiceAccounts, Paths: role.Paths,
-		})
-	}
-	return out
-}
-
-func buildJWTRoles(cfg *config.Config) []vault.JWTRoleSpec {
-	out := make([]vault.JWTRoleSpec, 0, len(cfg.K8sIssuance.Roles))
-	for _, r := range cfg.K8sIssuance.Roles {
-		out = append(out, vault.JWTRoleSpec{
-			Name:          r.Name,
-			PocketIDGroup: r.PocketIDGroup,
-			Policies:      r.VaultPolicies,
-			TTL:           r.TTL,
-			MaxTTL:        r.MaxTTL,
 		})
 	}
 	return out

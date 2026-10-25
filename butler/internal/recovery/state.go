@@ -271,7 +271,10 @@ func (s *Service) ConfirmIdentity(ctx context.Context, evidence IdentityEvidence
 	if strings.TrimSpace(evidence.PocketIDSubject) == "" || evidence.ButlerRole != "admin" {
 		return fmt.Errorf("a Pocket ID-authenticated Butler administrator is required")
 	}
-	if !contains(evidence.VaultPolicies, "vault-admin") || !contains(evidence.VaultPolicies, "k8s-admin") {
+	// Vault proves the administrator path. Cluster access is a separate
+	// authorization decision made by Vault when the user mints a k8s*
+	// credential, so one Vault role no longer has to carry both policies.
+	if !contains(evidence.VaultPolicies, "vault-admin") {
 		return fmt.Errorf("Vault OIDC login did not receive the required administrator policies")
 	}
 	state, err := s.k8s.CoreV1().ConfigMaps(s.namespace).Get(ctx, stateConfigMapName, metav1.GetOptions{})

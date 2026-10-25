@@ -55,7 +55,7 @@ grafana:
       auth_url: https://auth.6940469.xyz/authorize
       token_url: https://auth.6940469.xyz/api/oidc/token
       api_url: https://auth.6940469.xyz/api/oidc/userinfo
-      role_attribute_path: "contains(groups[*], 'homelab-admin') && 'Admin' || contains(groups[*], 'homelab-operator') && 'Editor' || 'Viewer'"
+      role_attribute_path: "contains(groups[*], 'butleradmin') && 'Admin' || 'Viewer'"
   dashboardProviders:
     dashboardproviders.yaml:
       apiVersion: 1

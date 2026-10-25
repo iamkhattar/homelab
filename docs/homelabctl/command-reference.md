@@ -139,19 +139,17 @@ non-persistent overrides.
 | --- | --- | --- |
 | `control login`, `logout` | Create or remove the local Pocket ID session | Fixed loopback callback, PKCE, issuer/audience/state/nonce validation and private file permissions |
 | `control recovery` | Read bootstrap and Vault lifecycle status | Uses a 10-minute, audience-bound Kubernetes TokenRequest and the non-ingressed recovery service |
-| `control recovery ui` | Open the break-glass browser console | Random loopback-only session; CLI injects the recovery token and the browser never receives it |
 | `control bootstrap --confirm` | Advance the resumable Vault bootstrap | Explicit confirmation is mandatory; secrets are never returned |
-| `control verify-identity --confirm` | Prove Pocket ID access to Butler and Vault before accepting bootstrap | Requires Butler admin; the temporary Vault token is verified, revoked and never sent to Butler |
+| `control verify-identity --confirm` | Prove Pocket ID access to Butler and Vault before accepting bootstrap | Requires Butler admin; the `vaultadmin` role's temporary token must carry `vault-admin`, is revoked and is never sent to Butler |
 | `control recovery export` | Write the recovery Secret directly to an age-encrypted off-repository file | Refuses repository and filesystem-root destinations and existing output files |
 | `control status`, `operations`, `events` | Inspect reconciliation and audit-safe activity | Viewer access; no request bodies or secret values are recorded |
+| `control reconcile` | Queue one serialized reconciliation pass | Operator access is enforced server-side, which currently means Butler admin because the operator tier is disabled; the CLI cannot widen scope or bypass serialization |
 | `control users ...`, `groups`, `clients ...` | Manage Pocket ID identities and rotate client secrets | Mutations require Butler admin; rotated secrets go directly to Vault |
-| `control credentials issue` | Issue an approved short-lived Kubernetes token | Admin-only; role, namespace and maximum TTL are server-side; default output is an `ExecCredential` |
 
 ```bash
 # One-time private bootstrap. Butler generates Pocket ID's machine credential
 # directly in Vault; no API key is passed on the command line.
 homelabctl control recovery
-homelabctl control recovery ui
 homelabctl control certificate status
 homelabctl control certificate verify-dns --confirm
 homelabctl control bootstrap --confirm
@@ -163,16 +161,46 @@ homelabctl control recovery export \
 homelabctl control login
 homelabctl control verify-identity --confirm
 homelabctl control status
+homelabctl control reconcile
 homelabctl control users list
 homelabctl control users set-groups USER_ID --group GROUP_ID
 homelabctl control clients rotate CLIENT_ID
-homelabctl control credentials issue --role homelab-viewer --ttl 15m
 homelabctl control logout
 ```
 
 `control certificate status` prints only the CNAME host/target and readiness;
 the acme-dns username and password never cross the recovery API. DNS acceptance
 requires `control certificate verify-dns --confirm` and an exact public match.
+
+## Cluster credentials
+
+`homelabctl credentials` is a top-level command, not part of `control`. It
+completes Vault's browser OIDC login as the requesting identity and asks Vault's
+Kubernetes secrets engine for a short-lived credential. Butler is not in the
+path: authorization is the Vault policy bound to the identity's Pocket ID
+group, so `butleradmin` does not imply cluster access.
+
+| Flag | Default | Boundary |
+| --- | --- | --- |
+| `--role` | `k8sviewer` | Exactly `k8sadmin`, `k8soperator` or `k8sviewer`; anything else is rejected before the browser opens |
+| `--namespace` | `security` | Kubernetes namespace for the minted credential |
+| `--ttl` | `1h` | Positive and at most `8h`; Vault enforces the engine role's own maximum |
+| `--format` | `kubeconfig` | `kubeconfig` or `token` |
+| `--output` | stdout | Writes a mode-0600 file instead; nothing is written to disk otherwise |
+| `--vault-address` | `https://vault.6940469.xyz` | Overridden by `VAULT_ADDR` when set |
+| `--server`, `--certificate-authority-data` | current kubectl context | Only used for `kubeconfig`; supplying both skips the local kubectl read |
+| `--cluster` | `homelab` | Cluster name in the rendered kubeconfig |
+
+```bash
+homelabctl credentials > /tmp/homelab.kubeconfig
+KUBECONFIG=/tmp/homelab.kubeconfig kubectl get nodes
+homelabctl credentials --role k8sadmin --ttl 2h
+homelabctl credentials --format token --output /secure/short-lived-token
+```
+
+When the identity's group does not carry the requested role, Vault returns a
+permission error and the command prints it unchanged. That error is the
+authorization failure, not a transport problem.
 
 ## Deployment and infrastructure
 

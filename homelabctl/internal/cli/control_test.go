@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -54,18 +56,53 @@ func TestControlDryRunUsesShortLivedRecoveryToken(t *testing.T) {
 	}
 }
 
-func TestControlRecoveryUIDryRunKeepsTokenOutOfOutput(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-	runner := command.NewRunner(strings.NewReader(""), &stdout, &stderr)
+func TestControlReconcileUsesNormalAPI(t *testing.T) {
+	t.Setenv("BUTLER_TOKEN", "test-token")
+	var stderr bytes.Buffer
+	runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &stderr)
 	root := New(BuildInfo{}, runner)
-	root.SetArgs([]string{"--repo-root", testRepository(t), "--dry-run", "control", "recovery", "ui"})
+	root.SetArgs([]string{"--repo-root", testRepository(t), "--dry-run", "control", "reconcile", "--port-forward"})
 	if err := root.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	combined := stdout.String() + stderr.String()
-	for _, expected := range []string{"create token butler-recovery-client", "--audience=butler-recovery", "loopback-only recovery console"} {
-		if !strings.Contains(combined, expected) {
-			t.Fatalf("output %q does not contain %q", combined, expected)
+	for _, expected := range []string{"port-forward service/butler", "8080:8080", "--address 127.0.0.1"} {
+		if !strings.Contains(stderr.String(), expected) {
+			t.Fatalf("output %q does not contain %q", stderr.String(), expected)
+		}
+	}
+}
+
+func TestControlReconcilePostsToReconcileEndpoint(t *testing.T) {
+	var method, path string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method, path = r.Method, r.URL.Path
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			t.Errorf("Authorization = %q", r.Header.Get("Authorization"))
+		}
+		_, _ = w.Write([]byte(`{"kind":"reconcile","state":"running"}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("BUTLER_TOKEN", "test-token")
+	runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+	root := New(BuildInfo{}, runner)
+	root.SetArgs([]string{"--repo-root", testRepository(t), "control", "reconcile", "--address", server.URL})
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if method != http.MethodPost || path != "/api/v1/reconcile" {
+		t.Fatalf("request = %s %s, want POST /api/v1/reconcile", method, path)
+	}
+}
+
+func TestControlRecoveryHasNoUICommand(t *testing.T) {
+	recovery, _, err := newControlCommand(&state{}).Find([]string{"recovery"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, subcommand := range recovery.Commands() {
+		if subcommand.Name() == "ui" {
+			t.Fatal("control recovery ui must not exist")
 		}
 	}
 }

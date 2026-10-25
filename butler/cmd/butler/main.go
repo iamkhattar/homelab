@@ -111,7 +111,14 @@ func main() {
 			reconciler.NewPocketIDGroups(vc, platformResources, cfg.OIDC.AdminURL),
 			reconciler.NewPocketIDClients(vc, platformResources, cfg.OIDC.AdminURL),
 		}}
-		serveRecovery(ctx, cfg, vc, k8s, reconciler.NewVaultBootstrap(vc, k8s, cfg.Namespace, cfg), credentialBootstrap, identityBootstrap, certificateManager)
+		// VaultOIDCRole reconciliation runs beside the Vault bootstrap that
+		// creates auth/jwt, so the recovery ceremony configures roles after the
+		// OIDC handoff instead of waiting for normal Butler to start.
+		vaultBootstrap := recovery.Sequence{Steps: []recovery.Bootstrapper{
+			reconciler.NewVaultBootstrap(vc, k8s, cfg.Namespace, cfg),
+			reconciler.NewVaultOIDCRoles(vc, platformResources, cfg.Certificates.Domain, cfg.Namespace),
+		}}
+		serveRecovery(ctx, cfg, vc, k8s, vaultBootstrap, credentialBootstrap, identityBootstrap, certificateManager)
 		return
 	}
 	if mode != "normal" {
@@ -125,6 +132,7 @@ func main() {
 
 	reconcilers := []reconciler.Reconciler{
 		vaultConfiguration,
+		reconciler.NewVaultOIDCRoles(vc, platformResources, cfg.Certificates.Domain, cfg.Namespace),
 		reconciler.NewManagedCredentials(vc, platformResources),
 		reconciler.NewPocketIDGroups(vc, platformResources, cfg.OIDC.AdminURL),
 		reconciler.NewPocketIDClients(vc, platformResources, cfg.OIDC.AdminURL),
@@ -140,12 +148,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	auth, err := server.NewAuthMiddleware(ctx, cfg.OIDC.Issuer, cfg.OIDC.Audience, nil)
+	auth, err := server.NewAuthMiddleware(ctx, cfg.OIDC.Issuer, cfg.OIDC.AllowedClients, access.Roles{
+		Admin:    cfg.OIDC.Groups.Admin,
+		Operator: cfg.OIDC.Groups.Operator,
+		Viewer:   cfg.OIDC.Groups.Viewer,
+	}, nil)
 	if err != nil {
 		slog.Error("setting up auth middleware", "error", err)
 		os.Exit(1)
 	}
-	auth.AllowAudiences(cfg.OIDC.AllowedAudiences...)
 
 	srv := server.New(sched, vc, auth)
 	operationsStore, err := operations.NewKubernetesStore(ctx, dynamicK8s, cfg.Namespace, 500)
@@ -154,12 +165,7 @@ func main() {
 		os.Exit(1)
 	}
 	srv.UseOperationsStore(operationsStore)
-	credentialService, err := access.NewCredentialService(vc, cfg.K8sIssuance)
-	if err != nil {
-		slog.Error("configuring Kubernetes credential issuance", "error", err)
-		os.Exit(1)
-	}
-	srv.ConfigureControlPlane(identity.NewService(vc, cfg.OIDC.AdminURL, platformResources), credentialService)
+	srv.ConfigureControlPlane(identity.NewService(vc, cfg.OIDC.AdminURL, platformResources))
 
 	// Start reconciliation loop in background.
 	go sched.Start(ctx, platformChanges)

@@ -2,25 +2,17 @@ package server
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/iamkhattar/homelab/butler/internal/access"
-	"github.com/iamkhattar/homelab/butler/internal/config"
 	"github.com/iamkhattar/homelab/butler/internal/operations"
 	"github.com/iamkhattar/homelab/butler/internal/reconciler"
 	"github.com/iamkhattar/homelab/butler/internal/vault"
 )
-
-type serverCredentialIssuer struct{}
-
-func (serverCredentialIssuer) IssueKubernetesCredential(_ context.Context, role, namespace string, ttl time.Duration) (vault.KubernetesCredential, error) {
-	return vault.KubernetesCredential{Role: role, Namespace: namespace, ServiceAccount: "issued", Token: "secret-token", TTLSeconds: int64(ttl.Seconds()), ExpiresAt: time.Now().Add(ttl)}, nil
-}
 
 func newTestServer(t *testing.T, token string) *Server {
 	t.Helper()
@@ -74,32 +66,48 @@ func TestReadyz_NoToken(t *testing.T) {
 	}
 }
 
-func TestOperatorConsoleAssetsAndRecoveryBoundary(t *testing.T) {
+func TestRootReturnsPlainTextPointer(t *testing.T) {
 	srv := newTestServer(t, "tok")
 
-	page := httptest.NewRecorder()
-	srv.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/", nil))
-	if page.Code != http.StatusOK {
-		t.Fatalf("page status = %d", page.Code)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
 	}
-	for _, expected := range []string{"Butler operator console", "Exceptional actions", "homelabctl control recovery ui"} {
-		if !bytes.Contains(page.Body.Bytes(), []byte(expected)) {
-			t.Fatalf("operator console omitted %q", expected)
+	if contentType := rec.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/plain") {
+		t.Fatalf("Content-Type = %q, want text/plain", contentType)
+	}
+	if rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("Cache-Control = %q", rec.Header().Get("Cache-Control"))
+	}
+	if rec.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("X-Content-Type-Options = %q", rec.Header().Get("X-Content-Type-Options"))
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "homelabctl control") || !strings.Contains(body, "/api/v1") {
+		t.Fatalf("pointer = %q, want homelabctl and API guidance", body)
+	}
+	for _, forbidden := range []string{"<html", "<script", "<style", "/assets/", "/auth/login"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("pointer contains browser surface %q", forbidden)
 		}
 	}
-	for _, forbidden := range []string{"/api/v1/bootstrap/advance", "pocket-id-api-key"} {
-		if bytes.Contains(page.Body.Bytes(), []byte(forbidden)) {
-			t.Fatalf("normal console contains recovery action %q", forbidden)
-		}
-	}
-	if page.Header().Get("Content-Security-Policy") == "" {
-		t.Fatal("operator console omitted Content-Security-Policy")
-	}
+}
 
-	asset := httptest.NewRecorder()
-	srv.ServeHTTP(asset, httptest.NewRequest(http.MethodGet, "/assets/butler.js", nil))
-	if asset.Code != http.StatusOK || asset.Header().Get("Content-Type") != "text/javascript; charset=utf-8" {
-		t.Fatalf("asset status = %d, content type = %q", asset.Code, asset.Header().Get("Content-Type"))
+func TestBrowserSurfacesAreNotServed(t *testing.T) {
+	srv := newTestServer(t, "tok")
+	for _, path := range []string{"/assets/butler.css", "/assets/butler.js", "/auth/login", "/auth/callback"} {
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		contentType := rec.Header().Get("Content-Type")
+		for _, browserType := range []string{"text/html", "text/css", "text/javascript", "application/javascript"} {
+			if strings.HasPrefix(contentType, browserType) {
+				t.Fatalf("%s served %s", path, contentType)
+			}
+		}
+		if rec.Code == http.StatusOK && !strings.HasPrefix(contentType, "text/plain") {
+			t.Fatalf("%s status = %d, content type = %q", path, rec.Code, contentType)
+		}
 	}
 }
 
@@ -144,28 +152,14 @@ func TestReconcile_Success(t *testing.T) {
 	}
 }
 
-func TestKubernetesCredentialEndpointDoesNotAuditToken(t *testing.T) {
+func TestKubernetesCredentialEndpointIsRemoved(t *testing.T) {
+	// Cluster credentials are minted by Vault as the requesting user. Butler
+	// must not expose a brokered credential route at all: a missing route is
+	// the desired 404/405, never an authorization decision.
 	srv := newTestServer(t, "tok")
-	service, err := access.NewCredentialService(serverCredentialIssuer{}, config.K8sIssuanceConfig{
-		HostNamespace: "kube-system",
-		Roles:         []config.K8sIssuanceRoleSpec{{Name: "homelab-viewer", MaxTTL: "1h"}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	srv.ConfigureControlPlane(nil, service)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/access/kubernetes-credentials", bytes.NewBufferString(`{"role":"homelab-viewer","ttl":"15m"}`))
 	rec := httptest.NewRecorder()
-	srv.ServeHTTP(rec, req)
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-	if rec.Header().Get("Cache-Control") != "no-store" {
-		t.Fatalf("Cache-Control = %q", rec.Header().Get("Cache-Control"))
-	}
-	for _, event := range srv.operations.Events() {
-		if bytes.Contains([]byte(event.Message), []byte("secret-token")) {
-			t.Fatalf("credential leaked into event: %#v", event)
-		}
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/access/kubernetes-credentials", bytes.NewBufferString(`{"role":"k8sviewer","ttl":"15m"}`)))
+	if rec.Code != http.StatusNotFound && rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want 404/405 for the removed credential endpoint", rec.Code)
 	}
 }

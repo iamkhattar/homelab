@@ -21,22 +21,26 @@ func TestRecoveryRejectsUnauthenticatedRequestBeforeServiceAccess(t *testing.T) 
 	}
 }
 
-func TestRecoveryUIHasNoIngressAuthenticationDependency(t *testing.T) {
+func TestRecoveryRootReturnsPlainTextPointer(t *testing.T) {
 	srv := NewRecovery(fakeRecoveryAuth{}, nil)
 	recorder := httptest.NewRecorder()
 	srv.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/", nil))
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", recorder.Code)
 	}
-	for _, expected := range []string{"Butler break-glass recovery", "homelabctl control recovery ui", "browser never receives that token"} {
-		if !strings.Contains(recorder.Body.String(), expected) {
-			t.Fatalf("recovery UI omitted %q", expected)
+	if contentType := recorder.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/plain") {
+		t.Fatalf("Content-Type = %q, want text/plain", contentType)
+	}
+	if recorder.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("X-Content-Type-Options = %q", recorder.Header().Get("X-Content-Type-Options"))
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, "homelabctl control recovery") || !strings.Contains(body, "/api/v1") {
+		t.Fatalf("pointer = %q, want CLI and API guidance", body)
+	}
+	for _, forbidden := range []string{"<html", "<script", "<style", "Short-lived recovery token</label>"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("pointer contains browser surface %q", forbidden)
 		}
-	}
-	if strings.Contains(recorder.Body.String(), "Short-lived recovery token</label>") {
-		t.Fatal("recovery UI asks the browser to hold the Kubernetes token")
-	}
-	if !strings.Contains(recorder.Header().Get("Content-Security-Policy"), "frame-ancestors 'none'") {
-		t.Fatal("recovery UI omitted anti-framing Content-Security-Policy")
 	}
 }

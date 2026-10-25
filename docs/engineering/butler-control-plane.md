@@ -16,7 +16,7 @@ wired modes: `normal` and `recovery`.
 | `internal/recovery` | Resumable Vault bootstrap state and Kubernetes TokenReview authentication |
 | `internal/observability` | OpenTelemetry providers, OTLP export and W3C propagation |
 | `internal/pocketid`, `vault`, `garage` | Provider adapters used by the domains |
-| `internal/server` | Versioned HTTP transport, Pocket ID middleware and embedded UIs |
+| `internal/server` | Versioned HTTP transport and Pocket ID middleware for both runtimes; JSON only, no browser assets |
 
 Transport handlers validate and authorize requests, then call a domain. They
 do not contain provider credentials or return generated secret values.
@@ -107,8 +107,8 @@ The foundation pass does not contact Pocket ID. Vault's JWT/OIDC method and
 group roles are configured atomically only after Butler has created Vault's
 confidential Pocket ID client and stored its complete credential.
 The bounded recovery Vault role can create, read and update only the bootstrap
-identity documents at `security/pocket-id`, `oauth/butler`,
-`oauth/homelabctl`, and `oauth/vault`, in addition to the acme-dns document.
+identity documents at `security/pocket-id`, `oauth/homelabctl`, and
+`oauth/vault`, in addition to the acme-dns document.
 It has no wildcard `oauth/*` permission; application clients remain owned by
 normal Butler after the identity gate is operational.
 
@@ -132,21 +132,72 @@ filesystem-root destinations.
 
 ## Pocket ID and authorization
 
-Normal UI/API requests use Authorization Code with PKCE and a stable public
-client ID of `butler`. Butler verifies issuer, signature, expiry and audience.
-It maps Pocket ID groups to a strict hierarchy:
+There is one first-party client, `homelabctl` (the CLI), which logs in with
+Authorization Code and PKCE against Pocket ID directly. Butler is not a client;
+it is the resource server that verifies issuer, signature, expiry and audience
+on every bearer token. Pocket ID stamps the requesting client's ID as the ID
+token audience, so Butler accepts that client ID and nothing else - a token
+minted for `vault`, `grafana` or any other client is rejected. Butler maps
+Pocket ID groups to two roles. The operator tier exists in the model but is
+disabled in production by naming no group for it:
 
 | Pocket ID group | Butler role |
 | --- | --- |
-| `homelab-viewer` or no privileged group | viewer |
-| `homelab-operator` | operator |
-| `homelab-admin` | admin |
+| `butlerviewer` | viewer |
+| `butleradmin` | admin |
+| any other group, including `household` | none - every request is denied |
 
-Viewers inspect status, identity and operation data. Operators may reconcile.
-Administrators may create or disable non-admin users, replace membership and
-rotate confidential OIDC clients. Butler
-rejects Pocket ID administrator creation or promotion; first-owner and account
-recovery remain deliberate Pocket ID procedures.
+The group names are configuration (`oidc.groups`), not constants. An empty name
+disables a tier, which is how the middle operator tier is off: `operator: ""`
+in both the embedded config and the chart values. The `access.Operator` role and
+its hierarchy stay in the code so a deployment can re-enable a middle tier by
+naming one, but no group grants it on Titan.
+
+Authorization groups are a nine-name vocabulary shared by Butler, Vault,
+Kubernetes and the applications. Each is enforced by whoever owns the
+authority:
+
+| Group | Enforced by | Grant |
+| --- | --- | --- |
+| `butleradmin` | Butler (`oidc.groups.admin`) | Butler admin |
+| `butlerviewer` | Butler (`oidc.groups.viewer`) | Butler viewer |
+| `vaultadmin` | Vault JWT role | `vault-admin` policy |
+| `vaultread` | Vault JWT role | `vault-read` policy: may read secret values |
+| `vaultmeta` | Vault JWT role | `vault-metadata` policy: metadata only |
+| `k8sadmin` | Vault JWT role | `k8s-admin` policy |
+| `k8soperator` | Vault JWT role | `k8s-operator` policy |
+| `k8sviewer` | Vault JWT role | `k8s-viewer` policy |
+| `household` | app client restrictions | access to the shared applications |
+
+`vaultread` grants `read` on `secret/data/*`, so it is the explicit exception to
+metadata-only access. `vaultmeta` grants `read` and `list` on `secret/metadata`
+only: a member can enumerate paths and versions but `vault kv get` is denied.
+`vaultadmin` remains the wildcard administrator. Note that the Kubernetes side
+is *not* symmetric with Vault: `k8sviewer` binds the built-in `view` role, which
+excludes Secrets, while `k8soperator` binds `edit`, which includes them. An
+operator can therefore read a Kubernetes Secret directly even when they hold no
+Vault secret-read policy.
+
+Holding an account at Pocket ID grants nothing by itself: an identity that
+belongs to no Butler group is denied, not silently treated as a viewer. Vault
+and Kubernetes groups do not widen the Butler role either, because Butler never
+reads them. A household member therefore cannot read Butler's status, identity
+or operation data simply by being able to sign in to the applications.
+
+Butler does not broker cluster credentials. Cluster access is minted by Vault as
+the requesting user, using the policy bound to their `k8s*` group, so
+`butleradmin` no longer implies `cluster-admin`:
+
+```bash
+homelabctl credentials --role k8sviewer
+KUBECONFIG=/tmp/homelab.kubeconfig kubectl get nodes
+```
+
+`homelabctl credentials` performs its own Vault OIDC login and calls
+`kubernetes/creds/<role>`; the printed kubeconfig is the only artifact and goes
+to stdout unless `--output` names a mode-0600 file. When the identity's group
+does not carry the role, Vault's own permission error is printed verbatim
+because that is the authorization decision.
 
 Butler generates Pocket ID's machine credential as part of the existing
 `pocket-id-runtime` `ManagedCredential`. It writes the 48-character value
@@ -182,7 +233,7 @@ non-ingressed recovery Service using a fresh audience-bound Kubernetes token.
 
 The first command proves Pocket ID issuer, audience, nonce, PKCE and Butler
 role mapping. The second checks `/api/v1/me`, performs Vault's browser OIDC
-flow against the `homelab-admin` role, looks up the temporary token's policies,
+flow against the `vaultadmin` role, looks up the temporary token's policies,
 and revokes it. Only non-secret evidence reaches
 `POST /api/v1/bootstrap/identity-verification`; Butler requires an admin role
 and both `vault-admin` and `k8s-admin` policies before changing the persisted
@@ -196,7 +247,7 @@ The current API is under `/api/v1`:
 | Endpoint | Minimum role | Behaviour |
 | --- | --- | --- |
 | `GET /me`, `/status`, `/operations`, `/events` | viewer | Inspect control-plane state |
-| `POST /reconcile` | operator | Queue an asynchronous reconciliation |
+| `POST /reconcile` | operator (admin while the operator tier is disabled) | Queue an asynchronous reconciliation |
 | `GET/POST /identity/users` | viewer/admin | List or create users |
 | `PUT /identity/users/{id}` | admin | Update or disable a user |
 | `PUT /identity/users/{id}/groups` | admin | Replace membership |
@@ -204,43 +255,33 @@ The current API is under `/api/v1`:
 | `POST /identity/clients/{id}/rotate` | admin | Rotate directly into Vault |
 | `POST /bootstrap/identity-verification` | recovery identity | Accept non-secret evidence for both real human login paths |
 
-## Operator console and break-glass UI
+There is deliberately no credential endpoint. `POST
+/api/v1/access/kubernetes-credentials` was removed with the credential broker:
+it gated cluster access behind Butler admin, so holding `butleradmin` implied
+`cluster-admin`. Vault now mints cluster credentials as the requesting identity
+through the policy bound to that identity's `k8s*` group, which means the
+Butler role and the cluster role are independent decisions.
 
-Butler's embedded normal UI is an exceptional-operations console, not the
-homelab homepage and not another observability dashboard. It deliberately
-shows only control-plane posture, reconciler state, bounded operation/event
-history, and Butler-owned actions:
+## Operator surfaces and break-glass access
 
-- queue one serialized reconciliation after explicit typed confirmation;
-- rotate a confidential Pocket ID client secret through Butler's
-  persist-before-revoke workflow after selecting and typing the client name;
-- link to Grafana for telemetry, Pocket ID for ordinary identity work, Vault
-  for secret/policy inspection, and Homepage for application navigation; and
-- explain which recovery operations are intentionally unavailable from the
-  Pocket ID-dependent normal runtime.
-
-Short-lived Kubernetes credential issuance stays CLI-only because its response
-contains a bearer token. Vault recovery export and Pocket ID machine-key
-replacement also stay CLI-only so secret material never enters browser state.
-The UI ships as embedded HTML, CSS, and JavaScript with no CDN or runtime asset
-dependency. Butler serves a restrictive Content Security Policy, no-store
-headers, and same-origin assets.
-
-True break-glass access uses:
+Butler serves no browser surface. Its normal runtime exposes only the Pocket
+ID-authenticated JSON API under `/api/v1`, and its recovery runtime exposes only
+its own JSON API; neither serves HTML, CSS or JavaScript. `homelabctl control`
+is therefore the only control surface, including the `control recovery` family
+that uses the non-ingressed recovery service. Recovery export and Pocket ID
+machine-key replacement stay CLI-only because secret material never leaves CLI
+memory.
 
 ```bash
-homelabctl control recovery ui
+homelabctl control recovery
+homelabctl control bootstrap --confirm
+homelabctl control reconcile
 ```
 
-The CLI creates the audience-bound ten-minute recovery token and Kubernetes
-port-forward, then starts a second random loopback-only proxy. A one-time
-capability path grants an HTTP-only, `SameSite=Strict` local session; the proxy
-injects the recovery bearer token upstream. The token never appears in the
-URL, browser JavaScript, DOM, cookie, local storage, or server response. The
-console can inspect recovery posture, verify DNS delegation, and advance one
-resumable bootstrap pass with typed confirmation. Closing the CLI destroys the
-proxy and tunnel; expiry bounds the underlying token even if the browser tab
-remains open.
+The CLI creates the audience-bound ten-minute recovery token and the Kubernetes
+port-forward for every recovery call. The token never appears in a URL, cookie,
+local storage, or server response. Closing a command ends the port-forward, and
+token expiry bounds access even if the workstation is left unattended.
 
 Do not expose recovery Butler through Traefik. Do not place Pocket ID
 forward-auth in front of Vault: Vault's native Pocket ID OIDC is the normal
@@ -255,8 +296,8 @@ Kubernetes writes refetch current objects and retry optimistic-lock conflicts.
 Timer-driven and operator-triggered reconciliations are serialized because
 provider creation and one-time secret responses are unsafe to race.
 
-Butler also watches `PocketIDClient`, `PocketIDGroup`, `ManagedCredential` and
-`GarageBucket` resources. Creates, deletes and spec-generation changes send a
+Butler also watches `PocketIDClient`, `PocketIDGroup`, `ManagedCredential`,
+`GarageBucket` and `VaultOIDCRole` resources. Creates, deletes and spec-generation changes send a
 coalesced immediate trigger to that same serialized scheduler; Butler's own
 status updates do not retrigger it. The one-minute timer is a drift-repair
 resync for missed events rather than the normal convergence path. Garage is
@@ -274,6 +315,7 @@ The `platform.6940469.xyz/v1alpha1` API group is installed by the standalone
 | `PocketIDGroup` | Cluster | Reconcile the small shared authorization group vocabulary |
 | `ManagedCredential` | Namespaced | Generate immutable values, render dependent values, or project selected Vault fields into a consumer-specific path |
 | `GarageBucket` | Namespaced | Create a Garage bucket, key and least-privilege grants, with credentials written directly to Vault |
+| `VaultOIDCRole` | Namespaced | Converge one Vault `auth/jwt/role/<group>` from a declared group and policy set |
 | `ButlerOperation` | Namespaced | Durable secret-free operation and event journal used by the Butler API |
 
 No secret value is stored in a custom resource or status. Status contains only
@@ -348,10 +390,31 @@ Inspect reconciliation without reading any secret value:
 
 ```bash
 kubectl get managedcredentials,pocketidclients,garagebuckets -A
+kubectl get vaultoidcroles -n security
 kubectl get pocketidgroups
 kubectl describe managedcredential paperless-database -n paperless-ngx
 kubectl get butleroperations -n security
 ```
+
+### Vault owning its roles
+
+`VaultOIDCRole` is declared by the Vault chart, beside the Vault release, and
+declares exactly one group and its policy list. Butler reconciles it into
+`auth/jwt/role/<spec.group>` with `role_type: oidc`, `user_claim: sub`,
+`groups_claim: groups`, the Vault OIDC client ID as `bound_audiences`,
+`bound_claims.groups` pinned to the declared group, the declared `policies`, the
+declared `ttl`/`maxTTL` (defaults `1h`/`8h`), and both the loopback and UI
+redirect URIs. Each pass compares the managed fields with the live role and
+rewrites only on drift.
+
+Two rules keep that authority safe. A declaration outside the Butler/Vault
+namespace is ignored and logged: accepting any namespace would let a namespace
+owner grant themselves a Vault policy. A group declared by more than one
+resource fails reconciliation instead of last-writer-wins. The `k8sIssuance`
+roles remain, but they configure the *Kubernetes secrets engine* only - the
+`kubernetes/roles/<name>` entry and the ServiceAccount whose token it mints.
+They no longer carry a group or policy list, so human authorization has exactly
+one source of truth.
 
 CRD schemas are upgraded through the `butler-crds` foundation chart. Do not
 hand-apply copies of the definitions, and do not put provider declarations in

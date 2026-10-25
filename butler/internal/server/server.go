@@ -1,14 +1,12 @@
 package server
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/iamkhattar/homelab/butler/internal/access"
 	"github.com/iamkhattar/homelab/butler/internal/identity"
@@ -20,23 +18,13 @@ import (
 
 // Server is the Butler HTTP server.
 type Server struct {
-	mux         *http.ServeMux
-	scheduler   *reconciler.Scheduler
-	vault       *vault.Client
-	auth        *AuthMiddleware
-	identity    *identity.Service
-	operations  *operations.Store
-	credentials *access.CredentialService
+	mux        *http.ServeMux
+	scheduler  *reconciler.Scheduler
+	vault      *vault.Client
+	auth       *AuthMiddleware
+	identity   *identity.Service
+	operations *operations.Store
 }
-
-//go:embed ui/index.html
-var controlPlaneUI []byte
-
-//go:embed ui/app.css
-var controlPlaneCSS []byte
-
-//go:embed ui/app.js
-var controlPlaneJS []byte
 
 // New creates a new Server. If auth is nil, JWT protection is disabled.
 func New(scheduler *reconciler.Scheduler, vc *vault.Client, auth *AuthMiddleware) *Server {
@@ -51,10 +39,11 @@ func New(scheduler *reconciler.Scheduler, vc *vault.Client, auth *AuthMiddleware
 	return s
 }
 
-// ConfigureControlPlane wires the normal-mode services exposed by /api/v1.
-func (s *Server) ConfigureControlPlane(identityService *identity.Service, credentialService *access.CredentialService) {
+// ConfigureControlPlane wires the normal-mode identity service exposed by
+// /api/v1. Butler does not broker cluster credentials: Vault mints them as the
+// requesting user, so no credential service exists here.
+func (s *Server) ConfigureControlPlane(identityService *identity.Service) {
 	s.identity = identityService
-	s.credentials = credentialService
 }
 
 func (s *Server) UseOperationsStore(store *operations.Store) {
@@ -67,14 +56,7 @@ func (s *Server) routes() {
 	// Unauthenticated.
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
 	s.mux.HandleFunc("GET /readyz", s.handleReadyz)
-	s.mux.HandleFunc("GET /assets/butler.css", s.handleUIAsset("text/css; charset=utf-8", controlPlaneCSS))
-	s.mux.HandleFunc("GET /assets/butler.js", s.handleUIAsset("text/javascript; charset=utf-8", controlPlaneJS))
-	s.mux.HandleFunc("GET /", s.handleUI)
-	if s.auth != nil {
-		s.mux.HandleFunc("GET /auth/login", s.auth.Login)
-		s.mux.HandleFunc("GET /auth/callback", s.auth.Callback)
-		s.mux.HandleFunc("POST /auth/logout", s.auth.Logout)
-	}
+	s.mux.HandleFunc("GET /{$}", s.handleRoot)
 
 	// Authenticated.
 	s.mux.Handle("GET /api/v1/me", s.require(access.Viewer, http.HandlerFunc(s.handleMe)))
@@ -89,50 +71,22 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /api/v1/identity/groups", s.require(access.Viewer, http.HandlerFunc(s.handleGroups)))
 	s.mux.Handle("GET /api/v1/identity/clients", s.require(access.Viewer, http.HandlerFunc(s.handleClients)))
 	s.mux.Handle("POST /api/v1/identity/clients/{id}/rotate", s.require(access.Admin, http.HandlerFunc(s.handleRotateClient)))
-	s.mux.Handle("POST /api/v1/access/kubernetes-credentials", s.require(access.Admin, http.HandlerFunc(s.handleKubernetesCredential)))
 }
 
-func (s *Server) handleKubernetesCredential(w http.ResponseWriter, r *http.Request) {
-	if s.credentials == nil {
-		http.Error(w, "credential issuance unavailable", http.StatusServiceUnavailable)
-		return
-	}
-	var body struct {
-		Role string `json:"role"`
-		TTL  string `json:"ttl"`
-	}
-	if !decodeJSON(w, r, &body) {
-		return
-	}
-	ttl, err := time.ParseDuration(body.TTL)
-	if err != nil {
-		http.Error(w, "invalid credential TTL", http.StatusBadRequest)
-		return
-	}
-	principal, _ := access.PrincipalFrom(r.Context())
-	credential, err := s.credentials.Issue(r.Context(), principal, body.Role, ttl)
-	if err == nil {
-		s.operations.Record("access.kubernetes-credential.issued", actorFrom(r), "Short-lived Kubernetes credential issued for approved role "+body.Role)
-	}
-	w.Header().Set("Cache-Control", "no-store")
-	respondCode(w, http.StatusCreated, credential, err)
+// handleRoot answers the unauthenticated root path with a plain-text pointer.
+// Butler serves no browser application; the JSON API and homelabctl are the
+// only control surfaces.
+func (s *Server) handleRoot(w http.ResponseWriter, _ *http.Request) {
+	writePlainPointer(w, "butler control plane; use homelabctl control; API is under /api/v1")
 }
 
-func (s *Server) handleUI(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+// writePlainPointer writes a non-HTML pointer response with no executable or
+// stylable content.
+func writePlainPointer(w http.ResponseWriter, message string) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	_, _ = w.Write(controlPlaneUI)
-}
-
-func (s *Server) handleUIAsset(contentType string, content []byte) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", contentType)
-		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		_, _ = w.Write(content)
-	}
+	_, _ = w.Write([]byte(message + "\n"))
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

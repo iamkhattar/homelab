@@ -146,6 +146,7 @@ func newPlatformStoreClient(objs ...runtime.Object) (*platform.Store, *dynamicfa
 			platform.PocketIDGroupGVR:  "PocketIDGroupList",
 			platform.CredentialGVR:     "ManagedCredentialList",
 			platform.GarageBucketGVR:   "GarageBucketList",
+			platform.VaultOIDCRoleGVR:  "VaultOIDCRoleList",
 		},
 		objs...,
 	)

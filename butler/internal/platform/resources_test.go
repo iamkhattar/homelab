@@ -118,7 +118,7 @@ func TestChangeHandlerCoalescesBursts(t *testing.T) {
 	t.Parallel()
 	events := make(chan struct{}, 1)
 	handler := newChangeHandler(events)
-	object := platformObject("PocketIDGroup", "", "homelab-admin", map[string]interface{}{"friendlyName": "Administrators"})
+	object := platformObject("PocketIDGroup", "", "butleradmin", map[string]interface{}{"friendlyName": "Administrators"})
 	handler.OnAdd(object, false)
 	handler.OnAdd(object, false)
 	if got := len(events); got != 1 {

@@ -106,9 +106,9 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 		long:    "Read the named Vault initialization Secret into memory and write only an age-encrypted, mode-0600 bundle outside the repository. Existing output files are never overwritten.",
 		example: "  homelabctl control recovery export --output /secure/titan-vault.age --age-recipient age1example",
 	},
-	"homelabctl control recovery ui": {
-		long:    "Open a ten-minute, loopback-only break-glass console. homelabctl holds the audience-bound Kubernetes token in memory and injects it through a random local session; the browser never stores the token.",
-		example: "  homelabctl control recovery ui",
+	"homelabctl control reconcile": {
+		long:    "Queue one serialized reconciliation pass across every configured domain and print the operation record. Butler enforces the Operator role server-side; the CLI cannot widen scope or bypass serialization.",
+		example: "  BUTLER_TOKEN=... homelabctl control reconcile",
 	},
 	"homelabctl control status": {
 		long:    "List Butler domain reconcilers and their most recent outcome through the Pocket ID-protected normal API.",
@@ -151,6 +151,10 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 	"homelabctl control clients rotate": {
 		long:    "Rotate one confidential Pocket ID OIDC client secret and write the one-time value directly to its Vault oauth path. The CLI receives only a success status.",
 		example: "  BUTLER_TOKEN=... homelabctl control clients rotate grafana",
+	},
+	"homelabctl credentials": {
+		long:    "Authenticate to Vault with browser OIDC and mint a short-lived Kubernetes credential as yourself. Authority comes from the Vault policy bound to your Pocket ID group; Butler is not involved. The default output is a kubeconfig on stdout, and nothing touches disk unless --output is given with mode 0600.",
+		example: "  homelabctl credentials > /tmp/homelab.kubeconfig\n  KUBECONFIG=/tmp/homelab.kubeconfig kubectl get nodes\n  homelabctl credentials --role k8sadmin --ttl 2h\n  homelabctl credentials --format token --output /secure/token",
 	},
 	"homelabctl deploy": {long: "Preview or reconcile Helmfile desired state. Deployment remains separate from image publication and CI. The shared image tag defaults to the full committed Git SHA and must already exist in the registry."},
 	"homelabctl deploy diff": {

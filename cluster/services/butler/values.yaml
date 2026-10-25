@@ -1,3 +1,30 @@
+# Pocket ID groups Butler provisions. PocketIDClient resources reference these
+# names in spec.allowedUserGroups; the reconciler resolves them to Pocket ID
+# group IDs and fails closed when a referenced group does not exist.
+#
+# Two groups grant Butler roles. Six are Vault authority groups: the Vault
+# chart declares the policy mapping with VaultOIDCRole resources, so membership
+# is enforced by Vault, not by Butler. household is application access only.
+groups:
+  - name: butleradmin
+    friendlyName: Butler administrators
+  - name: butlerviewer
+    friendlyName: Butler viewers
+  - name: vaultadmin
+    friendlyName: Vault administrators
+  - name: vaultread
+    friendlyName: Vault secret readers
+  - name: vaultmeta
+    friendlyName: Vault metadata readers
+  - name: k8sadmin
+    friendlyName: Kubernetes administrators
+  - name: k8soperator
+    friendlyName: Kubernetes operators
+  - name: k8sviewer
+    friendlyName: Kubernetes viewers
+  - name: household
+    friendlyName: Household members who use the shared applications
+
 replicaCount: 1
 
 image:
@@ -166,9 +193,15 @@ config:
     # Set to https://auth.<domain> once Pocket-ID is reachable; empty disables
     # OIDC bootstrap of Vault auth/jwt and butler API authz.
     issuer: "https://auth.6940469.xyz"
-    audience: butler
-    allowedAudiences:
+    # Pocket ID stamps the requesting client's ID as the ID token audience.
+    allowedClients:
       - homelabctl
+    groups:
+      admin: butleradmin
+      # The operator tier is disabled: cluster authority is granted by Vault
+      # and Kubernetes groups, not by a Butler middle tier.
+      operator: ""
+      viewer: butlerviewer
     adminURL: http://pocket-id.security.svc.cluster.local
   certificates:
     acmeDNSURL: https://auth.acme-dns.io
@@ -185,31 +218,22 @@ config:
     # Reference to the Kubernetes Secret object that holds the reviewer token;
     # this ConfigMap contains only the object name, never the token value.
     tokenReviewerRef: vault-k8s-token-reviewer-token
+    # Vault Kubernetes secrets-engine roles only. The auth/jwt roles that map a
+    # Pocket ID group to Vault policies are declared by the Vault chart as
+    # VaultOIDCRole resources, so authorization has exactly one source of truth.
     roles:
-      - name: homelab-admin
+      - name: k8sadmin
         serviceAccountName: vault-managed-admin
         ttl: 1h
         maxTTL: 8h
-        pocketIdGroup: homelab-admin
-        vaultPolicies:
-          - vault-admin
-          - k8s-admin
-      - name: homelab-operator
+      - name: k8soperator
         serviceAccountName: vault-managed-operator
         ttl: 1h
         maxTTL: 8h
-        pocketIdGroup: homelab-operator
-        vaultPolicies:
-          - vault-read
-          - k8s-operator
-      - name: homelab-viewer
+      - name: k8sviewer
         serviceAccountName: vault-managed-viewer
         ttl: 1h
         maxTTL: 4h
-        pocketIdGroup: homelab-viewer
-        vaultPolicies:
-          - vault-read
-          - k8s-viewer
   garage:
     enabled: true
     endpoint: http://garage.storage.svc.cluster.local:3903

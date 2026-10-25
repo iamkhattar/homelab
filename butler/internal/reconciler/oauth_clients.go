@@ -53,6 +53,10 @@ func (r *PocketIDClients) Reconcile(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("listing pocket-id clients: %w", err)
 	}
+	groupIDs, err := resolveGroupIDs(ctx, pid, items)
+	if err != nil {
+		return err
+	}
 	byName := make(map[string]pocketid.OIDCClient, len(existing))
 	for _, client := range existing {
 		byName[client.Name] = client
@@ -88,7 +92,7 @@ func (r *PocketIDClients) Reconcile(ctx context.Context) error {
 			}
 			continue
 		}
-		providerID, err := r.reconcileOne(ctx, pid, &items[i], byName)
+		providerID, err := r.reconcileOne(ctx, pid, &items[i], byName, groupIDs)
 		if err != nil {
 			failures = append(failures, fmt.Errorf("%s/%s: %w", items[i].Namespace, items[i].Name, err))
 			if statusErr := convergeStatus(&items[i].Status, platform.Failed(items[i].Generation, "ReconcileFailed", err), func() error {
@@ -107,82 +111,173 @@ func (r *PocketIDClients) Reconcile(ctx context.Context) error {
 	return errors.Join(failures...)
 }
 
-func (r *PocketIDClients) reconcileOne(ctx context.Context, pid *pocketid.Client, item *platform.PocketIDClient, existing map[string]pocketid.OIDCClient) (string, error) {
+func (r *PocketIDClients) reconcileOne(ctx context.Context, pid *pocketid.Client, item *platform.PocketIDClient, existing map[string]pocketid.OIDCClient, groupIDs map[string]string) (string, error) {
 	if item.Spec.Type != "public" && item.Spec.Type != "confidential" {
 		return "", errors.New("type must be public or confidential")
 	}
 	if len(item.Spec.RedirectURIs) == 0 || item.Spec.VaultPath == "" {
 		return "", errors.New("redirectURIs and vaultPath are required")
 	}
-	want := pocketid.OIDCClient{ID: item.Name, Name: item.Name, IsPublic: item.Spec.Type == "public", PKCEEnabled: item.Spec.Type == "public", CallbackURLs: item.Spec.RedirectURIs}
 	have, present := existing[item.Name]
+	currentGroups := have.AllowedUserGroups
+	providerID, metadataChanged, err := r.reconcileClient(ctx, pid, item, have, present)
+	if err != nil {
+		return "", err
+	}
+	if err := reconcileAllowedGroups(ctx, pid, item, providerID, groupIDs, currentGroups, metadataChanged); err != nil {
+		return "", err
+	}
+	return providerID, nil
+}
+
+// reconcileClient converges the OIDC client itself and its Vault material. The
+// returned bool reports whether the client metadata was written, because the
+// client update payload carries no allowed user groups and stale knowledge of
+// the provider-side restriction must not be trusted afterwards.
+func (r *PocketIDClients) reconcileClient(ctx context.Context, pid *pocketid.Client, item *platform.PocketIDClient, have pocketid.OIDCClient, present bool) (string, bool, error) {
+	want := pocketid.OIDCClient{ID: item.Name, Name: item.Name, IsPublic: item.Spec.Type == "public", PKCEEnabled: item.Spec.Type == "public", CallbackURLs: item.Spec.RedirectURIs}
 	if !present {
 		created, err := pid.CreateClient(ctx, want)
 		if err != nil {
-			return "", fmt.Errorf("creating client: %w", err)
+			return "", false, fmt.Errorf("creating client: %w", err)
 		}
 		if err := r.persistCreds(ctx, item.Spec.VaultPath, created.ID, created.SecretID, created.Secret); err != nil {
 			if created.SecretID != "" {
 				cleanupErr := pid.DeleteClientSecret(ctx, created.ID, created.SecretID)
-				return "", errors.Join(err, cleanupErr)
+				return "", false, errors.Join(err, cleanupErr)
 			}
-			return "", err
+			return "", false, err
 		}
-		return created.ID, nil
+		return created.ID, false, nil
 	}
+	changed := false
 	if !sameStringSet(have.CallbackURLs, want.CallbackURLs) || have.IsPublic != want.IsPublic || have.PKCEEnabled != want.PKCEEnabled {
 		want.ID = have.ID
 		if err := pid.UpdateClient(ctx, have.ID, want); err != nil {
-			return "", fmt.Errorf("updating client: %w", err)
+			return "", false, fmt.Errorf("updating client: %w", err)
 		}
 		have = want
+		changed = true
 	}
 	creds, err := r.vault.ReadSecretIfExists(ctx, item.Spec.VaultPath)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	if have.IsPublic {
 		secrets, err := pid.ListClientSecrets(ctx, have.ID)
 		if err != nil {
-			return "", err
+			return "", false, err
 		}
 		for _, secret := range secrets {
 			if err := pid.DeleteClientSecret(ctx, have.ID, secret.ID); err != nil {
-				return "", err
+				return "", false, err
 			}
 		}
 		clientID, _ := creds["client_id"].(string)
 		if len(creds) != 1 || clientID != have.ID {
 			if err := r.persistCreds(ctx, item.Spec.VaultPath, have.ID, "", ""); err != nil {
-				return "", err
+				return "", false, err
 			}
 		}
-		return have.ID, nil
+		return have.ID, changed, nil
 	}
 	secretID, _ := creds["client_secret_id"].(string)
 	secrets, err := pid.ListClientSecrets(ctx, have.ID)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	if secretID == "" || !containsSecret(secrets, secretID) {
 		created, createErr := pid.CreateSecret(ctx, have.ID)
 		if createErr != nil {
-			return "", fmt.Errorf("creating replacement client secret: %w", createErr)
+			return "", false, fmt.Errorf("creating replacement client secret: %w", createErr)
 		}
 		if err := r.persistCreds(ctx, item.Spec.VaultPath, have.ID, created.ID, created.Secret); err != nil {
 			cleanupErr := pid.DeleteClientSecret(ctx, have.ID, created.ID)
-			return "", errors.Join(err, cleanupErr)
+			return "", false, errors.Join(err, cleanupErr)
 		}
 		secretID = created.ID
 	}
 	for _, secret := range secrets {
 		if secret.ID != secretID {
 			if err := pid.DeleteClientSecret(ctx, have.ID, secret.ID); err != nil {
-				return "", err
+				return "", false, err
 			}
 		}
 	}
-	return have.ID, nil
+	return have.ID, changed, nil
+}
+
+// resolveGroupIDs maps the Pocket ID group names declared by clients to their
+// provider IDs. The names are resolved against the same provider group state
+// that PocketIDGroups converges, which the scheduler runs before this
+// reconciler, so a declared group exists by the time a client references it.
+// Group names are not resolved from resource status: the provider list is the
+// single source of truth for the IDs written back to Pocket ID.
+func resolveGroupIDs(ctx context.Context, pid *pocketid.Client, items []platform.PocketIDClient) (map[string]string, error) {
+	referenced := false
+	for i := range items {
+		if items[i].Spec.AllowedUserGroups != nil {
+			referenced = true
+			break
+		}
+	}
+	if !referenced {
+		return nil, nil
+	}
+	groups, err := pid.ListUserGroups(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing pocket-id groups for client access restrictions: %w", err)
+	}
+	ids := make(map[string]string, len(groups))
+	for _, group := range groups {
+		ids[group.Name] = group.ID
+	}
+	return ids, nil
+}
+
+// reconcileAllowedGroups converges the client's Pocket-ID sign-in restriction.
+//
+// spec.allowedUserGroups is tri-state:
+//   - absent/nil leaves the client unrestricted in the declarative sense: no
+//     request is sent, so a restriction managed outside this repository is
+//     preserved and Butler never opens a client by omission;
+//   - an explicit empty list clears the restriction, which admits every user;
+//   - a non-empty list admits only members of the named groups.
+//
+// The update fails closed. An unresolvable name aborts before any request,
+// because sending the resolvable subset would silently grant or deny access to
+// the wrong people, and sending an empty list would open the client to everyone.
+func reconcileAllowedGroups(ctx context.Context, pid *pocketid.Client, item *platform.PocketIDClient, providerID string, groupIDs map[string]string, current []pocketid.UserGroup, clientMetadataChanged bool) error {
+	names := item.Spec.AllowedUserGroups
+	if names == nil {
+		return nil
+	}
+	want := make([]string, 0, len(names))
+	seen := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		id, ok := groupIDs[name]
+		if !ok || id == "" {
+			return fmt.Errorf("allowedUserGroups references Pocket ID group %q, which does not exist", name)
+		}
+		want = append(want, id)
+	}
+	if !clientMetadataChanged {
+		have := make([]string, 0, len(current))
+		for _, group := range current {
+			have = append(have, group.ID)
+		}
+		if sameStringSet(have, want) {
+			return nil
+		}
+	}
+	if err := pid.UpdateAllowedUserGroups(ctx, providerID, want); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *PocketIDClients) readAPIKey(ctx context.Context) (string, error) {

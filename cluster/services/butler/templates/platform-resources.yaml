@@ -1,12 +1,12 @@
-{{- range $name, $friendlyName := dict "homelab-admin" "Homelab administrators" "homelab-operator" "Homelab operators" "homelab-viewer" "Homelab viewers" }}
+{{- range .Values.groups }}
 apiVersion: platform.6940469.xyz/v1alpha1
 kind: PocketIDGroup
 metadata:
-  name: {{ $name }}
+  name: {{ .name }}
   labels:
     app.kubernetes.io/managed-by: {{ $.Release.Name }}
 spec:
-  friendlyName: {{ $friendlyName }}
+  friendlyName: {{ .friendlyName }}
 ---
 {{- end }}
 apiVersion: platform.6940469.xyz/v1alpha1
@@ -19,17 +19,7 @@ spec:
   redirectURIs:
     - http://127.0.0.1:17654/callback
   vaultPath: oauth/homelabctl
----
-apiVersion: platform.6940469.xyz/v1alpha1
-kind: PocketIDClient
-metadata:
-  name: butler
-  namespace: {{ .Release.Namespace }}
-spec:
-  type: public
-  redirectURIs:
-    - https://butler.6940469.xyz/auth/callback
-  vaultPath: oauth/butler
+  allowedUserGroups: [butleradmin, butlerviewer]
 ---
 apiVersion: platform.6940469.xyz/v1alpha1
 kind: PocketIDClient
@@ -42,3 +32,8 @@ spec:
     - http://localhost:8250/oidc/callback
     - https://vault.6940469.xyz/ui/vault/auth/jwt/oidc/callback
   vaultPath: oauth/vault
+  # Vault's OIDC client admits every platform identity: Butler users reach the
+  # Vault UI, and each Vault/k8s group logs in with the role carrying its own
+  # policy. The group list is the sign-in allowlist, not the authorization
+  # grant; VaultOIDCRole declares what each group may do.
+  allowedUserGroups: [butleradmin, butlerviewer, vaultadmin, vaultread, vaultmeta, k8sadmin, k8soperator, k8sviewer]
