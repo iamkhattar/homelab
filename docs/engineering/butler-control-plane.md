@@ -178,6 +178,24 @@ excludes Secrets, while `k8soperator` binds `edit`, which includes them. An
 operator can therefore read a Kubernetes Secret directly even when they hold no
 Vault secret-read policy.
 
+### Sign-in access
+
+Authority and access are separate. Group membership decides what an identity
+may do; the client's allowed groups decide whether it may sign in at all. Each
+client lists exactly the groups that grant something inside it:
+
+| Client | Allowed groups |
+| --- | --- |
+| `homelabctl` | `butleradmin`, `butlerviewer` |
+| `vault` | `vaultadmin`, `vaultread`, `vaultmeta`, `k8sadmin`, `k8soperator`, `k8sviewer` |
+| Grafana, Homepage, Vaultwarden | `household` |
+
+A platform role never widens application access: an administrator who wants the
+shared applications joins `household` like anyone else, and adding a group to a
+client is therefore a deliberate access decision rather than a convenience.
+Butler resolves the names to Pocket ID group IDs and fails closed, so a name
+that does not exist is an error instead of an open client.
+
 Holding an account at Pocket ID grants nothing by itself: an identity that
 belongs to no Butler group is denied, not silently treated as a viewer. Vault
 and Kubernetes groups do not widen the Butler role either, because Butler never
