@@ -21,4 +21,4 @@ spec:
   redirectURIs:
     - https://grafana.6940469.xyz/login/generic_oauth
   vaultPath: oauth/grafana
-  allowedUserGroups: [household, butleradmin, butlerviewer]
+  allowedUserGroups: [household]

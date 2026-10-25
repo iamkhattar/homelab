@@ -36,4 +36,4 @@ spec:
   # Vault UI, and each Vault/k8s group logs in with the role carrying its own
   # policy. The group list is the sign-in allowlist, not the authorization
   # grant; VaultOIDCRole declares what each group may do.
-  allowedUserGroups: [butleradmin, butlerviewer, vaultadmin, vaultread, vaultmeta, k8sadmin, k8soperator, k8sviewer]
+  allowedUserGroups: [vaultadmin, vaultread, vaultmeta, k8sadmin, k8soperator, k8sviewer]
