@@ -72,6 +72,69 @@ func TestControlReconcileUsesNormalAPI(t *testing.T) {
 	}
 }
 
+func TestControlOrphansPrintsReadOnlyReportAndExitsWithDrift(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/v1/orphans" {
+			t.Errorf("request = %s %s, want GET /api/v1/orphans", r.Method, r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"orphaned":[{"kind":"pocket-id-client","name":"retired","why":"declared in no PocketIDClient resource"}],"missing":[],"sources":[{"name":"pocket-id-clients","status":"ok"}]}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("BUTLER_TOKEN", "test-token")
+	var stdout bytes.Buffer
+	runner := command.NewRunner(strings.NewReader(""), &stdout, &bytes.Buffer{})
+	root := New(BuildInfo{}, runner)
+	root.SetArgs([]string{"--repo-root", testRepository(t), "control", "orphans", "--address", server.URL})
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected a drift error")
+	}
+	exitCoder, ok := err.(interface{ ExitCode() int })
+	if !ok || exitCoder.ExitCode() != driftExitCode {
+		t.Fatalf("error %v does not carry exit code %d", err, driftExitCode)
+	}
+	for _, expected := range []string{`"kind": "pocket-id-client"`, `"name": "retired"`, `"status": "ok"`} {
+		if !strings.Contains(stdout.String(), expected) {
+			t.Fatalf("output %q does not contain %q", stdout.String(), expected)
+		}
+	}
+}
+
+func TestControlOrphansCleanReportExitsZero(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"orphaned":[],"missing":[],"sources":[]}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("BUTLER_TOKEN", "test-token")
+	runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+	root := New(BuildInfo{}, runner)
+	root.SetArgs([]string{"--repo-root", testRepository(t), "control", "orphans", "--address", server.URL})
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestControlOrphansReportFailureIsNotDrift(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "unavailable", http.StatusBadGateway)
+	}))
+	defer server.Close()
+
+	t.Setenv("BUTLER_TOKEN", "test-token")
+	runner := command.NewRunner(strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+	root := New(BuildInfo{}, runner)
+	root.SetArgs([]string{"--repo-root", testRepository(t), "control", "orphans", "--address", server.URL})
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if exitCoder, ok := err.(interface{ ExitCode() int }); ok {
+		t.Fatalf("report failure must not report drift exit code %d", exitCoder.ExitCode())
+	}
+}
+
 func TestControlReconcilePostsToReconcileEndpoint(t *testing.T) {
 	var method, path string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

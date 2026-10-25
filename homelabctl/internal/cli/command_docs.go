@@ -122,6 +122,10 @@ var commandDocumentationByPath = map[string]commandDocumentation{
 		long:    "List bounded audit-safe control-plane events with actor, type, message, operation and timestamp fields.",
 		example: "  BUTLER_TOKEN=... homelabctl control events",
 	},
+	"homelabctl control orphans": {
+		long:    "Compare declared PocketIDClient, PocketIDGroup and VaultOIDCRole resources, k8sIssuance roles and Butler-owned Vault policies with the objects that actually exist in Pocket ID and Vault. Provider data is retain-by-default, so this read-only report is how renames and removals leave discoverable debris. It makes no changes and exits 3 when anything is orphaned or missing.",
+		example: "  homelabctl control orphans\n  homelabctl control orphans --port-forward",
+	},
 	"homelabctl control users": {long: "Manage non-administrator Pocket ID user lifecycle and group membership through Butler's identity domain."},
 	"homelabctl control groups": {
 		long:    "List Pocket ID authorization groups and their stable IDs before assigning user membership through Butler.",

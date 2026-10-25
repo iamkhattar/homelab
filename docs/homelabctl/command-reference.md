@@ -143,6 +143,7 @@ non-persistent overrides.
 | `control verify-identity --confirm` | Prove Pocket ID access to Butler and Vault before accepting bootstrap | Requires Butler admin; the `vaultadmin` role's temporary token must carry `vault-admin`, is revoked and is never sent to Butler |
 | `control recovery export` | Write the recovery Secret directly to an age-encrypted off-repository file | Refuses repository and filesystem-root destinations and existing output files |
 | `control status`, `operations`, `events` | Inspect reconciliation and audit-safe activity | Viewer access; no request bodies or secret values are recorded |
+| `control orphans` | Report provider objects that no longer match the repository, and declarations whose provider object is absent | Read-only, viewer access; prints names, kinds and reasons only and exits 3 when anything is orphaned or missing |
 | `control reconcile` | Queue one serialized reconciliation pass | Operator access is enforced server-side, which currently means Butler admin because the operator tier is disabled; the CLI cannot widen scope or bypass serialization |
 | `control users ...`, `groups`, `clients ...` | Manage Pocket ID identities and rotate client secrets | Mutations require Butler admin; rotated secrets go directly to Vault |
 
@@ -161,6 +162,7 @@ homelabctl control recovery export \
 homelabctl control login
 homelabctl control verify-identity --confirm
 homelabctl control status
+homelabctl control orphans
 homelabctl control reconcile
 homelabctl control users list
 homelabctl control users set-groups USER_ID --group GROUP_ID
@@ -171,6 +173,15 @@ homelabctl control logout
 `control certificate status` prints only the CNAME host/target and readiness;
 the acme-dns username and password never cross the recovery API. DNS acceptance
 requires `control certificate verify-dns --confirm` and an exact public match.
+
+`control orphans` is read-only. It prints JSON with two separated lists:
+`orphaned` objects exist in Pocket ID or Vault but are declared nowhere, while
+`missing` objects are declared but absent from their provider. Each entry
+carries only a kind, a name and a short reason. A provider that cannot be read
+appears under `sources` as `unavailable` with its error, and the remaining
+sources are still reported. The command exits `3` when any entry is found, so
+it can gate a check without treating drift as an execution failure; `1` means
+the report itself could not be completed. It never deletes or repairs anything.
 
 ## Cluster credentials
 
