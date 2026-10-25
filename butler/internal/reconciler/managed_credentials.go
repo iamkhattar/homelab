@@ -142,6 +142,16 @@ func (r *ManagedCredentials) reconcileOne(ctx context.Context, item *platform.Ma
 		}
 	}
 
+	if item.Spec.Prune {
+		// The declaration owns the path: drop keys removed from Fields so a
+		// credential split or migration actually removes the old values.
+		for key := range seed {
+			if _, ok := item.Spec.Fields[key]; !ok {
+				delete(seed, key)
+			}
+		}
+	}
+
 	want, err := vault.GenerateSecretDataWithExisting(generated, seed)
 	if err != nil {
 		return err

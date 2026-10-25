@@ -113,6 +113,17 @@ networkPolicy:
 config:
   vault:
     address: http://vault.security.svc.cluster.local:8200
+    # Vault's database secrets engine owns the shared PostgreSQL connection.
+    # Only the admin password remains in KV; consumers receive static roles
+    # whose rotation is a deliberate operator action.
+    database:
+      enabled: true
+      mount: database
+      connectionName: postgresql
+      address: postgresql.databases.svc.cluster.local:5432
+      adminUsername: postgres
+      adminSecretPath: databases/postgresql
+      adminSecretKey: postgres-password
     kubernetesAuth:
       role: butler
       tokenPath: /var/run/secrets/butler-vault/token

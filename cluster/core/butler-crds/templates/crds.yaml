@@ -178,6 +178,7 @@ spec:
                   x-kubernetes-validations:
                     - rule: "!self.contains('..') && !self.contains('//')"
                       message: Vault paths cannot contain '..' or empty segments
+                prune: {type: boolean, default: false}
                 fields:
                   type: object
                   minProperties: 1
@@ -269,6 +270,52 @@ spec:
                     owner: {type: boolean, default: false}
             status:
 {{ include "butler-crds.statusSchema" . | indent 14 }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: vaultdatabaseroles.platform.6940469.xyz
+spec:
+  group: platform.6940469.xyz
+  scope: Namespaced
+  names:
+    plural: vaultdatabaseroles
+    singular: vaultdatabaserole
+    kind: VaultDatabaseRole
+    shortNames: [vdbrole]
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - {name: Database, type: string, jsonPath: .spec.database}
+        - {name: Rotation period, type: string, jsonPath: .spec.rotationPeriod}
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            apiVersion: {type: string}
+            kind: {type: string}
+            metadata: {type: object}
+            spec:
+              type: object
+              required: [database]
+              properties:
+                # The PostgreSQL database and owning role created without a
+                # password by the consumer's provisioning job. metadata.name is
+                # the Vault static-role name and the PostgreSQL username.
+                database:
+                  type: string
+                  minLength: 1
+                  maxLength: 63
+                  pattern: '^[a-z0-9][a-z0-9-]*$'
+                # Defaults to ten years. Rotation is deliberate, not a lease:
+                # `vault write -f database/rotate-role/<name>`.
+                rotationPeriod:
+                  type: string
+                  minLength: 2
+                  maxLength: 16
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition

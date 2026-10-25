@@ -134,6 +134,7 @@ func main() {
 	reconcilers := []reconciler.Reconciler{
 		vaultConfiguration,
 		reconciler.NewVaultOIDCRoles(vc, platformResources, cfg.Certificates.Domain, cfg.Namespace),
+		reconciler.NewVaultDatabaseRoles(vc, platformResources),
 		reconciler.NewManagedCredentials(vc, platformResources),
 		reconciler.NewPocketIDGroups(vc, platformResources, cfg.OIDC.AdminURL),
 		reconciler.NewPocketIDClients(vc, platformResources, cfg.OIDC.AdminURL),

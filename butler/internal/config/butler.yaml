@@ -1,5 +1,10 @@
 vault:
   address: http://vault.security.svc.cluster.local:8200
+  # The database secrets engine is configured by the chart values. The
+  # embedded fallback leaves it disabled; local development has no PostgreSQL.
+  database:
+    enabled: false
+    address: postgresql.databases.svc.cluster.local:5432
 
 server:
   port: "8080"

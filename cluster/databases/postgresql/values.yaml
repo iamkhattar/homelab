@@ -11,8 +11,6 @@ postgresql:
       adminPasswordKey: postgres-password
     database: homelab
   primary:
-    initdb:
-      scriptsSecret: postgresql-initdb
     persistence:
       enabled: true
       size: 10Gi
@@ -37,6 +35,16 @@ postgresql:
           ports:
             - protocol: TCP
               port: 5432
+        # The provisioning Job runs beside PostgreSQL and connects with the
+        # Vault-projected admin credential. It only creates passwordless roles
+        # and databases.
+        - from:
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/component: database-provisioning
+          ports:
+            - protocol: TCP
+              port: 5432
       extraEgress:
         - to:
             - namespaceSelector: {}
@@ -52,3 +60,18 @@ postgresql:
       digest: sha256:b672b54e6dbb277d098182cf9708aaaea3b7f2bc2d4f1917c5fb34ffcaa19e05
     serviceMonitor:
       enabled: false
+
+# Idempotent provisioning for database consumers. Each name becomes a
+# passwordless PostgreSQL role and a database owned by that role. Passwords are
+# never created here: the Vault static role sets and rotates them.
+#
+# On a fresh cluster the Job waits for VSO to project the admin credential, then
+# creates whatever is missing. On an existing cluster it is a no-op for roles
+# and databases that already exist. Consumers must also declare a
+# VaultDatabaseRole in their own chart.
+provisioning:
+  enabled: true
+  adminUsername: postgres
+  adminDatabase: postgres
+  consumers:
+    - pocketid

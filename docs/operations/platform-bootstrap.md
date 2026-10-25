@@ -306,10 +306,11 @@ kubectl -n security wait --for=condition=Ready \
   managedcredential/pocket-id-runtime --timeout=2m
 kubectl -n security wait --for=condition=Ready \
   vaultstaticsecret/pocket-id-credentials --timeout=2m
+kubectl -n databases wait --for=condition=complete \
+  job/postgresql-database-provisioning --timeout=5m
+kubectl -n security get vaultdatabaserole pocketid
 kubectl -n security wait --for=condition=Ready \
-  managedcredential/pocket-id-database --timeout=2m
-kubectl -n security wait --for=condition=Ready \
-  vaultstaticsecret/pocket-id-database --timeout=2m
+  vaultdynamicsecret/pocket-id-database --timeout=2m
 kubectl -n security rollout status deployment/pocket-id
 ```
 
@@ -322,13 +323,48 @@ Pocket ID keeps its identity data in PostgreSQL. The PostgreSQL release is a
 declared dependency of the Pocket ID release, so applying the identity stage
 applies the database with it. The chain is:
 
-1. the PostgreSQL chart generates the `pocketid` password into Vault and adds
-   the role and database to its `init.sql`, which runs when the volume is
-   initialised;
-2. the Pocket ID chart copies only that password and the connection string into
-   `security/pocket-id/database`;
-3. VSO projects that path into the `security` namespace as
-   `pocket-id-database`, and the container reads `DB_CONNECTION_STRING` from it.
+1. the PostgreSQL provisioning Job waits for VSO to project the admin
+   credential, then creates a passwordless `pocketid` role and a `pocketid`
+   database owned by it. It never sets a password;
+2. Butler configures `database/config/postgresql` from
+   `secret/databases/postgresql` and converges the `VaultDatabaseRole` into
+   `database/static-roles/pocketid`. Vault rotates the password once on import
+   to learn it;
+3. VSO reads `database/static-creds/pocketid`, composes
+   `DB_CONNECTION_STRING`, and projects it into the `security` namespace as
+   `pocket-id-database`;
+4. the container reads that key and runs its migrations as the stable
+   `pocketid` role, so the schema survives a later rotation.
+
+Check the credentials without printing them:
+
+```bash
+vault read database/static-roles/pocketid
+kubectl -n databases get job/postgresql-database-provisioning
+kubectl -n security get vaultdatabaserole pocketid vaultdynamicsecret/pocket-id-database
+kubectl -n security get secret pocket-id-database \
+  -o jsonpath='{.data.DB_CONNECTION_STRING}' | base64 -d | sed 's#://[^@]*@#://<redacted>@#'
+```
+
+Once the `VaultDynamicSecret` is `Ready`, delete the legacy copied credential.
+Vault retains provider state by default, so removing the `ManagedCredential`
+does not remove the old path:
+
+```bash
+vault kv metadata delete secret/security/pocket-id/database
+```
+
+Rotation is deliberate, not a lease:
+
+```bash
+vault write -f database/rotate-role/pocketid
+```
+
+A pod restart re-reads the same password. Only `rotate-role` changes it, and
+VSO restarts Pocket ID through `rolloutRestartTargets`. If Pocket ID cannot
+start and the credential is suspect, break-glass is host access and then
+`psql` on `postgresql-0` in the `databases` namespace; do not edit the shared
+KV document.
 
 Uploads such as logos and profile pictures use `FILE_BACKEND=database`, so they
 live in PostgreSQL too. The persistent volume keeps only the re-downloadable
@@ -336,6 +372,45 @@ GeoLite database.
 Butler retains a one-minute drift-repair resync if an event is missed.
 Do not manually create the destination Secret or restart VSO while this chain
 is converging.
+
+### Rebuilding the identity database
+
+The PostgreSQL and Pocket ID volumes hold only identity data. Rebuild them
+together when the schema is compromised or the credentials cannot be
+recovered. The sequence is destructive: it deletes every Pocket ID user,
+client and upload, then recreates the declared clients from their CRs.
+
+```bash
+kubectl -n security scale deployment/pocket-id --replicas=0
+kubectl -n security delete pvc pocket-id-data
+kubectl -n databases delete statefulset postgresql
+kubectl -n databases delete pvc data-postgresql-0
+homelabctl deploy apply --stage data
+kubectl -n databases wait --for=condition=complete \
+  job/postgresql-database-provisioning --timeout=5m
+vault write -f database/rotate-role/pocketid
+homelabctl deploy apply --stage identity
+```
+
+The explicit `rotate-role` is required: the new PostgreSQL role was created
+without a password while Vault still holds the password from the deleted
+volume. Rotation writes the password to the recreated role, and VSO then
+projects it.
+
+Then verify the chain end to end:
+
+1. the provisioning Job completes and `pocketid` exists as both a role and a
+   database;
+2. Butler has written `database/config/postgresql` and
+   `database/static-roles/pocketid`;
+3. `vaultdynamicsecret/pocket-id-database` is `Ready` and Pocket ID's rollout
+   completes;
+4. Pocket ID has migrated an empty identity database;
+5. open `https://auth.6940469.xyz` and enroll the owner again by hand; there is
+   no unattended first-owner operation;
+6. run `homelabctl control bootstrap --confirm` and
+   `homelabctl control verify-identity` so Butler recreates the declared OIDC
+   clients and rewrites Vault's JWT configuration.
 
 Open `https://auth.6940469.xyz`, create the first human owner and enroll a
 passkey. Pocket ID excludes its synthetic static API user from the initial

@@ -22,12 +22,13 @@ const (
 )
 
 var (
-	PocketIDClientGVR  = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "pocketidclients"}
-	PocketIDGroupGVR   = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "pocketidgroups"}
-	CredentialGVR      = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "managedcredentials"}
-	GarageBucketGVR    = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "garagebuckets"}
-	VaultOIDCRoleGVR   = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "vaultoidcroles"}
-	ButlerOperationGVR = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "butleroperations"}
+	PocketIDClientGVR    = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "pocketidclients"}
+	PocketIDGroupGVR     = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "pocketidgroups"}
+	CredentialGVR        = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "managedcredentials"}
+	GarageBucketGVR      = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "garagebuckets"}
+	VaultOIDCRoleGVR     = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "vaultoidcroles"}
+	VaultDatabaseRoleGVR = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "vaultdatabaseroles"}
+	ButlerOperationGVR   = schema.GroupVersionResource{Group: Group, Version: Version, Resource: "butleroperations"}
 )
 
 type ResourceStatus struct {
@@ -76,6 +77,10 @@ type ManagedCredential struct {
 type ManagedCredentialSpec struct {
 	VaultPath string                     `json:"vaultPath"`
 	Fields    map[string]CredentialField `json:"fields"`
+	// Prune makes the declaration authoritative: KV keys not listed in Fields
+	// are deleted on the next write. Off by default so adding a field to an
+	// older credential never deletes values another consumer still reads.
+	Prune bool `json:"prune,omitempty"`
 }
 
 type CredentialField struct {
@@ -132,6 +137,24 @@ type VaultOIDCRoleSpec struct {
 	MaxTTL   string   `json:"maxTTL,omitempty"`
 }
 
+// VaultDatabaseRole declares one static role on the database secrets engine.
+// metadata.name becomes the Vault static-role name and the PostgreSQL
+// username; Database names the database and owning role created by the
+// consumer's provisioning job. Raw statements are deliberately not part of the
+// API: Butler owns the rotation statement and the declarations only choose
+// which database the role belongs to. Rotation is a deliberate operator action
+// (`vault write -f database/rotate-role/<name>`), not a lease.
+type VaultDatabaseRole struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              VaultDatabaseRoleSpec `json:"spec"`
+}
+
+type VaultDatabaseRoleSpec struct {
+	Database       string `json:"database"`
+	RotationPeriod string `json:"rotationPeriod,omitempty"`
+}
+
 type Resources interface {
 	ListPocketIDClients(context.Context) ([]PocketIDClient, error)
 	UpdatePocketIDClientStatus(context.Context, *PocketIDClient) error
@@ -142,6 +165,7 @@ type Resources interface {
 	ListGarageBuckets(context.Context) ([]GarageBucket, error)
 	UpdateGarageBucketStatus(context.Context, *GarageBucket) error
 	ListVaultOIDCRoles(context.Context) ([]VaultOIDCRole, error)
+	ListVaultDatabaseRoles(context.Context) ([]VaultDatabaseRole, error)
 }
 
 type Store struct{ dynamic dynamic.Interface }
@@ -162,6 +186,7 @@ func (s *Store) WatchChanges(ctx context.Context) (<-chan struct{}, error) {
 		CredentialGVR,
 		GarageBucketGVR,
 		VaultOIDCRoleGVR,
+		VaultDatabaseRoleGVR,
 	} {
 		informer := factory.ForResource(gvr)
 		if _, err := informer.Informer().AddEventHandler(newChangeHandler(events)); err != nil {
@@ -246,6 +271,9 @@ func (s *Store) UpdateGarageBucketStatus(ctx context.Context, item *GarageBucket
 }
 func (s *Store) ListVaultOIDCRoles(ctx context.Context) ([]VaultOIDCRole, error) {
 	return listNamespaced[VaultOIDCRole](ctx, s.dynamic, VaultOIDCRoleGVR)
+}
+func (s *Store) ListVaultDatabaseRoles(ctx context.Context) ([]VaultDatabaseRole, error) {
+	return listNamespaced[VaultDatabaseRole](ctx, s.dynamic, VaultDatabaseRoleGVR)
 }
 
 func Ready(generation int64, providerID string) ResourceStatus {

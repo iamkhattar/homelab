@@ -85,6 +85,7 @@ func (r *VaultBootstrap) configure(ctx context.Context) error {
 		RecoveryRole:           "butler-recovery",
 		RecoveryServiceAccount: "butler-recovery",
 		ConsumerRoles:          buildConsumerRoles(r.cfg),
+		Database:               buildDatabaseEngineConfig(r.cfg),
 	}
 
 	// Best-effort: read OAuth client creds for Vault from KV. If they have not
@@ -129,6 +130,18 @@ func buildConsumerRoles(cfg *config.Config) []vault.ConsumerRoleSpec {
 		})
 	}
 	return out
+}
+
+func buildDatabaseEngineConfig(cfg *config.Config) vault.DatabaseEngineConfig {
+	return vault.DatabaseEngineConfig{
+		Enabled:         cfg.Vault.Database.Enabled,
+		Mount:           cfg.Vault.Database.Mount,
+		ConnectionName:  cfg.Vault.Database.ConnectionName,
+		Address:         cfg.Vault.Database.Address,
+		AdminUsername:   cfg.Vault.Database.AdminUsername,
+		AdminSecretPath: cfg.Vault.Database.AdminSecretPath,
+		AdminSecretKey:  cfg.Vault.Database.AdminSecretKey,
+	}
 }
 
 func buildK8sEngineConfig(cfg *config.Config) vault.K8sEngineConfig {

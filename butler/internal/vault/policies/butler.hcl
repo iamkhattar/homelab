@@ -14,3 +14,7 @@ path "auth/jwt/*" { capabilities = ["create", "read", "update", "delete", "list"
 path "secret/data/*" { capabilities = ["create", "read", "update", "delete"] }
 path "secret/metadata/*" { capabilities = ["read", "list", "delete"] }
 path "kubernetes/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+# The database secrets engine is configured and its static roles are written
+# here. Only the admin credential stays in KV; application credentials are
+# static roles that Vault rotates deliberately.
+path "database/*" { capabilities = ["create", "read", "update", "delete", "list"] }

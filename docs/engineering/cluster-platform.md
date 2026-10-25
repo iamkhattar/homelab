@@ -79,16 +79,45 @@ ready. Deploy and verify one checkpoint at a time during first bootstrap.
 
 ## Shared data is shared infrastructure, not shared identity
 
-PostgreSQL runs once, but KitchenOwl, Paperless-ngx and Vaultwarden each receive
-their own database, login and generated password. Butler stores the source at
-`secret/databases/postgresql`, then publishes exact consumer projections such
-as `secret/applications/paperless-ngx/database`. Namespace-local VSO roles can
-read the projection only, never the shared source. The PostgreSQL first-boot
-Secret contains an `init.sql` script generated from those same values.
+PostgreSQL runs once. A database consumer does not receive a generated password
+from a shared KV document. Instead the PostgreSQL chart's provisioning Job
+creates a passwordless role and a database owned by that role, and the
+consumer's chart declares a `VaultDatabaseRole`. Butler configures Vault's
+`database/` secrets engine from the PostgreSQL admin credential, then writes
+`database/static-roles/<consumer>`. Vault imports the role, rotates the
+password once to learn it, and leaves it alone for the declared period. VSO
+reads `database/static-creds/<consumer>`, projects `username` and `password`,
+and composes the connection string in a template, so no `*-url` key exists in
+Vault.
 
-The init script runs only for an empty PostgreSQL volume. Butler must eventually
-own idempotent database/user reconciliation for applications added after first
-boot; do not expect changing `init.sql` to mutate an existing database.
+The only database credential in KV is therefore `postgres-password`, which
+Vault itself needs to open the connection. Pocket ID is currently the only
+deployed consumer. Static roles were chosen over dynamic roles because a
+consumer owns its schema migrations: a dynamic user would own the tables it
+creates, so revocation would either fail or drop the application schema.
+
+The default rotation period is ten years (`87600h`). A pod restart re-reads the
+same password; it does not rotate. Rotation is a deliberate operator action:
+
+```bash
+vault write -f database/rotate-role/pocketid
+```
+
+VSO observes the new password and restarts Pocket ID through its
+`rolloutRestartTargets`. Rotation is also required after restoring or rebuilding
+the PostgreSQL volume: the recreated role has no password, while Vault still
+holds the old one. Break-glass access is host access, then `psql` on
+`postgresql-0` in the `databases` namespace.
+
+The provisioning Job is idempotent and runs on install and upgrade: it checks
+`pg_roles` and `pg_database` before creating anything and never sets a
+password. Adding a consumer therefore means declaring a provisioning entry, a
+`VaultDatabaseRole`, and a `VaultDynamicSecret`; it never means adding a
+password to the shared document. The PostgreSQL `ManagedCredential` sets
+`prune: true`, so the legacy per-application keys and `init.sql` are deleted
+from `secret/databases/postgresql` on the next reconcile. That first prune
+changes the projected `postgresql-credentials` Secret and rolls the PostgreSQL
+StatefulSet once; the data on the PVC is preserved.
 
 Redis is authenticated and initially serves Paperless-ngx. Butler creates both
 the password and the complete client URI at `secret/databases/redis`; VSO gives
