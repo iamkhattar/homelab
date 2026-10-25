@@ -78,10 +78,9 @@ type ReconcileConfig struct {
 // butler's own API authz (verifies tokens from this issuer) and as the
 // upstream issuer for Vault's auth/jwt mount.
 type OIDCConfig struct {
-	Issuer           string   `yaml:"issuer"`
-	Audience         string   `yaml:"audience"`
-	AllowedAudiences []string `yaml:"allowedAudiences"`
-	AdminURL         string   `yaml:"adminURL"`
+	Issuer         string   `yaml:"issuer"`
+	AllowedClients []string `yaml:"allowedClients"`
+	AdminURL       string   `yaml:"adminURL"`
 }
 
 type GarageConfig struct {
@@ -152,7 +151,6 @@ func Load() (*Config, error) {
 	cfg.Vault.Address = envOr("VAULT_ADDR", cfg.Vault.Address)
 	cfg.Server.Port = envOr("SERVER_PORT", cfg.Server.Port)
 	cfg.OIDC.Issuer = envOr("OIDC_ISSUER", cfg.OIDC.Issuer)
-	cfg.OIDC.Audience = envOr("OIDC_AUDIENCE", cfg.OIDC.Audience)
 	cfg.Namespace = envOr("NAMESPACE", "security")
 	cfg.LogLevel = envOr("LOG_LEVEL", "info")
 
@@ -183,8 +181,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("certificates.acmeDNSURL must be an absolute HTTPS URL")
 	}
 	if c.OIDC.Issuer != "" {
-		if c.OIDC.Audience == "" {
-			return fmt.Errorf("oidc.audience is required when oidc.issuer is configured")
+		if len(c.OIDC.AllowedClients) == 0 {
+			return fmt.Errorf("oidc.allowedClients is required when oidc.issuer is configured")
 		}
 		if _, err := absoluteHTTPURL(c.OIDC.Issuer); err != nil {
 			return fmt.Errorf("oidc.issuer: %w", err)

@@ -140,12 +140,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	auth, err := server.NewAuthMiddleware(ctx, cfg.OIDC.Issuer, cfg.OIDC.Audience, nil)
+	auth, err := server.NewAuthMiddleware(ctx, cfg.OIDC.Issuer, cfg.OIDC.AllowedClients, nil)
 	if err != nil {
 		slog.Error("setting up auth middleware", "error", err)
 		os.Exit(1)
 	}
-	auth.AllowAudiences(cfg.OIDC.AllowedAudiences...)
 
 	srv := server.New(sched, vc, auth)
 	operationsStore, err := operations.NewKubernetesStore(ctx, dynamicK8s, cfg.Namespace, 500)

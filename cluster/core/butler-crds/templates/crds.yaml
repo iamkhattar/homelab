@@ -48,6 +48,10 @@ spec:
                   x-kubernetes-validations:
                     - rule: "!self.contains('..') && !self.contains('//')"
                       message: Vault paths cannot contain '..' or empty segments
+                allowedUserGroups:
+                  type: array
+                  maxItems: 32
+                  items: {type: string, minLength: 1, maxLength: 128}
             status:
 {{ include "butler-crds.statusSchema" . | indent 14 }}
 ---

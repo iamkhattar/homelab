@@ -46,6 +46,12 @@ type PocketIDClientSpec struct {
 	Type         string   `json:"type"`
 	RedirectURIs []string `json:"redirectURIs"`
 	VaultPath    string   `json:"vaultPath"`
+	// AllowedUserGroups restricts sign-in to members of the named Pocket ID
+	// groups. Nil means unrestricted (Butler leaves the provider untouched);
+	// an explicit empty list means "no group may sign in" and clears the
+	// restriction. A nil slice keeps the distinction because the JSON
+	// converter leaves an absent field nil.
+	AllowedUserGroups []string `json:"allowedUserGroups,omitempty"`
 }
 
 type PocketIDGroup struct {

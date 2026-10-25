@@ -27,8 +27,8 @@ var butlerRecoveryPolicy string
 //go:embed policies/vault_admin.hcl
 var vaultAdminPolicy string
 
-//go:embed policies/vault_read.hcl
-var vaultReadPolicy string
+//go:embed policies/vault_metadata.hcl
+var vaultMetadataPolicy string
 
 //go:embed policies/cert_manager.hcl
 var certManagerPolicy string
@@ -48,7 +48,6 @@ var k8sViewerPolicy string
 type BootstrapInput struct {
 	// OIDC config for the Vault auth/jwt mount.
 	OIDCIssuer       string
-	OIDCAudience     string
 	OIDCClientID     string
 	OIDCClientSecret string
 	PublicDomain     string
@@ -427,10 +426,10 @@ func (c *Client) ensureJWTPolicies(ctx context.Context, oidcIssuer string) error
 	}
 	slog.Info("wrote vault-admin policy")
 
-	if err := c.raw.Sys().PutPolicyWithContext(ctx, "vault-read", vaultReadPolicy); err != nil {
-		return fmt.Errorf("writing vault-read policy: %w", err)
+	if err := c.raw.Sys().PutPolicyWithContext(ctx, "vault-metadata", vaultMetadataPolicy); err != nil {
+		return fmt.Errorf("writing vault-metadata policy: %w", err)
 	}
-	slog.Info("wrote vault-read policy")
+	slog.Info("wrote vault-metadata policy")
 
 	return nil
 }

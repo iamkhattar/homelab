@@ -11,8 +11,9 @@ reconcile:
 # validate tokens hitting Butler's normal API.
 oidc:
   issuer: ""        # e.g. https://auth.shivlab.com — set via chart values
-  audience: butler
-  allowedAudiences:
+  # Pocket ID stamps the requesting client's ID as the ID token audience, so
+  # this lists the clients whose tokens Butler accepts. homelabctl is the CLI.
+  allowedClients:
     - homelabctl
   adminURL: http://pocket-id.security.svc.cluster.local
 
@@ -47,7 +48,7 @@ k8sIssuance:
       maxTTL: 8h
       pocketIdGroup: homelab-operator
       vaultPolicies:
-        - vault-read
+        - vault-metadata
         - k8s-operator
     - name: homelab-viewer
       serviceAccountName: vault-managed-viewer
@@ -55,5 +56,5 @@ k8sIssuance:
       maxTTL: 4h
       pocketIdGroup: homelab-viewer
       vaultPolicies:
-        - vault-read
+        - vault-metadata
         - k8s-viewer

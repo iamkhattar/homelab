@@ -18,36 +18,36 @@ import (
 // AuthMiddleware validates JWT bearer tokens against an OIDC issuer.
 type AuthMiddleware struct {
 	issuer   string
-	audience string
 	allowed  map[string]struct{}
 	mu       sync.Mutex
 	verifier *oidc.IDTokenVerifier
 	caChain  func(context.Context) (string, error)
 }
 
-// NewAuthMiddleware creates a middleware that validates JWTs from the given issuer.
-// Returns nil if issuer is empty (auth disabled).
-func NewAuthMiddleware(ctx context.Context, issuer, audience string, caChain func(context.Context) (string, error)) (*AuthMiddleware, error) {
+// NewAuthMiddleware creates a middleware that validates JWTs from the given
+// issuer against the clients whose tokens Butler accepts. Returns nil if issuer
+// is empty (auth disabled).
+//
+// Pocket ID stamps the requesting client's ID as the ID token audience, so the
+// allowlist names clients, not resources. Vault's OIDC login uses the same
+// model: it accepts only tokens minted for its own client ID.
+func NewAuthMiddleware(ctx context.Context, issuer string, allowedClients []string, caChain func(context.Context) (string, error)) (*AuthMiddleware, error) {
 	_ = ctx
 	if issuer == "" {
 		return nil, nil
 	}
 	// Discovery is deliberately lazy: Pocket ID is deployed after Butler and
 	// cannot be a process-start dependency during first-cluster bootstrap.
-	if audience == "" {
-		return nil, fmt.Errorf("OIDC audience is required when issuer is configured")
-	}
-	return &AuthMiddleware{issuer: issuer, audience: audience, allowed: map[string]struct{}{audience: {}}, caChain: caChain}, nil
-}
-
-// AllowAudiences adds explicitly configured public clients that may call the
-// same Butler resource API. Signatures, issuer and expiry remain verified.
-func (a *AuthMiddleware) AllowAudiences(audiences ...string) {
-	for _, audience := range audiences {
-		if audience != "" {
-			a.allowed[audience] = struct{}{}
+	allowed := make(map[string]struct{}, len(allowedClients))
+	for _, client := range allowedClients {
+		if client != "" {
+			allowed[client] = struct{}{}
 		}
 	}
+	if len(allowed) == 0 {
+		return nil, fmt.Errorf("at least one OIDC client is required when issuer is configured")
+	}
+	return &AuthMiddleware{issuer: issuer, allowed: allowed, caChain: caChain}, nil
 }
 
 func (a *AuthMiddleware) verifierFor(ctx context.Context) (*oidc.IDTokenVerifier, error) {

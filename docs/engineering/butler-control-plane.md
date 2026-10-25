@@ -107,8 +107,8 @@ The foundation pass does not contact Pocket ID. Vault's JWT/OIDC method and
 group roles are configured atomically only after Butler has created Vault's
 confidential Pocket ID client and stored its complete credential.
 The bounded recovery Vault role can create, read and update only the bootstrap
-identity documents at `security/pocket-id`, `oauth/butler`,
-`oauth/homelabctl`, and `oauth/vault`, in addition to the acme-dns document.
+identity documents at `security/pocket-id`, `oauth/homelabctl`, and
+`oauth/vault`, in addition to the acme-dns document.
 It has no wildcard `oauth/*` permission; application clients remain owned by
 normal Butler after the identity gate is operational.
 
@@ -132,15 +132,41 @@ filesystem-root destinations.
 
 ## Pocket ID and authorization
 
-Normal UI/API requests use Authorization Code with PKCE and a stable public
-client ID of `butler`. Butler verifies issuer, signature, expiry and audience.
-It maps Pocket ID groups to a strict hierarchy:
+There is one first-party client, `homelabctl` (the CLI), which logs in with
+Authorization Code and PKCE against Pocket ID directly. Butler is not a client;
+it is the resource server that verifies issuer, signature, expiry and audience
+on every bearer token. Pocket ID stamps the requesting client's ID as the ID
+token audience, so Butler accepts that client ID and nothing else - a token
+minted for `vault`, `grafana` or any other client is rejected. Butler maps
+Pocket ID groups to a strict hierarchy:
 
 | Pocket ID group | Butler role |
 | --- | --- |
-| `homelab-viewer` or no privileged group | viewer |
+| `homelab-viewer` | viewer |
 | `homelab-operator` | operator |
 | `homelab-admin` | admin |
+| no homelab group | none - every request is denied |
+
+Vault reuses the same three groups as JWT role bindings, but the policy tiers are
+separate from the Butler roles:
+
+| Pocket ID group | Vault policies | Can read secret values |
+| --- | --- | --- |
+| `homelab-admin` | `vault-admin`, `k8s-admin` | yes, wildcard |
+| `homelab-operator` | `vault-metadata`, `k8s-operator` | no, metadata only |
+| `homelab-viewer` | `vault-metadata`, `k8s-viewer` | no, metadata only |
+
+`vault-metadata` grants `read` and `list` on `secret/metadata` only, so a
+non-administrator can enumerate paths and versions but `vault kv get` is
+denied. Note that the Kubernetes side is *not* symmetric: `k8s-viewer` binds the
+built-in `view` role, which excludes Secrets, while `k8s-operator` binds `edit`,
+which includes them. An operator can therefore still read a Kubernetes Secret
+directly even though Vault denies the value.
+
+Holding an account at Pocket ID grants nothing by itself: an identity that
+belongs to no homelab group is denied, not silently treated as a viewer. A
+household member therefore cannot read Butler's status, identity or operation
+data simply by being able to sign in to the applications.
 
 Viewers inspect status, identity and operation data. Operators may reconcile.
 Administrators may create or disable non-admin users, replace membership and

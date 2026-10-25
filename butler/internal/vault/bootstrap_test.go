@@ -81,7 +81,6 @@ func TestEnsureJWTAuthDoesNotContactVaultBeforePocketIDClientExists(t *testing.T
 func TestRecoveryPolicyCanManageOnlyBootstrapIdentityCredentials(t *testing.T) {
 	paths := []string{
 		"security/pocket-id",
-		"oauth/butler",
 		"oauth/homelabctl",
 		"oauth/vault",
 	}
@@ -95,5 +94,28 @@ func TestRecoveryPolicyCanManageOnlyBootstrapIdentityCredentials(t *testing.T) {
 		if strings.Contains(butlerRecoveryPolicy, forbidden) {
 			t.Errorf("recovery policy must not contain broad data path %q", forbidden)
 		}
+	}
+}
+
+func TestMetadataPolicyCannotReadSecretValues(t *testing.T) {
+	// Match a real stanza, not the explanatory comment.
+	if strings.Contains(vaultMetadataPolicy, `path "secret/data`) {
+		t.Fatal("vault-metadata must not grant any access to secret values")
+	}
+	for _, want := range []string{`path "secret/metadata"`, `path "secret/metadata/*"`, `"list"`} {
+		if !strings.Contains(vaultMetadataPolicy, want) {
+			t.Errorf("vault-metadata policy must contain %s", want)
+		}
+	}
+}
+
+func TestAdminPolicyRemainsTheOnlySecretReader(t *testing.T) {
+	// vault-admin is a wildcard policy; the two non-admin tiers must not be able
+	// to read values. Reaching them requires an explicit secret/data stanza.
+	if !strings.Contains(vaultAdminPolicy, `path "*"`) {
+		t.Fatal("vault-admin is expected to remain a wildcard policy")
+	}
+	if strings.Contains(vaultMetadataPolicy, `path "secret/data`) {
+		t.Fatal("non-admin tier must not read secret values")
 	}
 }

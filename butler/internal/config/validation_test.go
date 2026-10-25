@@ -6,7 +6,7 @@ func TestValidateControlPlaneEndpoints(t *testing.T) {
 	t.Parallel()
 	valid := Config{
 		Certificates: CertificateConfig{ACMEDNSURL: "https://auth.acme-dns.io", Domain: "example.test", CredentialPath: "infrastructure/acme-dns", Namespace: "networking", CertificateName: "homelab-wildcard", TLSSecretName: "homelab-wildcard-tls"},
-		OIDC:         OIDCConfig{Issuer: "https://auth.example.test", Audience: "butler", AdminURL: "http://pocket-id.security.svc.cluster.local"},
+		OIDC:         OIDCConfig{Issuer: "https://auth.example.test", AllowedClients: []string{"homelabctl"}, AdminURL: "http://pocket-id.security.svc.cluster.local"},
 	}
 	if err := valid.Validate(); err != nil {
 		t.Fatal(err)
@@ -16,7 +16,7 @@ func TestValidateControlPlaneEndpoints(t *testing.T) {
 		name   string
 		mutate func(*Config)
 	}{
-		{"missing audience", func(c *Config) { c.OIDC.Audience = "" }},
+		{"missing allowed clients", func(c *Config) { c.OIDC.AllowedClients = nil }},
 		{"missing admin url", func(c *Config) { c.OIDC.AdminURL = "" }},
 		{"insecure acme dns", func(c *Config) { c.Certificates.ACMEDNSURL = "http://auth.example.test" }},
 	}

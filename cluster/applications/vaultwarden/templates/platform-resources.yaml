@@ -30,3 +30,4 @@ spec:
   redirectURIs:
     - https://vaultwarden.6940469.xyz/identity/connect/oidc-signin
   vaultPath: oauth/vaultwarden
+  allowedUserGroups: [household, homelab-admin, homelab-operator, homelab-viewer]

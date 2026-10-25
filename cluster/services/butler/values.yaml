@@ -1,3 +1,16 @@
+# Pocket ID groups Butler provisions. PocketIDClient resources reference these
+# names in spec.allowedUserGroups; the reconciler resolves them to Pocket ID
+# group IDs and fails closed when a referenced group does not exist.
+groups:
+  - name: homelab-admin
+    friendlyName: Homelab administrators
+  - name: homelab-operator
+    friendlyName: Homelab operators
+  - name: homelab-viewer
+    friendlyName: Homelab viewers
+  - name: household
+    friendlyName: Household members who use the shared applications
+
 replicaCount: 1
 
 image:
@@ -166,8 +179,8 @@ config:
     # Set to https://auth.<domain> once Pocket-ID is reachable; empty disables
     # OIDC bootstrap of Vault auth/jwt and butler API authz.
     issuer: "https://auth.6940469.xyz"
-    audience: butler
-    allowedAudiences:
+    # Pocket ID stamps the requesting client's ID as the ID token audience.
+    allowedClients:
       - homelabctl
     adminURL: http://pocket-id.security.svc.cluster.local
   certificates:
@@ -200,7 +213,7 @@ config:
         maxTTL: 8h
         pocketIdGroup: homelab-operator
         vaultPolicies:
-          - vault-read
+          - vault-metadata
           - k8s-operator
       - name: homelab-viewer
         serviceAccountName: vault-managed-viewer
@@ -208,7 +221,7 @@ config:
         maxTTL: 4h
         pocketIdGroup: homelab-viewer
         vaultPolicies:
-          - vault-read
+          - vault-metadata
           - k8s-viewer
   garage:
     enabled: true

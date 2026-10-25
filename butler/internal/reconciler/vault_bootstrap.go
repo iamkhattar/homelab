@@ -78,7 +78,6 @@ func (r *VaultBootstrap) Reconcile(ctx context.Context) error {
 func (r *VaultBootstrap) configure(ctx context.Context) error {
 	in := vault.BootstrapInput{
 		OIDCIssuer:             r.cfg.OIDC.Issuer,
-		OIDCAudience:           r.cfg.OIDC.Audience,
 		JWTRoles:               buildJWTRoles(r.cfg),
 		K8sEngine:              buildK8sEngineConfig(r.cfg),
 		ButlerRole:             r.cfg.Vault.KubernetesAuth.Role,

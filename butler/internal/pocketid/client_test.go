@@ -3,6 +3,7 @@ package pocketid
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -31,6 +32,85 @@ func TestListClientsUsesPaginatedV2Response(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(clients) != 1 || clients[0].ID != "grafana-id" || len(clients[0].CallbackURLs) != 1 {
+		t.Fatalf("unexpected clients: %#v", clients)
+	}
+}
+
+func TestUpdateAllowedUserGroupsUsesPocketIDEndpoint(t *testing.T) {
+	t.Parallel()
+	var method, path, body string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		method, path, body = r.Method, r.URL.Path, string(raw)
+		if got := r.Header.Get("X-API-KEY"); got != "test-key" {
+			t.Fatalf("X-API-KEY = %q", got)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key")
+	if err := client.UpdateAllowedUserGroups(context.Background(), "grafana", []string{"group-admin", "group-viewer"}); err != nil {
+		t.Fatal(err)
+	}
+	if method != http.MethodPut || path != "/api/oidc/clients/grafana/allowed-user-groups" {
+		t.Fatalf("request = %s %s", method, path)
+	}
+	if want := `{"userGroupIds":["group-admin","group-viewer"]}`; body != want {
+		t.Fatalf("body = %s, want %s", body, want)
+	}
+}
+
+func TestUpdateAllowedUserGroupsSendsAnEmptyArrayToClear(t *testing.T) {
+	t.Parallel()
+	var body string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		body = string(raw)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key")
+	if err := client.UpdateAllowedUserGroups(context.Background(), "grafana", nil); err != nil {
+		t.Fatal(err)
+	}
+	// Pocket-ID expects an array, so a nil slice must still serialize as [].
+	if want := `{"userGroupIds":[]}`; body != want {
+		t.Fatalf("body = %s, want %s", body, want)
+	}
+}
+
+func TestUpdateAllowedUserGroupsRequiresTheMachineCredential(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+	}))
+	defer server.Close()
+
+	err := NewClient(server.URL, "").UpdateAllowedUserGroups(context.Background(), "grafana", []string{"group-admin"})
+	if _, ok := err.(ErrAPIKeyMissing); !ok {
+		t.Fatalf("err = %v, want ErrAPIKeyMissing", err)
+	}
+}
+
+func TestListClientsDecodesAllowedUserGroups(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{{
+				"id": "grafana-id", "name": "grafana",
+				"allowedUserGroups": []UserGroup{{ID: "g1", Name: "homelab-admin", FriendlyName: "Homelab administrators"}},
+			}},
+		})
+	}))
+	defer server.Close()
+
+	clients, err := NewClient(server.URL, "test-key").ListClients(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(clients) != 1 || len(clients[0].AllowedUserGroups) != 1 || clients[0].AllowedUserGroups[0].ID != "g1" {
 		t.Fatalf("unexpected clients: %#v", clients)
 	}
 }

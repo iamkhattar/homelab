@@ -66,6 +66,11 @@ type OIDCClient struct {
 	PKCEEnabled  bool     `json:"pkceEnabled"`
 	CallbackURLs []string `json:"callbackURLs"`
 	LogoutURLs   []string `json:"logoutCallbackURLs,omitempty"`
+	// AllowedUserGroups is the sign-in restriction Pocket-ID returns on reads.
+	// It is never part of a create or update payload: access is changed
+	// exclusively through UpdateAllowedUserGroups, and omitempty keeps an
+	// unspecified restriction out of client writes.
+	AllowedUserGroups []UserGroup `json:"allowedUserGroups,omitempty"`
 	// Returned only on create.
 	Secret   string `json:"secret,omitempty"`
 	SecretID string `json:"-"`
@@ -120,6 +125,27 @@ func (c *Client) UpdateClient(ctx context.Context, id string, in OIDCClient) err
 	}
 	if err := c.do(ctx, http.MethodPut, "/api/oidc/clients/"+url.PathEscape(id), in, nil); err != nil {
 		return fmt.Errorf("updating oidc client %q: %w", id, err)
+	}
+	return nil
+}
+
+// UpdateAllowedUserGroups replaces the set of Pocket-ID groups whose members
+// may sign in to a client. An empty slice clears the restriction, which admits
+// every user; an omitted field on the client resource leaves the current
+// restriction untouched and must not reach this method.
+func (c *Client) UpdateAllowedUserGroups(ctx context.Context, clientID string, groupIDs []string) error {
+	if c.apiKey == "" {
+		return ErrAPIKeyMissing{}
+	}
+	body := struct {
+		UserGroupIDs []string `json:"userGroupIds"`
+	}{UserGroupIDs: groupIDs}
+	if body.UserGroupIDs == nil {
+		// Pocket-ID expects an array; null would be rejected.
+		body.UserGroupIDs = []string{}
+	}
+	if err := c.do(ctx, http.MethodPut, "/api/oidc/clients/"+url.PathEscape(clientID)+"/allowed-user-groups", body, nil); err != nil {
+		return fmt.Errorf("updating allowed user groups for oidc client %q: %w", clientID, err)
 	}
 	return nil
 }
